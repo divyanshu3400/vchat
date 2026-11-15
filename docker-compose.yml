@@ -1,0 +1,21 @@
+# Local Postgres + Redis for development. Run the apps themselves with the commands in README.md.
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: vchat
+      POSTGRES_USER: vchat
+      POSTGRES_PASSWORD: vchat-dev-only
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vchat"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+
+volumes:
+  pgdata:

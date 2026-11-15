@@ -1,0 +1,160 @@
+"""vChat settings. Everything environment-specific comes from env vars (see .env.example)."""
+
+import os
+import sys
+from datetime import timedelta
+from pathlib import Path
+
+import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    return os.environ.get(name, str(default)).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_list(name: str, default: str) -> list[str]:
+    return [v.strip() for v in os.environ.get(name, default).split(",") if v.strip()]
+
+
+DEBUG = env_bool("DJANGO_DEBUG", False)
+TESTING = "pytest" in sys.modules
+
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if DEBUG or TESTING:
+        SECRET_KEY = "dev-only-insecure-key-never-use-in-production-0000"
+    else:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is off.")
+
+ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1")
+CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS", "http://localhost:3000")
+
+INSTALLED_APPS = [
+    "daphne",  # must be first: makes runserver serve ASGI (HTTP + WebSocket)
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "rest_framework",
+    "channels",
+    "apps.accounts",
+    "apps.chat",
+    "apps.social",
+]
+
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+]
+
+ROOT_URLCONF = "config.urls"
+ASGI_APPLICATION = "config.asgi.application"
+WSGI_APPLICATION = "config.wsgi.application"
+
+TEMPLATES = [
+    {
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
+            ]
+        },
+    }
+]
+
+# Postgres in every real environment; SQLite only as a zero-setup local fallback.
+DATABASES = {
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=60,
+    )
+}
+
+AUTH_USER_MODEL = "accounts.User"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Redis backs the channel layer (fan-out across servers), rate limits and presence.
+# Without REDIS_URL everything stays in-process: fine for one dev server, wrong for production.
+REDIS_URL = os.environ.get("REDIS_URL", "")
+if REDIS_URL and not TESTING:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {"hosts": [REDIS_URL]},
+        }
+    }
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}}
+else:
+    CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "120/min",
+        "user": "600/min",
+        "guest_signup": "10/hour",
+        "reports": "30/hour",
+        "friend_requests": "40/hour",
+    },
+}
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    # Long-lived so a guest keeps the same identity (and friends) on this browser.
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=60),
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+VCHAT = {
+    "REFRESH_COOKIE": "vchat_refresh",
+    "MESSAGE_MAX_LENGTH": 1000,
+    "HISTORY_PAGE_MAX": 100,
+    # Flood control: at most N messages per WINDOW seconds per user, across all tabs and servers.
+    "RATE_LIMIT_MESSAGES": 5,
+    "RATE_LIMIT_WINDOW": 5,
+    # A WebSocket must authenticate within this many seconds or it is closed.
+    "WS_AUTH_TIMEOUT": 5,
+    # A socket counts as present for this many seconds after its last ping (clients ping every 25 s).
+    "PRESENCE_TTL": 70,
+    # Room counts are cached this long so busy landing pages don't hit Redis on every view.
+    "PRESENCE_COUNTS_CACHE": 10,
+}
+
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
+USE_I18N = True
+USE_TZ = True
+
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
+}
