@@ -20,6 +20,17 @@ export function useStickyScroll(listRef: RefObject<HTMLDivElement | null>, count
     // eslint-disable-next-line react-hooks/exhaustive-deps -- callers pass what changes the height
   }, [count, listRef, ...deps]);
 
+  // The list got shorter (keyboard opened, a bar appeared): stay at the bottom if we were there.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [listRef]);
+
   const onScroll = useCallback(() => {
     const el = listRef.current;
     if (!el) return;

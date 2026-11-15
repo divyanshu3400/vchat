@@ -24,6 +24,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   // Lets the app paint under the phone's notch and home bar; the chat shell pads with safe-area insets.
   viewportFit: "cover",
+  // Android Chrome: the page shrinks when the keyboard opens, so the message box stays above it.
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#F5FAF7" },
     { media: "(prefers-color-scheme: dark)", color: "#0C1511" },

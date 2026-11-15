@@ -42,6 +42,25 @@ function useTyping() {
       document.removeEventListener("focusout", onOut);
     };
   }, []);
+  // The app is as tall as what is visible above the keyboard (iPhones don't shrink the page
+  // themselves), so the message box sits right on top of the keyboard.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    const fit = () => {
+      root.style.setProperty("--app-h", `${Math.round(vv.height)}px`);
+      if (vv.offsetTop > 0 || window.scrollY > 0) window.scrollTo(0, 0);
+    };
+    fit();
+    vv.addEventListener("resize", fit);
+    vv.addEventListener("scroll", fit);
+    return () => {
+      vv.removeEventListener("resize", fit);
+      vv.removeEventListener("scroll", fit);
+      root.style.removeProperty("--app-h");
+    };
+  }, []);
   return typing;
 }
 

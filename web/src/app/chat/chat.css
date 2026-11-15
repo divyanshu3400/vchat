@@ -12,7 +12,7 @@
 
 /* ---------- frame ---------- */
 .app {
-  height: 100dvh;
+  height: var(--app-h, 100dvh);
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto auto;
@@ -576,3 +576,5 @@ button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700
 .strip-btn, .strip-btn.locked-media { width: auto; flex: none; white-space: nowrap; }
 .composer-strip { min-width: 0; }
 .composer-strip > * { flex-shrink: 0; }
+.messages { overflow-x: hidden; }
+.m.me .swipe-hint { left: auto; right: -30px; }

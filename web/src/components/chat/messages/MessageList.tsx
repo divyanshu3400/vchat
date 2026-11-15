@@ -129,10 +129,13 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
     navigator.vibrate?.(8);
   }
 
+  // Swipe towards the middle to reply: right on their messages, left on yours.
+  const dir = mine ? -1 : 1;
+
   function setShift(dx: number) {
     const el = rowRef.current;
     if (!el) return;
-    el.style.transform = dx ? `translateX(${dx}px)` : "";
+    el.style.transform = dx ? `translateX(${dx * dir}px)` : "";
     el.style.setProperty("--swipe", String(Math.min(1, dx / SWIPE_REPLY_PX)));
   }
 
@@ -187,7 +190,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           const p = press.current;
           if (!p) return;
           const t = e.touches[0];
-          const dx = t.clientX - p.x;
+          const dx = (t.clientX - p.x) * dir;
           const dy = t.clientY - p.y;
           if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearTimeout(p.t);
           if (!p.swiping && dx > 12 && Math.abs(dy) < 24 && !m.deleted) p.swiping = true;
