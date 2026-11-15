@@ -40,11 +40,10 @@ ADBLOCK_WALL=off
 # Rewarded ads unlock features (gender filter). Turn on together with live ads.
 REWARDED_ADS=0
 
-# Calls. TURN relay (coturn, compose profile "turn"); fill TURN_URLS once the ports are forwarded:
-#   TURN_URLS=turn:$TURN_PUBLIC_IP:3478?transport=udp,turn:$TURN_PUBLIC_IP:3478?transport=tcp
-#   STUN_URLS=stun:$TURN_PUBLIC_IP:3478
+# Calls. TURN relay (coturn, compose profile "turn"), reached over TLS on 443 through the edge
+# (deploy/edge/setup_turn443.sh). Once that is done:
+#   TURN_URLS=turns:turn.vchat.ssmm.online:443?transport=tcp
 TURN_SECRET=$(token)
-TURN_PUBLIC_IP=1.22.197.176
 TURN_URLS=
 STUN_URLS=stun:stun.l.google.com:19302
 

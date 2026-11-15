@@ -87,18 +87,24 @@ The dumps stay on this server. Copy them off it (NAS, another machine) to surviv
 
 Calls are WebRTC: media goes phone to phone; the backend only relays the call setup. Without a
 TURN relay, calls work on many networks but fail when both sides are behind strict NAT (common
-on mobile data). To turn the relay on:
+on mobile data). The relay is reached as TURN over TLS on port 443, so no new firewall ports:
 
-1. **Network (router/firewall):** forward from `1.22.197.176` to `10.10.11.6`:
-   UDP 3478, TCP 3478, UDP 49160–49200.
-2. **ufw on 10.10.11.6** (host networking isn't covered by Docker's rules):
-   ```bash
-   sudo ufw allow 3478/udp && sudo ufw allow 3478/tcp && sudo ufw allow 49160:49200/udp
+```
+phone --TLS 443--> edge 10.10.11.4: SNI router --turn.vchat.ssmm.online--> TLS ends, plain TURN
+                                     \--any other name--> the normal https sites  --> 10.10.11.6:3478 coturn
+```
+
+Both callers' relay addresses live on 10.10.11.6, so two relayed callers meet inside the server.
+
+1. **DNS:** `turn.vchat.ssmm.online` → the same address as `vchat.ssmm.online`.
+2. **Edge (10.10.11.4)**, from a copy of `deploy/edge/`: `sudo sh setup_turn443.sh`. It backs up
+   `/etc/nginx`, moves every https site behind a small SNI router on 443 (real client IPs kept with
+   PROXY protocol), checks each site answers as before and restores the backup by itself if not.
+   Undo: `sudo sh setup_turn443.sh --rollback`.
+3. **ufw on 10.10.11.6**, if enabled: `sudo ufw allow from 10.10.11.4 to any port 3478 proto tcp`.
+4. **Start it and point the app at it** (in `~/vchat/deploy/.env`):
    ```
-3. **Start it and point the app at it** (in `~/vchat/deploy/.env`):
-   ```
-   TURN_URLS=turn:1.22.197.176:3478?transport=udp,turn:1.22.197.176:3478?transport=tcp
-   STUN_URLS=stun:1.22.197.176:3478
+   TURN_URLS=turns:turn.vchat.ssmm.online:443?transport=tcp
    ```
    ```bash
    docker compose --profile turn up -d turn && docker compose up -d backend

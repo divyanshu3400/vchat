@@ -143,7 +143,10 @@ services:
       - --log-file=stdout
       - --listening-ip=${BIND_ADDR:-10.10.11.6}
       - --relay-ip=${BIND_ADDR:-10.10.11.6}
-      - --external-ip=${TURN_PUBLIC_IP:-1.22.197.176}/${BIND_ADDR:-10.10.11.6}
+      # Reached through the edge on 443 (turns:turn.vchat.ssmm.online), so relay addresses stay on
+      # this server: two relayed callers meet here. Only if UDP 3478/49160-49200 get forwarded from
+      # the public IP, set TURN_EXTERNAL_IP=<public ip>/10.10.11.6 in .env.
+      - --external-ip=${TURN_EXTERNAL_IP:-${BIND_ADDR:-10.10.11.6}}
       - --listening-port=3478
       - --min-port=49160
       - --max-port=49200
@@ -154,6 +157,7 @@ services:
       - --no-cli
       - --no-tls
       - --no-dtls
+      - --no-tcp-relay
       - --no-multicast-peers
       - --no-software-attribute
       - --stale-nonce=600
