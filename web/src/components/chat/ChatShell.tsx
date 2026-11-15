@@ -169,14 +169,16 @@ function TabBar({ pathname }: { pathname: string }) {
  */
 export default function ChatShell({ children }: { children: React.ReactNode }) {
   return (
-    <DockProvider>
-      <StrangerProvider>
-        <CallProvider>
+    // The floating chat windows (DockProvider renders them) have call buttons, so they live
+    // inside CallProvider; calls in turn follow the random chat.
+    <StrangerProvider>
+      <CallProvider>
+        <DockProvider>
           <Frame>{children}</Frame>
           <CallScreen />
-        </CallProvider>
-      </StrangerProvider>
-    </DockProvider>
+        </DockProvider>
+      </CallProvider>
+    </StrangerProvider>
   );
 }
 
