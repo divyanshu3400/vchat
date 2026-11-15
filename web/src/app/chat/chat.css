@@ -573,3 +573,6 @@ button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700
 .strip-gap { flex: 1; }
 /* the landing page mock-up styles ".composer div": not for the real box */
 .composer2 .input-shell { padding: 0; color: inherit; font-size: inherit; }
+.strip-btn, .strip-btn.locked-media { width: auto; flex: none; white-space: nowrap; }
+.composer-strip { min-width: 0; }
+.composer-strip > * { flex-shrink: 0; }

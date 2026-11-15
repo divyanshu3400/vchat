@@ -58,6 +58,7 @@ export default function Composer({
   const [lockedRec, setLockedRec] = useState(false);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const holdRef = useRef<{ x: number; t: number; slide: number } | null>(null);
+  const shiftHeld = useRef(false);
   const editingId = editing?.id;
   const voice = useRecorder((blob) => onVoice?.(blob));
 
@@ -276,12 +277,22 @@ export default function Composer({
               value={draft}
               disabled={disabled}
               onChange={(e) => {
+                // Some Android keyboards send Enter as a typed line break, not a key press.
+                const type = (e.nativeEvent as InputEvent).inputType;
+                if ((type === "insertLineBreak" || type === "insertParagraph") && !shiftHeld.current) {
+                  submit();
+                  return;
+                }
                 setDraft(e.target.value);
                 if (e.target.value) onTyping?.();
               }}
+              onKeyUp={(e) => {
+                shiftHeld.current = e.shiftKey;
+              }}
               onKeyDown={(e) => {
-                // Laptops: Enter sends, Shift+Enter is a new line. Phones: the Send button sends.
-                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia("(hover: hover)").matches) {
+                shiftHeld.current = e.shiftKey;
+                // Enter sends (phones too); Shift+Enter is a new line on a keyboard.
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   submit();
                 } else if (e.key === "Escape" && (editing || replying)) {
