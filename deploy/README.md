@@ -58,6 +58,13 @@ scp /tmp/vchat.bundle hashai@10.10.11.6:/tmp/vchat.bundle
 ssh hashai@10.10.11.6 'cd ~/vchat && git pull -q /tmp/vchat.bundle master && cd deploy && docker compose up -d --build'
 ```
 
+After an update that changes `deploy/nginx/`, reload the app nginx (the image doesn't change,
+so `up --build` leaves it running with the old config):
+
+```bash
+ssh hashai@10.10.11.6 'cd ~/vchat/deploy && docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload'
+```
+
 **Backups** run every night at 02:30 from `hashai`'s crontab (after SadasyaSetu's at 02:15),
 into `~/vchat-data/backups`, keeping 14 days; log in `backup.log` there. Set up and
 test-run on 2026-11-15 (the dump restored its table list with `pg_restore --list`). The line:
@@ -171,7 +178,7 @@ docker exec -i vchat-postgres-1 pg_restore -U vchat -d vchat --clean --if-exists
 ## Other host names
 
 `make_env.sh <host> <api host>` and `setup_edge.sh <host> <api host>` take other names.
-The app nginx's API server block (`server_name api.vchat.ssmm.online` in `nginx.conf`)
+The app nginx's API server block (`server_name api.vchat.ssmm.online` in `nginx/default.conf`)
 must be changed to match.
 
 ## Not checked yet

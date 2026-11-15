@@ -112,14 +112,17 @@ services:
           memory: 512M
 
   # Plain HTTP, published only on the private address. Only the edge (10.10.11.4) is
-  # answered; see nginx.conf. Docker's published ports skip ufw, so both guards matter.
+  # answered; see nginx/default.conf. Docker's published ports skip ufw, so both guards matter.
   nginx:
     image: nginx:1.29-alpine
     restart: unless-stopped
     ports:
       - "${BIND_ADDR:-10.10.11.6}:${HTTP_PORT:-8081}:80"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # The folder, not the single file: git replaces files on pull, and a single-file bind
+      # mount keeps showing the container the old one. With the folder, a reload is enough:
+      #   docker compose exec nginx nginx -s reload
+      - ./nginx:/etc/nginx/conf.d:ro
       - static:/srv/static:ro
     depends_on:
       - backend
