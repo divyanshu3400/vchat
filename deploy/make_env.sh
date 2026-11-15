@@ -47,6 +47,15 @@ TURN_SECRET=$(token)
 TURN_URLS=
 STUN_URLS=stun:stun.l.google.com:19302
 
+# Saved accounts: codes to verify an email and to reset a password. Until EMAIL_HOST is set,
+# saving an account is off and guests can still send friend requests.
+EMAIL_HOST=
+EMAIL_PORT=587
+EMAIL_HOST_USER=
+EMAIL_HOST_PASSWORD=
+EMAIL_USE_TLS=true
+DEFAULT_FROM_EMAIL=vChat <no-reply@ssmm.online>
+
 # Where the edge (10.10.11.4) reaches this server. 8080 is SadasyaSetu's.
 BIND_ADDR=10.10.11.6
 HTTP_PORT=8081

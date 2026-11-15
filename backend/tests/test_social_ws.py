@@ -8,7 +8,7 @@ from apps.chat.models import Room
 from apps.social.models import DirectMessage, Friendship, ordered_pair
 from config.asgi import application
 
-from .conftest import auth_client
+from .conftest import auth_client, make_member
 
 ORIGIN = [(b"origin", b"http://localhost:3000")]
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -16,7 +16,7 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 @database_sync_to_async
 def make_user(nickname):
-    user = User.create_guest(nickname=nickname, gender="O")
+    user = make_member(nickname)
     return user, str(AccessToken.for_user(user))
 
 

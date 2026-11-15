@@ -603,3 +603,8 @@ button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700
 .watch-input { width: 100%; font: inherit; font-size: 16px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); outline: none; }
 .watch-input:focus { border-color: var(--brand); }
 .watch-start .go:disabled { opacity: 0.5; cursor: default; }
+
+/* Me: save a guest account */
+.save-card { background: linear-gradient(160deg, var(--brand-soft), var(--surface)); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); border-radius: 20px; padding: 18px; display: grid; gap: 10px; }
+.save-card h2 { font-family: var(--display); font-size: 20px; }
+.save-card p { color: var(--muted); font-size: 14px; line-height: 1.55; }

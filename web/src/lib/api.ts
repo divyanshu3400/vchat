@@ -1,4 +1,11 @@
-export type ChatUser = { id: number; nickname: string; gender: string; is_guest?: boolean };
+export type ChatUser = {
+  id: number;
+  nickname: string;
+  gender: string;
+  is_guest?: boolean;
+  /** Only ever present for yourself. */
+  email?: string;
+};
 
 /** The message a reply answers, as a short quote. */
 export type ReplyPreview = {
@@ -37,10 +44,14 @@ export class ApiError extends Error {
   }
 }
 
-// DRF errors look like {"field": ["msg"]} or {"detail": "msg"}; surface the first readable one.
+// DRF errors look like {"field": ["msg"]} or {"detail": "msg"}; ours add a machine "code" next to
+// "detail". Surface the readable one: "detail" first, never "code".
 function firstErrorMessage(body: unknown): string | undefined {
   if (!body || typeof body !== "object") return undefined;
-  for (const value of Object.values(body as Record<string, unknown>)) {
+  const { detail, code: _code, ...rest } = body as Record<string, unknown>;
+  void _code;
+  if (typeof detail === "string") return detail;
+  for (const value of Object.values(rest)) {
     if (typeof value === "string") return value;
     if (Array.isArray(value) && typeof value[0] === "string") return value[0];
   }
@@ -72,6 +83,48 @@ async function request<T>(path: string, init: RequestInit & { access?: string } 
 
 export function guestSignup(input: { nickname: string; gender: string; age_confirmed: boolean }) {
   return request<Session>("/api/auth/guest", { method: "POST", body: JSON.stringify(input) });
+}
+
+// --- saved accounts (email + password) ----------------------------------------------
+
+/** Guest -> saved account, step 1: email a code to prove the address. */
+export function startAccount(email: string, password: string, access: string) {
+  return request<{ sent_to: string }>("/api/auth/account/start", {
+    method: "POST",
+    access,
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+/** Step 2: the code from the email. The same user, now saved. */
+export function verifyAccount(email: string, code: string, access: string) {
+  return request<{ user: ChatUser }>("/api/auth/account/verify", {
+    method: "POST",
+    access,
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export function login(email: string, password: string) {
+  return request<Session>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+}
+
+export function forgotPassword(email: string) {
+  return request<{ detail: string }>("/api/auth/password/forgot", { method: "POST", body: JSON.stringify({ email }) });
+}
+
+export function resetPassword(email: string, code: string, password: string) {
+  return request<Session>("/api/auth/password/reset", {
+    method: "POST",
+    body: JSON.stringify({ email, code, password }),
+  });
+}
+
+/** The machine-readable reason in an API error, e.g. "account_required". */
+export function errorCode(e: unknown): string | undefined {
+  if (!(e instanceof ApiError) || !e.body || typeof e.body !== "object") return undefined;
+  const code = (e.body as Record<string, unknown>).code;
+  return typeof code === "string" ? code : undefined;
 }
 
 /** Returns the current session from the httpOnly refresh cookie, or null if there is none. */

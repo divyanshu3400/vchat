@@ -18,6 +18,14 @@ def _social_error(exc: SocialError) -> Response:
     return Response({"code": exc.code, "detail": exc.detail}, status=code)
 
 
+# Guests save their account (email + password) before making friends. While email isn't set up
+# on the server, nobody could, so the rule waits until it is.
+ACCOUNT_REQUIRED = {
+    "code": "account_required",
+    "detail": "Save your account with an email to make friends, so you never lose them.",
+}
+
+
 def _int_param(value, name: str) -> int:
     try:
         return int(value)
@@ -55,6 +63,8 @@ class FriendRequestListView(APIView):
         return Response(services.pending_requests(request.user))
 
     def post(self, request):
+        if request.user.is_guest and settings.EMAIL_ENABLED:
+            return Response(ACCOUNT_REQUIRED, status=status.HTTP_403_FORBIDDEN)
         target = get_object_or_404(User, id=_int_param(request.data.get("to_user"), "to_user"))
         try:
             outcome, req = services.send_friend_request(request.user, target)
@@ -69,6 +79,8 @@ class FriendRequestActionView(APIView):
     def post(self, request, request_id, action):
         if action not in ("accept", "decline", "cancel"):
             return Response(status=status.HTTP_404_NOT_FOUND)
+        if action == "accept" and request.user.is_guest and settings.EMAIL_ENABLED:
+            return Response(ACCOUNT_REQUIRED, status=status.HTTP_403_FORBIDDEN)
         try:
             services.respond_to_request(request_id, request.user, action)
         except SocialError as exc:

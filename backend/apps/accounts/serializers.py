@@ -33,3 +33,37 @@ class PublicUserSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "nickname", "gender", "is_guest"]
         read_only_fields = fields
+
+
+class MeSerializer(serializers.ModelSerializer):
+    """You, as you see yourself: with your email. Never sent about anyone else."""
+
+    class Meta:
+        model = User
+        fields = ["id", "nickname", "gender", "is_guest", "email"]
+        read_only_fields = fields
+
+
+class EmailField(serializers.EmailField):
+    def to_internal_value(self, data):
+        return super().to_internal_value(data).strip().lower()
+
+
+class EmailPasswordSerializer(serializers.Serializer):
+    email = EmailField(max_length=254)
+    password = serializers.CharField(max_length=128, trim_whitespace=False)
+
+
+class EmailCodeSerializer(serializers.Serializer):
+    email = EmailField(max_length=254)
+    code = serializers.CharField(max_length=12)
+
+
+class EmailOnlySerializer(serializers.Serializer):
+    email = EmailField(max_length=254)
+
+
+class ResetSerializer(serializers.Serializer):
+    email = EmailField(max_length=254)
+    code = serializers.CharField(max_length=12)
+    password = serializers.CharField(max_length=128, trim_whitespace=False)

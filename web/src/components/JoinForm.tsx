@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { ApiError, fetchPremiumStatus, guestSignup, refreshSession, type ChatUser } from "@/lib/api";
@@ -68,7 +69,13 @@ export default function JoinForm() {
         <button className="cta" type="button" onClick={() => router.push(destination)}>
           Continue chatting <span aria-hidden="true">→</span>
         </button>
-        <p className="fine">Your friends and blocks are saved on this browser.</p>
+        <p className="fine">
+          {existing.is_guest === false ? (
+            <>Signed in as {existing.email}.</>
+          ) : (
+            <>You&apos;re a guest on this browser. Save your account in Me to keep it everywhere.</>
+          )}
+        </p>
       </div>
     );
   }
@@ -118,6 +125,12 @@ export default function JoinForm() {
         {error}
       </p>
       <p className="fine">No email or phone number needed. Letters, numbers, dots and underscores only.</p>
+      <p className="fine">
+        Saved your account before?{" "}
+        <Link href="/login" className="text-link">
+          Log in
+        </Link>
+      </p>
     </form>
   );
 }

@@ -4,7 +4,7 @@ from apps.accounts.models import User
 from apps.social.models import FriendRequest, Friendship
 from apps.social.services import send_dm
 
-from .conftest import auth_client
+from .conftest import auth_client, make_member
 
 pytestmark = pytest.mark.django_db
 
@@ -47,7 +47,7 @@ def test_repeat_request_is_idempotent_and_crossed_requests_auto_accept(alice, bo
 
 
 def test_decline_and_cancel(alice, bob, db):
-    carol = User.create_guest(nickname="carol")
+    carol = make_member("carol")
     auth_client(alice).post("/api/friends/requests/", {"to_user": bob.id}, format="json")
     auth_client(alice).post("/api/friends/requests/", {"to_user": carol.id}, format="json")
     to_bob = FriendRequest.objects.get(to_user=bob)
@@ -69,7 +69,7 @@ def test_cannot_add_self_or_someone_blocked(alice, bob):
 
 def test_blocking_removes_friendship_and_pending_requests(alice, bob, db):
     befriend(alice, bob)
-    carol = User.create_guest(nickname="carol")
+    carol = make_member("carol")
     auth_client(carol).post("/api/friends/requests/", {"to_user": alice.id}, format="json")
 
     auth_client(alice).post(f"/api/users/{bob.id}/block/")

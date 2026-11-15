@@ -142,12 +142,41 @@ REST_FRAMEWORK = {
         "anon": "120/min",
         "user": "600/min",
         "guest_signup": "10/hour",
+        "email_codes": "10/hour",
+        "login": "30/hour",
         "reports": "30/hour",
         "friend_requests": "40/hour",
         "rewards": "20/hour",
         "uploads": "60/hour",
     },
 }
+
+# Passwords for saved accounts: 8+ characters, not a common one, not all digits, not like the
+# nickname or email.
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+     "OPTIONS": {"user_attributes": ("nickname", "email", "username")}},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
+# --- email: verification and password-reset codes ---------------------------------
+# Filled from .env on the server. Without EMAIL_HOST, codes are printed to the console in
+# development and email accounts are switched off in production.
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", True)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_TIMEOUT = 15
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "vChat <no-reply@ssmm.online>")
+if EMAIL_HOST:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+elif DEBUG:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+EMAIL_ENABLED = bool(EMAIL_HOST) or DEBUG or TESTING
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),

@@ -113,6 +113,24 @@ Both callers' relay addresses live on 10.10.11.6, so two relayed callers meet in
 `TURN_SECRET` is in `.env` (made by `make_env.sh`); TURN logins are derived from it and expire
 after 6 hours. The relay refuses to forward into private networks.
 
+### Saved accounts (email)
+
+Guests save their account with an email and a password (verified with a 6-digit emailed code),
+then log in on any device and reset a forgotten password the same way. Once email is on,
+guests must save their account before sending or accepting friend requests.
+
+Add the SMTP settings to `~/vchat/deploy/.env`, then `docker compose up -d backend`:
+```
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=...
+EMAIL_HOST_PASSWORD=...
+EMAIL_USE_TLS=true
+DEFAULT_FROM_EMAIL=vChat <no-reply@ssmm.online>
+```
+Without `EMAIL_HOST` the feature is off (the app says so) and friend requests work as before.
+Set SPF/DKIM for the sending domain, or the codes land in spam.
+
 ## First time
 
 ### On 10.10.11.6 (app server)

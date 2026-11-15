@@ -13,7 +13,8 @@ const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
 export default function MeScreen() {
   const router = useRouter();
-  const { me, friends, premium } = useChat();
+  const { me, friends, premium, askAccount } = useChat();
+  const guest = me?.is_guest !== false;
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
   const [clean, setClean] = useState(() => (typeof window === "undefined" ? true : cleanWordsOn()));
@@ -33,10 +34,36 @@ export default function MeScreen() {
           <div>
             <h2>{me?.nickname ?? "…"}</h2>
             <p className="muted-text">
-              Guest{me?.gender ? ` · ${GENDER[me.gender] ?? ""}` : ""} · {friends.length} {friends.length === 1 ? "friend" : "friends"}
+              {guest ? "Guest" : "Saved account"}
+              {me?.gender ? ` · ${GENDER[me.gender] ?? ""}` : ""} · {friends.length} {friends.length === 1 ? "friend" : "friends"}
             </p>
           </div>
         </section>
+
+        {me && guest ? (
+          <section className="save-card" aria-labelledby="save-title">
+            <h2 id="save-title">Don&apos;t lose {me.nickname}</h2>
+            <p>
+              Right now this account lives only in this browser. Save it with your email and a password to keep your friends
+              and chats, make new friends, and log in on any device.
+            </p>
+            <button type="button" className="start-btn wide" onClick={() => askAccount()}>
+              Save my account
+            </button>
+          </section>
+        ) : (
+          me && (
+            <section className="settings" aria-label="Account">
+              <div className="setting">
+                <span>
+                  <b>Signed in as</b>
+                  <small>{me.email}</small>
+                </span>
+                <span className="tag">Verified</span>
+              </div>
+            </section>
+          )
+        )}
 
         <section className={`plus-card${premium?.plus ? " active" : ""}`} id="plus" aria-labelledby="plus-title">
           <div className="plus-head">
@@ -108,12 +135,6 @@ export default function MeScreen() {
               }}
             />
           </label>
-          <div className="setting">
-            <span>
-              <b>Keep your friends on other devices</b>
-              <small>Save this profile with Google. Coming soon.</small>
-            </span>
-          </div>
           <Link className="setting link" href="/#faq">
             <span>
               <b>Help and safety</b>
@@ -126,15 +147,22 @@ export default function MeScreen() {
         <section className="danger-zone">
           {!confirmLeave ? (
             <button type="button" className="pill-btn" onClick={() => setConfirmLeave(true)}>
-              Leave vChat on this browser
+              {guest ? "Leave vChat on this browser" : "Log out"}
             </button>
           ) : (
             <div className="confirm-bar inline">
               <span>
-                You&apos;re a guest: leaving deletes access to <b>{me?.nickname}</b> and your friends on this browser for good.
+                {guest ? (
+                  <>
+                    You&apos;re a guest: leaving loses <b>{me?.nickname}</b> and your friends for good. Save your account first to
+                    keep them.
+                  </>
+                ) : (
+                  <>Log out on this device? Log back in any time with {me?.email}.</>
+                )}
               </span>
               <button type="button" className="pill-btn danger" onClick={leave} disabled={busy}>
-                {busy ? "Leaving…" : "Leave"}
+                {busy ? "Leaving…" : guest ? "Leave" : "Log out"}
               </button>
               <button type="button" className="pill-btn" onClick={() => setConfirmLeave(false)}>
                 Stay

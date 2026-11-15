@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { setPlus } from "@/lib/plus";
+import AccountSheet from "@/components/account/AccountSheet";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   answerFriendRequest,
   ApiError,
+  errorCode,
   fetchConversations,
   fetchFriendRequests,
   fetchFriends,
@@ -54,6 +56,8 @@ type ChatContextValue = {
   /** Plus and rewarded-ad unlocks. null until loaded. */
   premium: PremiumStatus | null;
   setPremium: (status: PremiumStatus) => void;
+  /** Open "Save your account" (email + password). `then` runs once it is saved. */
+  askAccount: (reason?: string, then?: () => void) => void;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -333,8 +337,18 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
+  // Guests save their account (email + password) before making friends.
+  type AfterSave = { kind: "add"; user: ChatUser } | { kind: "accept"; id: number } | { kind: "run"; fn: () => void };
+  const [accountAsk, setAccountAsk] = useState<{ reason?: string; then?: AfterSave } | null>(null);
+  const askAccount = useCallback(
+    (reason?: string, then?: () => void) => setAccountAsk({ reason, then: then ? { kind: "run", fn: then } : undefined }),
+    [],
+  );
+  const FRIENDS_REASON = "Save your account to make friends, so you never lose them.";
+
   const addFriend = useCallback(
-    async (user: ChatUser) => {
+    async (user: ChatUser): Promise<string> => {
+      // The server says when a guest has to save the account first (account_required).
       try {
         const res = await sendFriendRequest(user.id, await getAccess());
         if (res.status === "accepted") {
@@ -344,6 +358,10 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         setOutgoing((l) => [res.request, ...withoutRequest(l, res.request.id)]);
         return `Friend request sent to ${user.nickname}.`;
       } catch (e) {
+        if (errorCode(e) === "account_required") {
+          setAccountAsk({ reason: FRIENDS_REASON, then: { kind: "add", user } });
+          return "Save your account to send friend requests.";
+        }
         return e instanceof ApiError ? e.message : "Couldn't send the request. Try again.";
       }
     },
@@ -352,7 +370,15 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
   const answerRequest = useCallback(
     async (id: number, action: "accept" | "decline" | "cancel") => {
-      await answerFriendRequest(id, action, await getAccess());
+      try {
+        await answerFriendRequest(id, action, await getAccess());
+      } catch (e) {
+        if (errorCode(e) === "account_required") {
+          setAccountAsk({ reason: FRIENDS_REASON, then: { kind: "accept", id } });
+          return;
+        }
+        throw e;
+      }
       // The socket event updates the lists; remove it now so the UI responds instantly.
       if (action !== "accept") handleEvent({ type: "friend_request_removed", request_id: id });
     },
@@ -419,9 +445,30 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       conversations,
       premium,
       setPremium,
+      askAccount,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount],
   );
 
-  return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
+  return (
+    <ChatContext.Provider value={value}>
+      {children}
+      {accountAsk && (
+        <AccountSheet
+          reason={accountAsk.reason}
+          getAccess={getAccess}
+          onClose={() => setAccountAsk(null)}
+          onSaved={(user) => {
+            const then = accountAsk.then;
+            meRef.current = user;
+            setMe(user);
+            setAccountAsk(null);
+            if (then?.kind === "add") void addFriend(then.user);
+            else if (then?.kind === "accept") answerRequest(then.id, "accept").catch(() => undefined);
+            else if (then?.kind === "run") then.fn();
+          }}
+        />
+      )}
+    </ChatContext.Provider>
+  );
 }
