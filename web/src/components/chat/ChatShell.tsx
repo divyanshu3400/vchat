@@ -2,39 +2,75 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { Logo } from "@/components/SiteChrome";
+import { useEffect, useState } from "react";
+import AdSlot from "@/components/AdSlot";
 import ThemeToggle from "@/components/ThemeToggle";
-import { RoomCount } from "@/components/LiveCounts";
-import { REGION_ROOMS, TOPIC_ROOMS } from "@/lib/rooms";
+import { ADS_ON } from "@/lib/ads";
 import { useChat } from "./ChatProvider";
+import ConversationList from "./ConversationList";
+import { DockProvider } from "./Dock";
+import { Icon } from "./bits";
+
+/** Screens reached from the tab bar. Everything else under /chat is a conversation. */
+const TAB_SCREENS = new Set(["/chat", "/chat/rooms", "/chat/stranger", "/chat/inbox", "/chat/me"]);
+
+const NAV = [
+  { href: "/chat", label: "Home", icon: "home" },
+  { href: "/chat/rooms", label: "Rooms", icon: "hash" },
+  { href: "/chat/stranger", label: "Random", icon: "shuffle", primary: true },
+  { href: "/chat/inbox", label: "Chats", icon: "chat", phoneOnly: true },
+  { href: "/chat/me", label: "Me", icon: "me" },
+] as const;
+
+/** True while a text field has focus: the phone keyboard is (almost always) up. */
+function useTyping() {
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const isField = (el: EventTarget | null) =>
+      el instanceof HTMLElement && (el.tagName === "TEXTAREA" || (el.tagName === "INPUT" && (el as HTMLInputElement).type !== "checkbox"));
+    const onIn = (e: FocusEvent) => isField(e.target) && setTyping(true);
+    const onOut = (e: FocusEvent) => isField(e.target) && setTyping(false);
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, []);
+  return typing;
+}
 
 export function ChatHeader({
   title,
   subtitle,
   actions,
+  back,
+  avatar,
 }: {
   title: string;
-  subtitle: React.ReactNode;
+  subtitle?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Where the phone's back arrow goes. Hidden on wider screens, where the list is always visible. */
+  back?: string;
+  avatar?: React.ReactNode;
 }) {
-  const { setNavOpen, incoming, unread } = useChat();
-  const pending = incoming.length + Object.values(unread).reduce((a, b) => a + b, 0);
   return (
-    <header className="chat-top">
-      <button className="menu-btn" type="button" onClick={() => setNavOpen(true)} aria-label="Open rooms and friends">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M4 7h16M4 12h16M4 17h16" />
-        </svg>
-        {pending > 0 && <span className="badge">{pending}</span>}
-      </button>
-      <div className="chat-title">
+    <header className="screen-head">
+      {back && (
+        <Link href={back} className="icon-btn back-btn" aria-label="Back">
+          <Icon name="back" />
+        </Link>
+      )}
+      {avatar}
+      <div className="screen-title">
         <h1>{title}</h1>
-        <span className="chat-status" role="status">
-          {subtitle}
-        </span>
+        {subtitle && (
+          <span className="screen-sub" role="status">
+            {subtitle}
+          </span>
+        )}
       </div>
-      <div className="chat-top-actions">
+      <div className="screen-actions">
         {actions}
         <ThemeToggle />
       </div>
@@ -42,118 +78,78 @@ export function ChatHeader({
   );
 }
 
-function FriendRequests() {
-  const { incoming, outgoing, answerRequest } = useChat();
-  const [error, setError] = useState("");
-  if (!incoming.length && !outgoing.length) return null;
+function isActive(pathname: string, href: string) {
+  return href === "/chat" ? pathname === "/chat" : pathname.startsWith(href);
+}
 
-  const run = (id: number, action: "accept" | "decline" | "cancel") =>
-    answerRequest(id, action).catch(() => setError("That request isn't waiting any more."));
-
+function Rail({ pathname }: { pathname: string }) {
   return (
-    <section className="side-section" aria-label="Friend requests">
-      {incoming.length > 0 && <h2>Friend requests · {incoming.length}</h2>}
-      {incoming.map((r) => (
-        <div key={r.id} className="req-row">
-          <span className="req-name">{r.from_user.nickname}</span>
-          <div className="req-actions">
-            <button type="button" className="req-accept" onClick={() => run(r.id, "accept")}>
-              Accept
-            </button>
-            <button type="button" onClick={() => run(r.id, "decline")}>
-              Decline
-            </button>
-          </div>
-        </div>
+    <nav className="rail" aria-label="Main">
+      <Link href="/" className="rail-logo" aria-label="vChat home page">
+        v<i>c</i>
+      </Link>
+      {NAV.filter((n) => !("phoneOnly" in n)).map((n) => (
+        <Link key={n.href} href={n.href} className={`rail-item${isActive(pathname, n.href) ? " on" : ""}`}>
+          <Icon name={n.icon} size={22} />
+          <span>{n.label}</span>
+        </Link>
       ))}
-      {outgoing.length > 0 && <h2>Waiting for answer</h2>}
-      {outgoing.map((r) => (
-        <div key={r.id} className="req-row muted">
-          <span className="req-name">{r.to_user.nickname}</span>
-          <div className="req-actions">
-            <button type="button" onClick={() => run(r.id, "cancel")}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ))}
-      {error && <p className="side-error">{error}</p>}
-    </section>
+      <span className="rail-grow" />
+      <Link href="/chat/me#plus" className="rail-item plus">
+        <Icon name="crown" size={22} />
+        <span>Plus</span>
+      </Link>
+    </nav>
   );
 }
 
+function TabBar({ pathname }: { pathname: string }) {
+  const { unread, incoming } = useChat();
+  const waiting = Object.values(unread).reduce((a, b) => a + b, 0) + incoming.length;
+  return (
+    <nav className="tabbar" aria-label="Main">
+      {NAV.map((n) => (
+        <Link
+          key={n.href}
+          href={n.href}
+          className={`tab${isActive(pathname, n.href) ? " on" : ""}${"primary" in n ? " primary" : ""}`}
+          aria-current={isActive(pathname, n.href) ? "page" : undefined}
+        >
+          <span className="tab-icon">
+            <Icon name={n.icon} size={"primary" in n ? 24 : 22} />
+            {n.href === "/chat/inbox" && waiting > 0 && <span className="badge">{waiting > 99 ? "99+" : waiting}</span>}
+          </span>
+          <span className="tab-label">{n.label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+/**
+ * Phone (< 768 px): one screen at a time, tab bar at the bottom, anchor ad above it.
+ * Tablet (768–1279 px): icon rail + conversation list + the screen.
+ * Laptop (1280 px +): the same, plus a 300×600 ad rail and floating chat windows.
+ */
 export default function ChatShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { friends, unread, navOpen, setNavOpen } = useChat();
-
-  const roomLink = (slug: string, name: string) => (
-    <Link
-      key={slug}
-      className="room-link"
-      href={`/chat/${slug}`}
-      aria-current={pathname === `/chat/${slug}` ? "page" : undefined}
-    >
-      <span className="friend-name"># {name}</span>
-      <RoomCount slug={slug} />
-    </Link>
-  );
-  // Online friends first, then alphabetical.
-  const sortedFriends = [...friends].sort(
-    (a, b) => Number(b.online) - Number(a.online) || a.user.nickname.localeCompare(b.user.nickname),
-  );
-  const onlineCount = friends.filter((f) => f.online).length;
+  const typing = useTyping();
+  const inConversation = !TAB_SCREENS.has(pathname);
 
   return (
-    <div className="chat-shell">
-      {navOpen && <div className="side-scrim" onClick={() => setNavOpen(false)} aria-hidden="true" />}
-      <aside className={`chat-side${navOpen ? " open" : ""}`} aria-label="Rooms and friends">
-        <div className="side-head">
-          <Logo />
-          <button className="side-close" type="button" onClick={() => setNavOpen(false)} aria-label="Close menu">
-            ×
-          </button>
-        </div>
-
-        <FriendRequests />
-
-        <nav className="side-section" aria-label="Friends">
-          <h2>
-            Friends{friends.length > 0 && ` · ${onlineCount} online`}
-          </h2>
-          {friends.length === 0 && (
-            <p className="side-hint">Liked talking to someone? Tap Add friend on their message.</p>
-          )}
-          {sortedFriends.map(({ user, online }) => {
-            const href = `/chat/dm/${user.id}`;
-            return (
-              <Link
-                key={user.id}
-                href={href}
-                className={`friend-link${online ? "" : " offline"}`}
-                aria-current={pathname === href ? "page" : undefined}
-                aria-label={`${user.nickname}, ${online ? "online" : "offline"}${unread[user.id] ? `, ${unread[user.id]} unread` : ""}`}
-              >
-                <span className="mini-av" aria-hidden="true">
-                  {user.nickname[0]?.toUpperCase()}
-                  <i className={`presence-dot${online ? " on" : ""}`} />
-                </span>
-                <span className="friend-name">{user.nickname}</span>
-                {unread[user.id] ? <span className="badge">{unread[user.id]}</span> : null}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <nav className="side-section" aria-label="Topic rooms">
-          <h2>Topics</h2>
-          {TOPIC_ROOMS.map((r) => roomLink(r.slug, r.name))}
-        </nav>
-        <nav className="side-section" aria-label="Region rooms">
-          <h2>Regions</h2>
-          {REGION_ROOMS.map((r) => roomLink(r.slug, r.name))}
-        </nav>
-      </aside>
-      <div className="chat-main">{children}</div>
-    </div>
+    <DockProvider>
+      <div className={`app${inConversation ? " in-conversation" : ""}${typing ? " typing" : ""}${ADS_ON ? " ads-on" : ""}`}>
+        <Rail pathname={pathname} />
+        <aside className="list-pane" aria-label="Conversations">
+          <ConversationList />
+        </aside>
+        <main className="screen">{children}</main>
+        <aside className="ad-rail" aria-label="Advertisement">
+          <AdSlot kind="sky" />
+        </aside>
+        {!inConversation && <AdSlot kind="anchor" className="phone-anchor" />}
+        {!inConversation && <TabBar pathname={pathname} />}
+      </div>
+    </DockProvider>
   );
 }

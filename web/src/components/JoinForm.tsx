@@ -5,8 +5,6 @@ import { FormEvent, useEffect, useState } from "react";
 import { ApiError, guestSignup, refreshSession, type ChatUser } from "@/lib/api";
 import { findRoom } from "@/lib/rooms";
 
-const DEFAULT_ROOM = "random";
-
 export default function JoinForm() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
@@ -15,7 +13,9 @@ export default function JoinForm() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [existing, setExisting] = useState<ChatUser | null>(null);
-  const [room, setRoom] = useState(DEFAULT_ROOM);
+  // Room pages link here as /?room=<slug>#join; otherwise people land on the app's home.
+  const [room, setRoom] = useState<string | null>(null);
+  const destination = room ? `/chat/${room}` : "/chat";
 
   useEffect(() => {
     // Room pages link here as /?room=<slug>#join.
@@ -45,7 +45,7 @@ export default function JoinForm() {
     setBusy(true);
     try {
       await guestSignup({ nickname: name, gender, age_confirmed: true });
-      router.push(`/chat/${room}`);
+      router.push(destination);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't reach vChat. Check your connection and try again.");
       setBusy(false);
@@ -58,7 +58,7 @@ export default function JoinForm() {
         <p>
           Welcome back, <b>{existing.nickname}</b>.
         </p>
-        <button className="cta" type="button" onClick={() => router.push(`/chat/${room}`)}>
+        <button className="cta" type="button" onClick={() => router.push(destination)}>
           Continue chatting <span aria-hidden="true">→</span>
         </button>
         <p className="fine">Your friends and blocks are saved on this browser.</p>

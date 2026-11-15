@@ -90,6 +90,8 @@ services:
       dockerfile: deploy/web.Dockerfile
       args:
         NEXT_PUBLIC_SITE_URL: ${SITE_URL:?set SITE_URL in .env}
+        # off until an ad network approves the site; "placeholder" shows the reserved boxes.
+        NEXT_PUBLIC_ADS_MODE: ${ADS_MODE:-off}
     image: vchat-web
     restart: unless-stopped
     healthcheck:

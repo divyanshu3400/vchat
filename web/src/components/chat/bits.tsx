@@ -1,0 +1,67 @@
+/** Small presentational pieces shared by the chat screens. */
+
+// Warm, readable on both themes; picked by nickname so a person keeps their colour.
+const AVATAR_COLOURS = ["#FFB23F", "#3DDCB0", "#FF8FA9", "#A9B8FF", "#FFD36E", "#C9A7FF", "#7FD8FF", "#F7A36B"];
+
+function colourFor(name: string) {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_COLOURS[h % AVATAR_COLOURS.length];
+}
+
+export function Avatar({
+  name,
+  size = 40,
+  online,
+}: {
+  name: string;
+  size?: number;
+  /** undefined: no presence dot at all. */
+  online?: boolean;
+}) {
+  return (
+    <span
+      className="avatar"
+      style={{ width: size, height: size, background: colourFor(name), fontSize: Math.round(size * 0.4) }}
+      aria-hidden="true"
+    >
+      {name.replace(/[^a-z0-9]/gi, "")[0]?.toUpperCase() ?? "?"}
+      {online !== undefined && <i className={`presence-dot${online ? " on" : ""}`} />}
+    </span>
+  );
+}
+
+const ICONS: Record<string, string> = {
+  home: "M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
+  shuffle: "M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5",
+  chat: "M21 12a8 8 0 0 1-11.8 7L4 20l1.2-4.4A8 8 0 1 1 21 12z",
+  hash: "M5 9h15M4 15h15M10 3 8 21M16 3l-2 18",
+  me: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 21a8 8 0 0 1 16 0",
+  crown: "M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5z",
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5",
+  back: "M15 5l-7 7 7 7",
+  min: "M5 12h14",
+  close: "M6 6l12 12M18 6 6 18",
+  send: "M4 20 21 12 4 4l2.5 8zM6.5 12H13",
+  more: "M5 12h.01M12 12h.01M19 12h.01",
+  lock: "M7 11V8a5 5 0 0 1 10 0v3M5 11h14v10H5z",
+  plus: "M12 5v14M5 12h14",
+  expand: "M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7",
+};
+
+export function Icon({ name, size = 20 }: { name: keyof typeof ICONS | string; size?: number }) {
+  return (
+    <svg className="icon" width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path d={ICONS[name] ?? ""} />
+    </svg>
+  );
+}
+
+export function timeAgo(iso: string) {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "now";
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  if (s < 7 * 86400) return `${Math.floor(s / 86400)}d`;
+  return new Date(iso).toLocaleDateString([], { day: "numeric", month: "short" });
+}

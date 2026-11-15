@@ -7,7 +7,10 @@ RUN npm ci && npm ls @next/swc-linux-x64-gnu > /dev/null
 COPY web/ ./
 # Baked into the build: canonical URLs, sitemap.xml and robots.txt use it.
 ARG NEXT_PUBLIC_SITE_URL
+# off | placeholder | live (see web/src/lib/ads.ts)
+ARG NEXT_PUBLIC_ADS_MODE=off
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
+    NEXT_PUBLIC_ADS_MODE=$NEXT_PUBLIC_ADS_MODE \
     BACKEND_URL=http://backend:8000 \
     NEXT_TELEMETRY_DISABLED=1
 RUN test -n "$NEXT_PUBLIC_SITE_URL" && npm run build

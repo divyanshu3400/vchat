@@ -22,6 +22,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // Lets the app paint under the phone's notch and home bar; the chat shell pads with safe-area insets.
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#FCF8FA" },
     { media: "(prefers-color-scheme: dark)", color: "#140F17" },

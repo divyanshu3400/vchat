@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   answerFriendRequest,
@@ -15,6 +15,7 @@ import {
   sendFriendRequest,
   wsUrl,
   type ChatUser,
+  type ConversationSummary,
   type Friend,
   type FriendRequest,
   type UserEvent,
@@ -41,9 +42,10 @@ type ChatContextValue = {
   answerRequest: (id: number, action: "accept" | "decline" | "cancel") => Promise<void>;
   unfriend: (userId: number) => Promise<void>;
   markRead: (userId: number, lastId: number) => void;
-  setActiveDm: (userId: number | null) => void;
-  navOpen: boolean;
-  setNavOpen: (open: boolean) => void;
+  /** While a DM is on screen (a page or an open window), its messages don't count as unread. */
+  watchDm: (userId: number) => () => void;
+  /** DM threads, most recent first, kept current from live messages. */
+  conversations: ConversationSummary[];
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -69,19 +71,20 @@ const withoutUser = (list: FriendRequest[], userId: number) =>
 
 export default function ChatProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const pathname = usePathname();
   const [me, setMe] = useState<ChatUser | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [incoming, setIncoming] = useState<FriendRequest[]>([]);
   const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
   const [unread, setUnread] = useState<Record<number, number>>({});
+  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [socketLive, setSocketLive] = useState(false);
-  const [navOpen, setNavOpen] = useState(false);
 
   const accessRef = useRef<{ token: string; exp: number } | null>(null);
   const inflight = useRef<Promise<string> | null>(null);
   const meRef = useRef<ChatUser | null>(null);
-  const activeDm = useRef<number | null>(null);
+  const friendsRef = useRef<Friend[]>([]);
+  // How many on-screen views (page or windows) show each DM.
+  const watched = useRef(new Map<number, number>());
   const listeners = useRef(new Set<(e: UserEvent) => void>());
   const socket = useRef<WebSocket | null>(null);
 
@@ -115,8 +118,15 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     setFriends(f);
     setIncoming(r.incoming);
     setOutgoing(r.outgoing);
-    setUnread(Object.fromEntries(c.filter((x) => x.unread > 0 && x.user.id !== activeDm.current).map((x) => [x.user.id, x.unread])));
+    setConversations(c);
+    setUnread(
+      Object.fromEntries(c.filter((x) => x.unread > 0 && !watched.current.has(x.user.id)).map((x) => [x.user.id, x.unread])),
+    );
   }, [getAccess]);
+
+  useEffect(() => {
+    friendsRef.current = friends;
+  }, [friends]);
 
   const handleEvent = useCallback((event: UserEvent) => {
     const self = meRef.current;
@@ -154,10 +164,24 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         break;
       case "dm": {
         const m = event.message;
-        const partner = m.sender.id === self?.id ? m.recipient_id : m.sender.id;
-        if (m.sender.id !== self?.id && partner !== activeDm.current) {
+        const mine = m.sender.id === self?.id;
+        const partner = mine ? m.recipient_id : m.sender.id;
+        if (!mine && !watched.current.has(partner)) {
           setUnread((u) => ({ ...u, [partner]: (u[partner] ?? 0) + 1 }));
         }
+        setConversations((list) => {
+          const known = list.find((c) => c.user.id === partner)?.user;
+          const partnerUser = mine ? (known ?? friendsRef.current.find((f) => f.user.id === partner)?.user) : m.sender;
+          if (!partnerUser) return list; // appears on the next resync
+          const summary: ConversationSummary = {
+            user: partnerUser,
+            last_message: m.content,
+            last_from_me: mine,
+            last_message_at: m.created_at,
+            unread: 0,
+          };
+          return [summary, ...list.filter((c) => c.user.id !== partner)];
+        });
         break;
       }
     }
@@ -237,12 +261,6 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     return () => clearInterval(id);
   }, [socketLive, getAccess]);
 
-  // Close the mobile room list after navigating.
-  useEffect(() => {
-    const id = setTimeout(() => setNavOpen(false), 0);
-    return () => clearTimeout(id);
-  }, [pathname]);
-
   const relation = useCallback(
     (userId: number): Relation => {
       if (userId === me?.id) return "self";
@@ -317,8 +335,20 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     [getAccess],
   );
 
-  const setActiveDm = useCallback((userId: number | null) => {
-    activeDm.current = userId;
+  const watchDm = useCallback((userId: number) => {
+    const map = watched.current;
+    map.set(userId, (map.get(userId) ?? 0) + 1);
+    setUnread((u) => {
+      if (!u[userId]) return u;
+      const next = { ...u };
+      delete next[userId];
+      return next;
+    });
+    return () => {
+      const left = (map.get(userId) ?? 1) - 1;
+      if (left > 0) map.set(userId, left);
+      else map.delete(userId);
+    };
   }, []);
 
   const value = useMemo<ChatContextValue>(
@@ -337,11 +367,10 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       answerRequest,
       unfriend,
       markRead,
-      setActiveDm,
-      navOpen,
-      setNavOpen,
+      watchDm,
+      conversations,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, subscribe, addFriend, answerRequest, unfriend, markRead, setActiveDm, navOpen],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

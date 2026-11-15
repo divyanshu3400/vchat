@@ -14,8 +14,11 @@ import {
 } from "@/lib/api";
 import { refreshRoomPresence, useRoomPresence } from "@/lib/presence";
 import { findRoom } from "@/lib/rooms";
+import AdSlot from "@/components/AdSlot";
 import { HEARTBEAT_MS, useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
+import { useDock } from "./Dock";
+import { Icon } from "./bits";
 
 type Status = "connecting" | "live" | "reconnecting" | "missing";
 
@@ -36,6 +39,7 @@ function mergeMessages(prev: ChatMessage[], incoming: ChatMessage[]) {
 
 export default function ChatRoom({ slug }: { slug: string }) {
   const { me, getAccess, relation, addFriend } = useChat();
+  const { openChat } = useDock();
   const presenceCounts = useRoomPresence();
   const room = findRoom(slug);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -182,19 +186,22 @@ export default function ChatRoom({ slug }: { slug: string }) {
   ];
 
   return (
-    <>
+    <div className="conversation">
       <ChatHeader
         title={`# ${room?.name ?? slug}`}
+        back="/chat/rooms"
         subtitle={
           <>
             <span className={`dot ${status === "live" ? "pulse" : "off"}`} /> {statusLabel}
             {status === "live" && hereNow > 0 && <> · {hereNow} here</>}
-            {me && <> · you are {me.nickname}</>}
+            {me && <span className="hide-phone"> · you are {me.nickname}</span>}
           </>
         }
       />
+      {/* Phone only: below the header, away from the typing box (no accidental taps). */}
+      <AdSlot kind="anchor" className="room-anchor" />
 
-      <div className="chat-list" ref={listRef} onScroll={onScroll} aria-live="polite" aria-relevant="additions">
+      <div className="messages" ref={listRef} onScroll={onScroll} aria-live="polite" aria-relevant="additions">
         {hasMore && (
           <button className="load-more" type="button" onClick={loadOlder}>
             Load earlier messages
@@ -202,7 +209,7 @@ export default function ChatRoom({ slug }: { slug: string }) {
         )}
         {status === "missing" && (
           <p className="empty">
-            This room doesn&apos;t exist. <Link href="/#rooms">Pick another room</Link>.
+            This room doesn&apos;t exist. <Link href="/chat/rooms">Pick another room</Link>.
           </p>
         )}
         {status !== "missing" && visible.length === 0 && (
@@ -222,7 +229,11 @@ export default function ChatRoom({ slug }: { slug: string }) {
               <div className="t">{m.content}</div>
               {!mine && (
                 <div className="msg-actions">
-                  {rel === "friend" && <Link href={`/chat/dm/${m.sender.id}`}>Message</Link>}
+                  {rel === "friend" && (
+                    <button type="button" onClick={() => openChat(m.sender.id)}>
+                      Message
+                    </button>
+                  )}
                   {(rel === "none" || rel === "incoming") && (
                     <button type="button" onClick={async () => setNotice(await addFriend(m.sender))}>
                       {rel === "incoming" ? "Accept friend" : "Add friend"}
@@ -255,31 +266,30 @@ export default function ChatRoom({ slug }: { slug: string }) {
         })}
       </div>
 
-      <div>
+      <div className="composer-wrap">
         {notice && (
           <p className="chat-notice" role="alert">
             {notice}
           </p>
         )}
-        <form className="chat-form" onSubmit={send}>
+        <form className="composer" onSubmit={send}>
           <input
             id="chat-input"
-            className="input"
+            className="composer-input"
             type="text"
             placeholder={status === "live" ? "Say something nice…" : "Connecting…"}
             maxLength={1000}
             autoComplete="off"
+            enterKeyHint="send"
             aria-label="Message"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
           />
           <button className="send-btn" type="submit" disabled={status !== "live" || !draft.trim()} aria-label="Send">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M3 20l18-8L3 4v6l12 2-12 2z" />
-            </svg>
+            <Icon name="send" />
           </button>
         </form>
       </div>
-    </>
+    </div>
   );
 }

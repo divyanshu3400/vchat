@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SharedAdSlot from "./AdSlot";
 import { OnlineTotal } from "./LiveCounts";
 import ThemeToggle from "./ThemeToggle";
 
@@ -56,12 +57,7 @@ export function SiteFooter() {
   );
 }
 
-/** Reserved ad space. The fixed min-height stops the layout jumping when the ad loads. */
-export function AdSlot({ label = "Advertisement" }: { label?: string }) {
-  // TODO: mount the ad network tag here once the account is approved (and only after consent in EU/UK).
-  return (
-    <div className="ad" role="complementary" aria-label={label}>
-      Ad space
-    </div>
-  );
+/** Public pages' ad: a 300×250 box that fits phones and laptops. Hidden while ads are off. */
+export function AdSlot() {
+  return <SharedAdSlot kind="rect" className="page-ad" />;
 }

@@ -33,6 +33,9 @@ REDIS_URL=redis://redis:6379/0
 # Public address of the site (canonical URLs, sitemap). Changing it needs a rebuild of web.
 SITE_URL=https://$HOST
 
+# Ad slots: off | placeholder (dashed boxes for review) | live. Needs a rebuild of web.
+ADS_MODE=off
+
 # Where the edge (10.10.11.4) reaches this server. 8080 is SadasyaSetu's.
 BIND_ADDR=10.10.11.6
 HTTP_PORT=8081
