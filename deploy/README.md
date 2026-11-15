@@ -58,11 +58,15 @@ scp /tmp/vchat.bundle hashai@10.10.11.6:/tmp/vchat.bundle
 ssh hashai@10.10.11.6 'cd ~/vchat && git pull -q /tmp/vchat.bundle master && cd deploy && docker compose up -d --build'
 ```
 
-**Backups** (cron as `hashai`, no sudo needed):
+**Backups** run every night at 02:30 from `hashai`'s crontab (after SadasyaSetu's at 02:15),
+into `~/vchat-data/backups`, keeping 14 days; log in `backup.log` there. Set up and
+test-run on 2026-11-15 (the dump restored its table list with `pg_restore --list`). The line:
 
-```bash
-( crontab -l 2>/dev/null; echo '30 2 * * * BACKUP_DIR=$HOME/vchat-data/backups $HOME/vchat/deploy/backup.sh >> $HOME/vchat-data/backups/backup.log 2>&1' ) | crontab -
 ```
+30 2 * * * BACKUP_DIR=$HOME/vchat-data/backups sh $HOME/vchat/deploy/backup.sh >> $HOME/vchat-data/backups/backup.log 2>&1
+```
+
+The dumps stay on this server. Copy them off it (NAS, another machine) to survive a disk loss.
 
 ## First time
 
