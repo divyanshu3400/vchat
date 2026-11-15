@@ -7,19 +7,20 @@ from apps.chat.realtime import user_group
 from apps.calls.consumer import CallMixin
 from apps.chat.ws_auth import AuthenticatedJsonConsumer
 from apps.stranger.consumer import StrangerMixin
+from apps.watch.consumer import WatchMixin
 
 from . import services
 from .services import SocialError
 
 
-class UserConsumer(CallMixin, StrangerMixin, AuthenticatedJsonConsumer):
+class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsumer):
     """The personal socket (/ws/me/): one per open tab, carries everything private to a user.
 
     client -> {"type": "dm", "to": <user id>, "content": "...", "client_id": "..."}
     server -> {"type": "dm", "message": {...}, "client_id": "..."}      to both people
     server -> {"type": "friend_request" | "friend_added" | "friend_removed" | "friend_request_removed", ...}
     Random 1-on-1 chat ("stranger.*") is documented in apps/stranger/consumer.py,
-    calls ("call.*") in apps/calls/consumer.py.
+    calls ("call.*") in apps/calls/consumer.py, watching together ("watch.*") in apps/watch/consumer.py.
     """
 
     async def on_authenticated(self):
@@ -52,6 +53,8 @@ class UserConsumer(CallMixin, StrangerMixin, AuthenticatedJsonConsumer):
         if isinstance(kind, str) and kind.startswith("stranger.") and await self.stranger_handle(kind, content):
             return
         if isinstance(kind, str) and kind.startswith("call.") and await self.call_handle(kind, content):
+            return
+        if isinstance(kind, str) and kind.startswith("watch.") and await self.watch_handle(kind, content):
             return
         if kind in ("dm.react", "dm.edit", "dm.delete"):
             return await self._dm_change(kind[3:], content)

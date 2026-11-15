@@ -190,6 +190,7 @@ export type UserEvent =
   | { type: "stranger.message"; message: StrangerMessage; client_id: string }
   | { type: "stranger.typing" }
   | { type: "stranger.update"; message: StrangerMessage }
+  | { type: "watch.state"; chat: WatchChat; state: WatchState | null; server_now: number }
   | { type: "stranger.ended"; by: "you" | "stranger" | "connection"; session: string }
   | { type: "stranger.idle" }
   | { type: "stranger.away"; session: string }
@@ -211,6 +212,17 @@ export function fetchIceServers(access: string) {
 }
 
 export type StrangerPartner = { id: number; nickname: string; gender: string; region: string };
+/** Watching a YouTube video together: one shared state per 1-on-1 chat. */
+export type WatchChat = { kind: "dm"; users: number[] } | { kind: "stranger"; session: string };
+export type WatchState = {
+  video: string;
+  playing: boolean;
+  /** seconds into the video at server time `at` (ms) */
+  position: number;
+  at: number;
+  by: number;
+};
+
 export type StrangerMessage = {
   id: number;
   session: string;

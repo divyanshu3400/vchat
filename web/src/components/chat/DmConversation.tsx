@@ -16,6 +16,7 @@ import { voiceFilename } from "./media/useRecorder";
 import Composer from "./messages/Composer";
 import MessageList, { JumpToLatest, type Msg } from "./messages/MessageList";
 import { useStickyScroll } from "./messages/useStickyScroll";
+import { WatchPanel, WatchStartSheet, useWatch } from "./watch/WatchTogether";
 import { useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
 import { Avatar, Icon } from "./bits";
@@ -62,6 +63,8 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const [uploading, setUploading] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const [watchSheet, setWatchSheet] = useState(false);
+  const watch = useWatch({ kind: "dm", with: userId });
   const rel = relation(userId);
   const isFriend = rel === "friend";
   const partnerOnline = friends.some((f) => f.user.id === userId && f.online);
@@ -278,6 +281,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
 
   const callButtons = isFriend && partner && (
     <>
+      <button type="button" className="icon-btn" aria-label="Watch YouTube together" title="Watch together" onClick={() => setWatchSheet(true)}>
+        <Icon name="play" size={isWindow ? 18 : 20} />
+      </button>
       <button type="button" className="icon-btn" aria-label={`Voice call ${name}`} onClick={() => startCall(partner, "voice")}>
         <Icon name="phone" size={isWindow ? 18 : 20} />
       </button>
@@ -335,6 +341,16 @@ export default function DmConversation({ userId, variant = "page", minimized = f
       {!minimized && (
         <>
           {confirmBar}
+          <WatchPanel watch={watch} partnerName={name} meId={me?.id} />
+          {watchSheet && (
+            <WatchStartSheet
+              onClose={() => setWatchSheet(false)}
+              onStart={(video) => {
+                setWatchSheet(false);
+                if (!watch.start(video)) setNotice("You're offline. Reconnecting…");
+              }}
+            />
+          )}
           <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
             {hasMore && (
               <button className="load-more" type="button" onClick={loadOlder}>
@@ -353,6 +369,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               onReply={onReply}
               onEdit={onEdit}
               onDelete={onDelete}
+              onWatch={isFriend ? (video) => watch.start(video) : undefined}
             />
             {uploading !== null && (
               <div className="m me last uploading">

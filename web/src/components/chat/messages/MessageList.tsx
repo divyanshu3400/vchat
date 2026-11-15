@@ -46,6 +46,8 @@ type Props = {
   onEdit?: (m: Msg) => void;
   onDelete?: (m: Msg) => void;
   extraActions?: (m: Msg) => MsgAction[];
+  /** 1-on-1 chats: play a shared YouTube link for both people. */
+  onWatch?: (video: string) => void;
 };
 
 const dayKey = (iso: string) => new Date(iso).toDateString();
@@ -108,9 +110,10 @@ type BubbleProps = {
   onReact: (id: number, emoji: string | null) => void;
   onReply: (m: Msg) => void;
   onLink: (url: string) => void;
+  onWatch?: (video: string) => void;
 };
 
-const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, stranger, onMenu, onReact, onReply, onLink }: BubbleProps) {
+const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, stranger, onMenu, onReact, onReply, onLink, onWatch }: BubbleProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const press = useRef<{ x: number; y: number; t: ReturnType<typeof setTimeout> | undefined; swiping: boolean; dx: number } | null>(null);
   const lastTap = useRef(0);
@@ -270,6 +273,11 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
                   </span>
                 </a>
               )}
+              {yt && onWatch && (
+                <button type="button" className="yt-together" onClick={() => onWatch(yt.id)}>
+                  <Icon name="play" size={14} /> Watch together
+                </button>
+              )}
             </>
           )}
           <span className="meta">
@@ -317,7 +325,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
 
 type MenuState = { m: Msg; style: CSSProperties; mine: string | null; confirmDelete: boolean; picker: boolean; at: number };
 
-export default function MessageList({ items, me, showNames, stranger, onReact, onReply, onEdit, onDelete, extraActions }: Props) {
+export default function MessageList({ items, me, showNames, stranger, onReact, onReply, onEdit, onDelete, extraActions, onWatch }: Props) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const maxSeen = useRef<number | null>(null);
@@ -398,6 +406,7 @@ export default function MessageList({ items, me, showNames, stranger, onReact, o
               onReact={onReact}
               onReply={onReply}
               onLink={setLink}
+              onWatch={onWatch}
             />
           </Fragment>
         );

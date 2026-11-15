@@ -9,6 +9,7 @@ import { voiceFilename } from "../media/useRecorder";
 import Composer from "../messages/Composer";
 import MessageList, { JumpToLatest, type Msg } from "../messages/MessageList";
 import { useStickyScroll } from "../messages/useStickyScroll";
+import { WatchPanel, WatchStartSheet, useWatch } from "../watch/WatchTogether";
 import { useRoomPresence } from "@/lib/presence";
 import { REGION_ROOMS, findRoom } from "@/lib/rooms";
 import { useChat } from "../ChatProvider";
@@ -215,6 +216,8 @@ function ChatView() {
   const [escArmed, setEscArmed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const ended = phase === "ended";
+  const [watchSheet, setWatchSheet] = useState(false);
+  const watch = useWatch({ kind: "stranger", session: ended ? null : session });
   const rel = partner ? relation(partner.id) : "none";
   const scroll = useStickyScroll(listRef, lines.length, [partnerTyping, ended, uploading !== null]);
 
@@ -321,6 +324,11 @@ function ChatView() {
         actions={
           <>
             {!ended && (
+              <button type="button" className="icon-btn" aria-label="Watch YouTube together" title="Watch together" onClick={() => setWatchSheet(true)}>
+                <Icon name="play" />
+              </button>
+            )}
+            {!ended && (
               <button
                 type="button"
                 className="icon-btn"
@@ -371,6 +379,16 @@ function ChatView() {
         }
       />
 
+      <WatchPanel watch={watch} partnerName="the stranger" meId={me?.id} />
+      {watchSheet && (
+        <WatchStartSheet
+          onClose={() => setWatchSheet(false)}
+          onStart={(video) => {
+            setWatchSheet(false);
+            if (!watch.start(video)) setNotice("You're offline. Reconnecting…");
+          }}
+        />
+      )}
       <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
         <p className="sys-line">You&apos;re chatting with a stranger{partner.region !== "any" ? ` from ${regionName(partner.region)}` : ""}. Say hi!</p>
         {/* Strangers' photos stay blurred until you choose to look; their links ask first. */}
@@ -382,6 +400,7 @@ function ChatView() {
           onReply={onReply}
           onEdit={ended ? undefined : onEdit}
           onDelete={ended ? undefined : onDelete}
+          onWatch={ended ? undefined : (video) => watch.start(video)}
         />
         {uploading !== null && (
           <div className="m me last uploading">

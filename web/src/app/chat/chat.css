@@ -578,3 +578,28 @@ button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700
 .composer-strip > * { flex-shrink: 0; }
 .messages { overflow-x: hidden; }
 .m.me .swipe-hint { left: auto; right: -30px; }
+
+/* ======================= watch together (YouTube) ======================= */
+.watch { flex: none; background: #000; border-bottom: 1px solid var(--line); }
+.watch-bar { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.watch-live { width: 9px; height: 9px; border-radius: 50%; background: #e62117; flex: none; animation: pulse 1.6s infinite; }
+.watch-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.watch-title b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-title small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-bar .icon-btn { width: 34px; height: 34px; border-radius: 10px; }
+.watch-frame { position: relative; aspect-ratio: 16 / 9; max-height: 34vh; width: 100%; margin: 0 auto; background: #000; }
+.watch-host, .watch-host > div, .watch-host iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+/* Hidden, not removed: the sound keeps playing while you read the chat. */
+.watch.min .watch-frame { height: 0; aspect-ratio: auto; overflow: hidden; }
+.watch-tap { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; cursor: pointer; font: inherit; font-weight: 800; font-size: 16px; color: #fff; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(2px); }
+.watch-error { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; color: #fff; background: #111; font-size: 14px; }
+.watch-error a { color: #fff; font-weight: 800; background: #e62117; padding: 7px 14px; border-radius: 999px; text-decoration: none; }
+.win .watch-frame { max-height: 180px; }
+@media (min-width: 768px) { .watch-frame { max-height: 42vh; } }
+
+.yt-together { appearance: none; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 800; background: #e62117; color: #fff; }
+.watch-start-title { display: block; font-family: var(--display); font-size: 18px; margin-bottom: 4px; color: var(--fg); }
+.watch-start p b.watch-start-title { margin-top: 0; font-size: 18px; font-family: var(--display); color: var(--fg); }
+.watch-input { width: 100%; font: inherit; font-size: 16px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); outline: none; }
+.watch-input:focus { border-color: var(--brand); }
+.watch-start .go:disabled { opacity: 0.5; cursor: default; }

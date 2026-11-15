@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     "apps.premium",
     "apps.media",
     "apps.calls",
+    "apps.watch",
 ]
 
 MIDDLEWARE = [
