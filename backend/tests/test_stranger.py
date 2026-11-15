@@ -38,16 +38,25 @@ def test_pairing_order_and_queue(store):
     assert matchmaker.waiting_count() == 0
 
 
-def test_never_yourself_blocked_or_recent(store):
+def test_never_yourself_or_blocked(store):
     matchmaker.find_or_wait(entry(1, "tab-a"), set())
     assert matchmaker.find_or_wait(entry(1, "tab-b"), set()) is None  # own second tab: both wait
     assert matchmaker.find_or_wait(entry(2), {1}) is None  # blocked
     assert matchmaker.find_or_wait(entry(3), set()).user_id == 1  # oldest compatible: tab-a
-    # 1 and 3 just chatted: not matched again even when both search
-    assert matchmaker.leave_queue("tab-b") and matchmaker.leave_queue("ch2")
-    assert matchmaker.find_or_wait(entry(1, "tab-c"), set()) is None
-    assert matchmaker.find_or_wait(entry(3, "ch3b"), set()) is None
-    assert matchmaker.waiting_count() == 2
+
+
+def test_new_people_first_but_the_same_two_can_meet_again(store):
+    matchmaker.find_or_wait(entry(1), set())
+    assert matchmaker.find_or_wait(entry(3), set()).user_id == 1  # 1 and 3 just chatted
+
+    # 1 waits longest, 4 is new for 3: 3 meets 4 first.
+    matchmaker.find_or_wait(entry(1, "ch1b"), set())
+    assert matchmaker.find_or_wait(entry(4), {1}) is None  # (4 blocked 1, so both wait)
+    assert matchmaker.find_or_wait(entry(3, "ch3b"), set()).user_id == 4
+
+    # Only 1 is left: 3 meets 1 again rather than nobody.
+    assert matchmaker.find_or_wait(entry(3, "ch3c"), set()).user_id == 1
+    assert matchmaker.waiting_count() == 0
 
 
 def test_region_preferences(store):

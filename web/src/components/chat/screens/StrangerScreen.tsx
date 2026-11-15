@@ -442,19 +442,23 @@ function ChatView() {
             onCancelEdit={() => setEditing(null)}
             onVoice={sendVoice}
             autoFocusKey={session}
-            left={
+            toolbar={
               <>
                 <button type="button" className={`next-btn${escArmed ? " armed" : ""}`} onClick={next} title="Next stranger (Esc twice)">
-                  {escArmed ? "Esc again" : "Next"}
+                  <Icon name="shuffle" size={17} /> {escArmed ? "Esc again" : "Next"}
                 </button>
+                <button type="button" className="end-btn" onClick={leave} title="End this chat">
+                  <Icon name="close" size={17} /> End
+                </button>
+                <span className="strip-gap" />
                 <button
                   type="button"
-                  className={`icon-btn${photosUnlocked ? "" : " locked-media"}`}
+                  className={`strip-btn${photosUnlocked ? "" : " locked-media"}`}
                   aria-label={photosUnlocked ? "Send a photo" : "Photos (locked)"}
                   disabled={uploading !== null}
                   onClick={() => (photosUnlocked ? photoRef.current?.click() : setUnlockPhotos(true))}
                 >
-                  <Icon name={photosUnlocked ? "image" : "lock"} size={18} />
+                  <Icon name={photosUnlocked ? "image" : "lock"} size={17} /> Photo
                 </button>
                 <input
                   ref={photoRef}

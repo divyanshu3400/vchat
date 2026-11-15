@@ -25,8 +25,10 @@ type Props = {
   onCancelEdit?: () => void;
   /** Voice messages: shown instead of Send while the box is empty. */
   onVoice?: (blob: Blob) => void;
-  /** Buttons on the left (Next, photo…). */
+  /** Buttons on the left of the box (photo…). */
   left?: ReactNode;
+  /** A strip of actions above the box (random chat: Next, End, photo). */
+  toolbar?: ReactNode;
   autoFocusKey?: unknown;
 };
 
@@ -47,6 +49,7 @@ export default function Composer({
   onCancelEdit,
   onVoice,
   left,
+  toolbar,
   autoFocusKey,
 }: Props) {
   const [draft, setDraft] = useState("");
@@ -164,6 +167,7 @@ export default function Composer({
 
   return (
     <div className="composer2">
+      {toolbar && <div className="composer-strip">{toolbar}</div>}
       {(replying || editing) && (
         <div className="reply-bar">
           <Icon name={editing ? "edit" : "reply"} size={18} />

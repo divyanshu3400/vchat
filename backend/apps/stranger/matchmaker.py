@@ -7,7 +7,8 @@ crashed server can't leave ghosts in the queue.
 
 Matching rules, in order:
   - never yourself (another tab of yours), never someone either of you blocked
-  - not someone you were matched with in the last RECENT_SECONDS
+  - prefer someone new: a partner from the last RECENT_SECONDS is picked only when nobody
+    else fits (with few people online, the same two can always meet again)
   - region: compatible when either side picked "any" or both picked the same region
   - gender filter (Plus / rewarded ad): someone wanting women only meets women only, and is
     only offered to people whose own filter (if any) fits them
@@ -181,21 +182,29 @@ def find_or_wait(me: Entry, blocked: set[int]) -> Entry | None:
     with store.lock():
         store.remove(me.channel)
         recent = store.recent(me.user_id, now)
+        fallback = None
         for other in store.entries():
             if other.ts < stale_before:
                 store.remove(other.channel)
                 continue
-            if other.user_id == me.user_id or other.user_id in blocked or other.user_id in recent:
+            if other.user_id == me.user_id or other.user_id in blocked or not me.compatible(other):
                 continue
-            if not me.compatible(other):
+            if other.user_id in recent:
+                fallback = fallback or other
                 continue
-            store.remove(other.channel)
-            until = now + _cfg("STRANGER_RECENT_SECONDS")
-            store.remember(me.user_id, other.user_id, until)
-            store.remember(other.user_id, me.user_id, until)
-            return other
+            return _pair(store, me, other, now)
+        if fallback:
+            return _pair(store, me, fallback, now)
         store.add(me)
         return None
+
+
+def _pair(store, me: Entry, other: Entry, now: float) -> Entry:
+    store.remove(other.channel)
+    until = now + _cfg("STRANGER_RECENT_SECONDS")
+    store.remember(me.user_id, other.user_id, until)
+    store.remember(other.user_id, me.user_id, until)
+    return other
 
 
 def leave_queue(channel: str) -> bool:

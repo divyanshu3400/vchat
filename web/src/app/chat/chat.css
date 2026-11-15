@@ -561,3 +561,15 @@ button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700
 .switch:checked::after { transform: translateX(18px); }
 .input-shell .composer-input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .input-shell .composer-input:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* random chat: Next / End / Photo in a strip above a full-width message box */
+.composer-strip { display: flex; align-items: center; gap: 8px; padding: 8px max(10px, env(safe-area-inset-right, 0px)) 0 max(10px, env(safe-area-inset-left, 0px)); }
+.composer-strip .next-btn, .end-btn, .strip-btn { display: inline-flex; align-items: center; gap: 6px; height: 38px; padding: 0 16px; border-radius: 12px; font-size: 14.5px; }
+.end-btn, .strip-btn { appearance: none; cursor: pointer; font: inherit; font-weight: 800; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.end-btn { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); }
+.end-btn:hover { background: color-mix(in srgb, var(--danger) 8%, var(--surface)); }
+.strip-btn { font-weight: 700; color: var(--muted); padding: 0 12px; }
+.strip-btn.locked-media { color: var(--amber); }
+.strip-gap { flex: 1; }
+/* the landing page mock-up styles ".composer div": not for the real box */
+.composer2 .input-shell { padding: 0; color: inherit; font-size: inherit; }
