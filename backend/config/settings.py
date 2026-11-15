@@ -158,6 +158,9 @@ SIMPLE_JWT = {
 VCHAT = {
     "REFRESH_COOKIE": "vchat_refresh",
     "MESSAGE_MAX_LENGTH": 1000,
+    # Your own messages: edit for 15 minutes, delete for everyone for an hour.
+    "MESSAGE_EDIT_SECONDS": 15 * 60,
+    "MESSAGE_DELETE_SECONDS": 60 * 60,
     "HISTORY_PAGE_MAX": 100,
     # Flood control: at most N messages per WINDOW seconds per user, across all tabs and servers.
     "RATE_LIMIT_MESSAGES": 5,

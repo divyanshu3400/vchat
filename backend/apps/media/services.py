@@ -11,6 +11,7 @@ import io
 
 from django.conf import settings
 from django.core import signing
+from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.urls import reverse
 from django.utils import timezone
@@ -95,6 +96,18 @@ def store_upload(owner, kind: str, upload) -> Attachment:
     attachment.file.save("upload", ContentFile(data), save=False)
     attachment.save()
     return attachment
+
+
+def pending_kind(owner_id: int, attachment_id) -> str | None:
+    """Kind of an unsent upload of this user ("image", "video", "audio"), else None."""
+    try:
+        return (
+            Attachment.objects.filter(id=attachment_id, owner_id=owner_id, used_at__isnull=True)
+            .values_list("kind", flat=True)
+            .first()
+        )
+    except (ValueError, ValidationError):
+        return None
 
 
 def claim_for_message(owner_id: int, attachment_id, allowed_kinds: tuple[str, ...]) -> Attachment:

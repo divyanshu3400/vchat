@@ -10,6 +10,9 @@ server -> {"type": "stranger.waiting", "waiting": <people in the queue>}
 server -> {"type": "stranger.matched", "session": "<uuid>", "partner": {id, nickname, gender, region}}
 client -> {"type": "stranger.message", "content": "...", "client_id": "..."}
 server -> {"type": "stranger.message", "message": {id, session, sender_id, content, created_at}, "client_id": "..."}
+          (+ "reply_to": <message id>, "attachment": <upload id> for a voice message, or a photo after an unlock)
+client -> {"type": "stranger.react", "message_id", "emoji"} | "stranger.edit" (+ "content") | "stranger.delete"
+server -> {"type": "stranger.update", "message": {...}}  (to both sides)
 client -> {"type": "stranger.typing"}           server -> {"type": "stranger.typing"} (to the partner)
 client -> {"type": "stranger.next"}             end this chat and look again
 client -> {"type": "stranger.leave"}            end this chat
@@ -34,6 +37,7 @@ from channels.db import database_sync_to_async
 from django.conf import settings
 from django.core.cache import cache
 
+from apps.chat import message_ops
 from apps.chat import services as chat_services
 from apps.chat.rooms_meta import REGION_SLUGS
 from apps.premium import services as premium
@@ -74,11 +78,17 @@ class StrangerMixin:
             "stranger.leave": self._st_leave,
             "stranger.cancel": self._st_cancel,
             "stranger.resume": self._st_resume,
+            "stranger.react": self._st_change,
+            "stranger.edit": self._st_change,
+            "stranger.delete": self._st_change,
         }
         handler = handlers.get(kind)
         if handler is None:
             return False
-        await handler(content)
+        if handler == self._st_change:
+            await handler(kind.removeprefix("stranger."), content)
+        else:
+            await handler(content)
         return True
 
     async def _st_find(self, content):
@@ -148,10 +158,29 @@ class StrangerMixin:
 
         st = self.stranger
         try:
-            payload = await database_sync_to_async(services.save_message)(st["session"], self.user, text, attachment_id)
+            payload = await database_sync_to_async(services.save_message)(
+                st["session"], self.user, text, attachment_id, content.get("reply_to")
+            )
         except services.PhotoLocked as exc:
             return await self.error(exc.code, exc.detail, client_id)
         event = {"type": "stranger.deliver", "session": st["session"], "payload": {"type": "stranger.message", "message": payload, "client_id": client_id}}
+        await self.channel_layer.send(st["partner_channel"], event)
+        await self.send_json(event["payload"])
+
+    async def _st_change(self, op, content):
+        if not self.stranger:
+            return await self.error("no_chat", "You're not chatting with anyone right now.")
+        if op == "react" and not await database_sync_to_async(chat_services.allow_message)(self.user.id):
+            return await self.error("rate_limited", "Slow down a little.")
+        st = self.stranger
+        value = content.get("emoji") if op == "react" else content.get("content")
+        try:
+            payload = await database_sync_to_async(services.change_message)(
+                st["session"], self.user, op, content.get("message_id"), value
+            )
+        except message_ops.MessageOpError as exc:
+            return await self.error(exc.code, exc.detail)
+        event = {"type": "stranger.deliver", "session": st["session"], "payload": {"type": "stranger.update", "message": payload}}
         await self.channel_layer.send(st["partner_channel"], event)
         await self.send_json(event["payload"])
 

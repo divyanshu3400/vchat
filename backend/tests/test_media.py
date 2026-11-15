@@ -149,7 +149,7 @@ def test_links_are_signed_and_expire(alice, settings):
 
 
 @pytest.mark.django_db(transaction=True)
-async def test_photo_to_stranger_needs_an_unlock():
+async def test_stranger_photos_need_an_unlock_voice_is_free():
     alice, a_token = await make_user("alice", "F")
     bob, b_token = await make_user("bob", "M")
     a, b = await me_socket(a_token), await me_socket(b_token)
@@ -174,6 +174,16 @@ async def test_photo_to_stranger_needs_an_unlock():
         auth_client(alice), b"\x1a\x45\xdf\xa3" + b"\x00" * 200, "audio", "n.webm", "audio/webm"
     )
     await a.send_json_to({"type": "stranger.message", "attachment": voice.data["id"]})
-    assert (await a.receive_json_from())["code"] == "invalid_attachment"  # photos only with strangers
+    got = await b.receive_json_from()  # voice messages are free, no unlock spent
+    assert got["message"]["attachment"]["kind"] == "audio"
+    await a.receive_json_from()
+    status = await database_sync_to_async(auth_client(alice).get)("/api/premium/status/")
+    assert status.data["grants"]["random_photos"]["uses_left"] == 2
+
+    clip = await database_sync_to_async(upload)(
+        auth_client(alice), b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 200, "video", "c.mp4", "video/mp4"
+    )
+    await a.send_json_to({"type": "stranger.message", "attachment": clip.data["id"]})
+    assert (await a.receive_json_from())["code"] == "invalid_attachment"  # no videos with strangers
     await a.disconnect()
     await b.disconnect()

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   blockUser,
@@ -12,8 +12,10 @@ import {
   type DirectMessage,
 } from "@/lib/api";
 import { useCalls } from "./calls/CallProvider";
-import MediaBubble from "./media/MediaBubble";
-import VoiceRecorder from "./media/VoiceRecorder";
+import { voiceFilename } from "./media/useRecorder";
+import Composer from "./messages/Composer";
+import MessageList, { JumpToLatest, type Msg } from "./messages/MessageList";
+import { useStickyScroll } from "./messages/useStickyScroll";
 import { useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
 import { Avatar, Icon } from "./bits";
@@ -24,9 +26,10 @@ function merge(prev: DirectMessage[], incoming: DirectMessage[]) {
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
-function timeLabel(iso: string) {
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
+const TYPING_SHOW_MS = 3500;
+const TYPING_SEND_GAP_MS = 2000;
+// Errors from a react/edit/delete just sent from this chat.
+const OP_ERRORS = new Set(["too_late", "not_yours", "gone", "not_found", "invalid_reaction", "not_text", "invalid_message"]);
 
 type Props = {
   userId: number;
@@ -39,22 +42,26 @@ type Props = {
 
 export default function DmConversation({ userId, variant = "page", minimized = false, onToggleMin, onClose }: Props) {
   const router = useRouter();
-  const { me, getAccess, friends, conversations, relation, sendDm, subscribe, markRead, watchDm, addFriend, unfriend, socketLive } =
+  const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive } =
     useChat();
   const known = friends.find((f) => f.user.id === userId)?.user ?? conversations.find((c) => c.user.id === userId)?.user;
   const [partner, setPartner] = useState<ChatUser | null>(known ?? null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [missing, setMissing] = useState(false);
-  const [draft, setDraft] = useState("");
   const [notice, setNotice] = useState("");
+  const [replying, setReplying] = useState<Msg | null>(null);
+  const [editing, setEditing] = useState<Msg | null>(null);
+  const [partnerRead, setPartnerRead] = useState(0);
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const lastTypingSent = useRef(0);
+  const lastOpAt = useRef(0);
   const [confirming, setConfirming] = useState<"unfriend" | "block" | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [uploading, setUploading] = useState<number | null>(null);
-  const [recording, setRecording] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const stickToBottom = useRef(true);
   const rel = relation(userId);
   const isFriend = rel === "friend";
   const partnerOnline = friends.some((f) => f.user.id === userId && f.online);
@@ -71,6 +78,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
         setPartner(res.partner);
         setMessages((prev) => merge(prev, res.messages));
         setHasMore(res.has_more);
+        setPartnerRead((r) => Math.max(r, res.partner_read_id ?? 0));
       })
       .catch((e) => {
         if (!cancelled && e instanceof ApiError && e.status === 404) setMissing(true);
@@ -86,13 +94,22 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   useEffect(
     () =>
       subscribe((event) => {
-        if (event.type === "dm") {
+        if (event.type === "dm" || event.type === "dm.update") {
           const m = event.message;
           if (m.sender.id === userId || m.recipient_id === userId) {
-            stickToBottom.current = stickToBottom.current || m.sender.id !== userId;
             setMessages((prev) => merge(prev, [m]));
+            if (event.type === "dm" && m.sender.id === userId) {
+              clearTimeout(typingTimer.current);
+              setPartnerTyping(false);
+            }
           }
-        } else if (event.type === "error" && event.client_id) {
+        } else if (event.type === "dm.read" && event.user_id === userId) {
+          setPartnerRead((r) => Math.max(r, event.last_id));
+        } else if (event.type === "dm.typing" && event.user_id === userId) {
+          setPartnerTyping(true);
+          clearTimeout(typingTimer.current);
+          typingTimer.current = setTimeout(() => setPartnerTyping(false), TYPING_SHOW_MS);
+        } else if (event.type === "error" && (event.client_id || (OP_ERRORS.has(event.code) && Date.now() - lastOpAt.current < 4000))) {
           setNotice(event.detail);
         }
       }),
@@ -104,14 +121,42 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     if (lastFromPartner && !minimized) markRead(userId, lastFromPartner);
   }, [lastFromPartner, userId, markRead, minimized]);
 
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
-  }, [messages, minimized]);
+  const scroll = useStickyScroll(listRef, messages.length, [minimized, partnerTyping]);
 
-  const onScroll = useCallback(() => {
-    const el = listRef.current;
-    if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  const items = useMemo<Msg[]>(
+    () =>
+      messages.map((m) => ({
+        id: m.id,
+        mine: m.sender.id === me?.id,
+        senderId: m.sender.id,
+        content: m.content,
+        attachment: m.attachment,
+        createdAt: m.created_at,
+        replyTo: m.reply_to,
+        reactions: m.reactions ?? {},
+        edited: m.edited,
+        deleted: m.deleted,
+        status: m.sender.id === me?.id ? (m.id <= partnerRead ? "seen" : "sent") : undefined,
+      })),
+    [messages, me?.id, partnerRead],
+  );
+
+  const op = useCallback(
+    (payload: Record<string, unknown>) => {
+      lastOpAt.current = Date.now();
+      if (!sendRaw(payload)) setNotice("You're offline. Reconnecting…");
+    },
+    [sendRaw],
+  );
+  const onReact = useCallback((id: number, emoji: string | null) => op({ type: "dm.react", message_id: id, emoji }), [op]);
+  const onDelete = useCallback((m: Msg) => op({ type: "dm.delete", message_id: m.id }), [op]);
+  const onReply = useCallback((m: Msg) => {
+    setEditing(null);
+    setReplying(m);
+  }, []);
+  const onEdit = useCallback((m: Msg) => {
+    setReplying(null);
+    setEditing(m);
   }, []);
 
   async function loadOlder() {
@@ -119,7 +164,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     const el = listRef.current;
     const fromBottom = el ? el.scrollHeight - el.scrollTop : 0;
     const res = await fetchDmHistory(userId, await getAccess(), messages[0].id);
-    stickToBottom.current = false;
+    scroll.hold();
     setMessages((prev) => merge(res.messages, prev));
     setHasMore(res.has_more);
     requestAnimationFrame(() => {
@@ -127,27 +172,44 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     });
   }
 
-  function send(e: FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text || !isFriend) return;
-    stickToBottom.current = true;
-    if (sendDm(userId, text)) {
-      setDraft("");
-      setNotice("");
-    } else {
-      setNotice("You're offline. Reconnecting…");
+  function send(text: string): boolean {
+    if (!isFriend) return false;
+    if (editing) {
+      lastOpAt.current = Date.now();
+      if (!sendRaw({ type: "dm.edit", message_id: editing.id, content: text })) {
+        setNotice("You're offline. Reconnecting…");
+        return false;
+      }
+      setEditing(null);
+      return true;
     }
+    scroll.follow();
+    if (!sendDm(userId, text, undefined, replying?.id)) {
+      setNotice("You're offline. Reconnecting…");
+      return false;
+    }
+    setNotice("");
+    setReplying(null);
+    return true;
+  }
+
+  function sendTyping() {
+    const now = Date.now();
+    if (now - lastTypingSent.current < TYPING_SEND_GAP_MS) return;
+    lastTypingSent.current = now;
+    sendRaw({ type: "dm.typing", to: userId });
   }
 
   async function sendFile(file: Blob, kind: AttachmentKind, filename: string) {
     if (!isFriend) return;
     setNotice("");
-    stickToBottom.current = true;
+    scroll.follow();
     setUploading(0);
+    const replyTo = replying?.id;
+    setReplying(null);
     try {
       const up = await uploadMedia(file, kind, await getAccess(), setUploading, filename);
-      if (!sendDm(userId, "", up.id)) setNotice("You're offline. Reconnecting…");
+      if (!sendDm(userId, "", up.id, replyTo)) setNotice("You're offline. Reconnecting…");
     } catch (e) {
       setNotice(e instanceof ApiError ? e.message : "Couldn't send that file.");
     }
@@ -172,7 +234,15 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   }
 
   const name = partner?.nickname ?? "…";
-  const status = !socketLive ? "Reconnecting…" : !isFriend ? "Not friends" : partnerOnline ? "Online" : "Offline";
+  const status = !socketLive
+    ? "Reconnecting…"
+    : !isFriend
+      ? "Not friends"
+      : partnerTyping
+        ? "typing…"
+        : partnerOnline
+          ? "Online"
+          : "Offline";
 
   const confirmBar = confirming && (
     <div className="confirm-bar" role="alertdialog" aria-label="Confirm">
@@ -265,7 +335,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
       {!minimized && (
         <>
           {confirmBar}
-          <div className="messages" ref={listRef} onScroll={onScroll} aria-live="polite" aria-relevant="additions">
+          <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
             {hasMore && (
               <button className="load-more" type="button" onClick={loadOlder}>
                 Load earlier messages
@@ -276,24 +346,32 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                 This is the start of your private chat with <b>{name}</b>. Only the two of you can see it.
               </p>
             )}
-            {messages.map((m) => {
-              const mine = m.sender.id === me?.id;
-              return (
-                <div key={m.id} className={`b${mine ? " me" : ""}${m.attachment ? " has-media" : ""}`}>
-                  {m.attachment && <MediaBubble attachment={m.attachment} />}
-                  {m.content && <div className="t">{m.content}</div>}
-                  <span className="when">{timeLabel(m.created_at)}</span>
-                </div>
-              );
-            })}
+            <MessageList
+              items={items}
+              me={me ?? undefined}
+              onReact={onReact}
+              onReply={onReply}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
             {uploading !== null && (
-              <div className="b me uploading">
-                <div className="t">
-                  Sending… {Math.round(uploading * 100)}%
+              <div className="m me last uploading">
+                <div className="m-row">
+                  <div className="bubble">
+                    <span className="txt">Sending… {Math.round(uploading * 100)}%</span>
+                  </div>
                 </div>
               </div>
             )}
+            {partnerTyping && (
+              <div className="typing" aria-label={`${name} is typing`}>
+                <i />
+                <i />
+                <i />
+              </div>
+            )}
           </div>
+          <JumpToLatest away={scroll.away} unseen={scroll.unseen} onClick={scroll.jump} />
           <div className="composer-wrap">
             {notice && (
               <p className="chat-notice" role="alert">
@@ -312,68 +390,44 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                 )}
               </p>
             )}
-            {recording ? (
-              <VoiceRecorder
-                onCancel={() => setRecording(false)}
-                onDone={(blob) => {
-                  setRecording(false);
-                  const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
-                  sendFile(blob, "audio", `voice.${ext}`);
-                }}
-              />
-            ) : (
-            <form className="composer" onSubmit={send}>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*,video/mp4,video/webm"
-                hidden
-                id={`dm-file-${userId}-${variant}`}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  e.target.value = "";
-                  if (file) sendFile(file, file.type.startsWith("video/") ? "video" : "image", file.name);
-                }}
-              />
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="Send a photo or video"
-                disabled={!isFriend || uploading !== null}
-                onClick={() => fileRef.current?.click()}
-              >
-                <Icon name="image" />
-              </button>
-              <input
-                id={`dm-input-${userId}-${variant}`}
-                className="composer-input"
-                type="text"
-                placeholder={isFriend ? `Message ${name}` : "Messaging is off"}
-                maxLength={1000}
-                autoComplete="off"
-                enterKeyHint="send"
-                aria-label={`Message ${name}`}
-                value={draft}
-                disabled={!isFriend}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              {draft.trim() ? (
-                <button className="send-btn" type="submit" disabled={!isFriend} aria-label="Send">
-                  <Icon name="send" />
-                </button>
-              ) : (
-                <button
-                  className="send-btn"
-                  type="button"
-                  disabled={!isFriend || uploading !== null}
-                  aria-label="Record a voice note"
-                  onClick={() => setRecording(true)}
-                >
-                  <Icon name="mic" />
-                </button>
-              )}
-            </form>
-            )}
+            <Composer
+              id={`dm-input-${userId}-${variant}`}
+              placeholder={isFriend ? `Message ${name}` : "Messaging is off"}
+              disabled={!isFriend}
+              onSend={send}
+              onTyping={sendTyping}
+              replying={replying}
+              replyName={replying ? (replying.mine ? "yourself" : name) : undefined}
+              onCancelReply={() => setReplying(null)}
+              editing={editing}
+              onCancelEdit={() => setEditing(null)}
+              onVoice={(blob) => sendFile(blob, "audio", voiceFilename(blob))}
+              left={
+                <>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*,video/mp4,video/webm"
+                    hidden
+                    id={`dm-file-${userId}-${variant}`}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = "";
+                      if (file) sendFile(file, file.type.startsWith("video/") ? "video" : "image", file.name);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    aria-label="Send a photo or video"
+                    disabled={!isFriend || uploading !== null}
+                    onClick={() => fileRef.current?.click()}
+                  >
+                    <Icon name="image" />
+                  </button>
+                </>
+              }
+            />
           </div>
         </>
       )}

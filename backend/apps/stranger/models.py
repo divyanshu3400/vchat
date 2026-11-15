@@ -32,12 +32,27 @@ class StrangerMessage(models.Model):
     session = models.ForeignKey(StrangerSession, on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
     content = models.TextField(blank=True)
-    # Photos only, and only after an unlock (Plus or a rewarded ad).
+    # Voice notes, and photos after an unlock (Plus or a rewarded ad).
     attachment = models.OneToOneField(
         "media.Attachment", on_delete=models.SET_NULL, null=True, blank=True, related_name="stranger_message"
     )
     enc_version = models.PositiveSmallIntegerField(default=0)
+    reply_to = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    edited_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=["session", "id"], name="stranger_msg_session")]
+
+
+class StrangerMessageReaction(models.Model):
+    """One emoji per person per message; picking another replaces it."""
+
+    message = models.ForeignKey(StrangerMessage, on_delete=models.CASCADE, related_name="reactions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    emoji = models.CharField(max_length=16)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["message", "user"], name="uniq_stranger_reaction")]

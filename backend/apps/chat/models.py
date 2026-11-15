@@ -41,7 +41,10 @@ class Message(models.Model):
     content = models.TextField()
     content_type = models.CharField(max_length=10, choices=ContentType.choices, default=ContentType.TEXT)
     enc_version = models.PositiveSmallIntegerField(default=0)
+    reply_to = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    edited_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # "Deleted for everyone": the text stays stored for abuse reports but is never sent again.
     deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
@@ -49,6 +52,18 @@ class Message(models.Model):
 
     def __str__(self) -> str:
         return f"{self.sender_id}@{self.room_id}: {self.content[:40]}"
+
+
+class MessageReaction(models.Model):
+    """One emoji per person per message; picking another replaces it."""
+
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="reactions")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    emoji = models.CharField(max_length=16)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["message", "user"], name="uniq_room_reaction")]
 
 
 class Block(models.Model):

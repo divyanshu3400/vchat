@@ -1,5 +1,15 @@
 export type ChatUser = { id: number; nickname: string; gender: string; is_guest?: boolean };
 
+/** The message a reply answers, as a short quote. */
+export type ReplyPreview = {
+  id: number;
+  sender_id: number;
+  nickname: string;
+  text: string;
+  kind: AttachmentKind | null;
+  deleted: boolean;
+};
+
 export type ChatMessage = {
   id: number;
   room: string;
@@ -7,6 +17,11 @@ export type ChatMessage = {
   content: string;
   content_type: "text" | "system";
   created_at: string;
+  reply_to: ReplyPreview | null;
+  /** emoji -> ids of the people who picked it */
+  reactions: Record<string, number[]>;
+  edited: boolean;
+  deleted: boolean;
 };
 
 export type Session = { user: ChatUser; access: string };
@@ -111,6 +126,11 @@ export type DirectMessage = {
   content: string;
   attachment: Attachment | null;
   created_at: string;
+  reply_to: ReplyPreview | null;
+  /** emoji -> ids of the people who picked it */
+  reactions: Record<string, number[]>;
+  edited: boolean;
+  deleted: boolean;
 };
 
 /** Upload with progress (0–1). Resolves to the attachment id to send in a message. */
@@ -155,6 +175,9 @@ export type ConversationSummary = {
 export type UserEvent =
   | { type: "ready"; user: ChatUser }
   | { type: "dm"; message: DirectMessage; client_id: string }
+  | { type: "dm.update"; message: DirectMessage }
+  | { type: "dm.read"; user_id: number; last_id: number }
+  | { type: "dm.typing"; user_id: number }
   | { type: "friend_request"; request: FriendRequest }
   | { type: "friend_request_removed"; request_id: number }
   | { type: "friend_added"; friend: ChatUser; online?: boolean; request_id: number }
@@ -166,6 +189,7 @@ export type UserEvent =
   | { type: "stranger.matched"; session: string; partner: StrangerPartner }
   | { type: "stranger.message"; message: StrangerMessage; client_id: string }
   | { type: "stranger.typing" }
+  | { type: "stranger.update"; message: StrangerMessage }
   | { type: "stranger.ended"; by: "you" | "stranger" | "connection"; session: string }
   | { type: "stranger.idle" }
   | { type: "stranger.away"; session: string }
@@ -194,6 +218,11 @@ export type StrangerMessage = {
   content: string;
   attachment: Attachment | null;
   created_at: string;
+  reply_to: ReplyPreview | null;
+  /** emoji -> ids of the people who picked it */
+  reactions: Record<string, number[]>;
+  edited: boolean;
+  deleted: boolean;
 };
 
 // --- Plus and rewarded unlocks ------------------------------------------------
@@ -257,7 +286,13 @@ export function fetchConversations(access: string) {
 export function fetchDmHistory(userId: number, access: string, before?: number) {
   const qs = new URLSearchParams({ limit: "50" });
   if (before) qs.set("before", String(before));
-  return request<{ partner: ChatUser; is_friend: boolean; messages: DirectMessage[]; has_more: boolean }>(
+  return request<{
+    partner: ChatUser;
+    is_friend: boolean;
+    messages: DirectMessage[];
+    has_more: boolean;
+    partner_read_id: number;
+  }>(
     `/api/dms/${userId}/messages?${qs}`,
     { access },
   );

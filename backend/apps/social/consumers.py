@@ -1,4 +1,5 @@
 from channels.db import database_sync_to_async
+from django.core.cache import cache
 
 from apps.chat import presence
 from apps.chat import services as chat_services
@@ -52,6 +53,10 @@ class UserConsumer(CallMixin, StrangerMixin, AuthenticatedJsonConsumer):
             return
         if isinstance(kind, str) and kind.startswith("call.") and await self.call_handle(kind, content):
             return
+        if kind in ("dm.react", "dm.edit", "dm.delete"):
+            return await self._dm_change(kind[3:], content)
+        if kind == "dm.typing":
+            return await self._dm_typing(content.get("to"))
         if kind != "dm":
             return await self.error("unknown_type", "Unknown message type.")
         client_id = str(content.get("client_id", ""))[:64]
@@ -70,12 +75,42 @@ class UserConsumer(CallMixin, StrangerMixin, AuthenticatedJsonConsumer):
             return await self.error("rate_limited", "You're sending messages too fast. Wait a moment.", client_id)
 
         try:
-            payload = await database_sync_to_async(services.send_dm)(self.user, recipient_id, text, attachment_id)
+            payload = await database_sync_to_async(services.send_dm)(
+                self.user, recipient_id, text, attachment_id, content.get("reply_to")
+            )
         except SocialError as exc:
             return await self.error(exc.code, exc.detail, client_id)
 
         event = {"type": "user.event", "payload": {"type": "dm", "message": payload, "client_id": client_id}}
         for uid in {self.user.id, recipient_id}:
+            await self.channel_layer.group_send(user_group(uid), event)
+
+    async def _dm_typing(self, to):
+        """{"type": "dm.typing", "to": <friend id>} -> the friend gets {"type": "dm.typing", "user_id"}."""
+        if not isinstance(to, int) or isinstance(to, bool) or to == self.user.id:
+            return
+        if not await database_sync_to_async(services.are_friends)(self.user.id, to):
+            return
+        # At most one every 2 s per sender, whatever the client does.
+        if not await database_sync_to_async(cache.add)(f"dmtyping:{self.user.id}:{to}", 1, 2):
+            return
+        event = {"type": "user.event", "payload": {"type": "dm.typing", "user_id": self.user.id}}
+        await self.channel_layer.group_send(user_group(to), event)
+
+    async def _dm_change(self, op, content):
+        """{"type": "dm.react", "message_id", "emoji"} / "dm.edit" (+ "content") / "dm.delete".
+        Both people's tabs get {"type": "dm.update", "message": {...}}."""
+        if op == "react" and not await database_sync_to_async(chat_services.allow_message)(self.user.id):
+            return await self.error("rate_limited", "Slow down a little.")
+        value = content.get("emoji") if op == "react" else content.get("content")
+        try:
+            payload, partner_id = await database_sync_to_async(services.change_dm)(
+                self.user, op, content.get("message_id"), value
+            )
+        except SocialError as exc:
+            return await self.error(exc.code, exc.detail)
+        event = {"type": "user.event", "payload": {"type": "dm.update", "message": payload}}
+        for uid in {self.user.id, partner_id}:
             await self.channel_layer.group_send(user_group(uid), event)
 
     async def user_event(self, event):

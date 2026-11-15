@@ -99,6 +99,7 @@ class DmMessagesView(APIView):
                 "is_friend": services.are_friends(request.user.id, partner.id),
                 "messages": messages,
                 "has_more": has_more,
+                "partner_read_id": services.partner_read_id(request.user, partner.id),
             }
         )
 

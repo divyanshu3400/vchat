@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ADS_ON } from "@/lib/ads";
 import { usePlus } from "@/lib/plus";
-import type { Attachment, StrangerPartner } from "@/lib/api";
+import type { Attachment, ReplyPreview, StrangerMessage, StrangerPartner } from "@/lib/api";
 import { useChat } from "../ChatProvider";
 
 /**
@@ -12,7 +12,33 @@ import { useChat } from "../ChatProvider";
  */
 export type Phase = "idle" | "searching" | "chatting" | "ended";
 export type EndedBy = "you" | "stranger" | "connection";
-export type Line = { id: number; mine: boolean; content: string; at: string; attachment: Attachment | null };
+export type Line = {
+  id: number;
+  mine: boolean;
+  senderId: number;
+  content: string;
+  at: string;
+  attachment: Attachment | null;
+  replyTo: ReplyPreview | null;
+  reactions: Record<string, number[]>;
+  edited: boolean;
+  deleted: boolean;
+};
+
+function toLine(m: StrangerMessage, meId: number | undefined): Line {
+  return {
+    id: m.id,
+    mine: m.sender_id === meId,
+    senderId: m.sender_id,
+    content: m.content,
+    at: m.created_at,
+    attachment: m.attachment,
+    replyTo: m.reply_to,
+    reactions: m.reactions ?? {},
+    edited: m.edited,
+    deleted: m.deleted,
+  };
+}
 
 // Ad rules (blueprint): a full-screen ad on every 5th skip, at most once every 4 minutes,
 // only between strangers and never during a conversation.
@@ -41,7 +67,9 @@ type StrangerValue = {
   next: () => void;
   cancel: () => void;
   leave: () => void;
-  send: (text: string, attachmentId?: string) => boolean;
+  send: (text: string, attachmentId?: string, replyTo?: number) => boolean;
+  /** stranger.react / stranger.edit / stranger.delete for a message of this chat. */
+  act: (kind: "react" | "edit" | "delete", messageId: number, value?: string | null) => boolean;
   typing: () => void;
   finishInterstitial: () => void;
 };
@@ -117,20 +145,12 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
           case "stranger.message": {
             const m = event.message;
             setPartnerTyping(false);
-            setLines((l) =>
-              l.some((x) => x.id === m.id)
-                ? l
-                : [
-                    ...l,
-                    {
-                      id: m.id,
-                      mine: m.sender_id === meRef.current?.id,
-                      content: m.content,
-                      at: m.created_at,
-                      attachment: m.attachment,
-                    },
-                  ],
-            );
+            setLines((l) => (l.some((x) => x.id === m.id) ? l : [...l, toLine(m, meRef.current?.id)]));
+            break;
+          }
+          case "stranger.update": {
+            const m = event.message;
+            setLines((l) => l.map((x) => (x.id === m.id ? toLine(m, meRef.current?.id) : x)));
             break;
           }
           case "stranger.typing":
@@ -177,6 +197,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             break;
           case "error":
             if (["rate_limited", "no_chat", "locked_photos", "invalid_attachment"].includes(event.code)) setNotice(event.detail);
+            else if (phaseRef.current === "chatting" && ["too_late", "not_yours", "gone", "not_found", "invalid_reaction", "not_text", "invalid_message"].includes(event.code)) setNotice(event.detail);
             if (event.code === "locked_filter") {
               // The unlock ran out (or never existed): fall back to "Anyone" and say why.
               setWant("any");
@@ -234,8 +255,18 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   }, [sendRaw]);
 
   const send = useCallback(
-    (text: string, attachmentId?: string) =>
-      sendRaw({ type: "stranger.message", content: text, attachment: attachmentId, client_id: crypto.randomUUID() }),
+    (text: string, attachmentId?: string, replyTo?: number) =>
+      sendRaw({ type: "stranger.message", content: text, attachment: attachmentId, reply_to: replyTo, client_id: crypto.randomUUID() }),
+    [sendRaw],
+  );
+
+  const act = useCallback(
+    (kind: "react" | "edit" | "delete", messageId: number, value?: string | null) =>
+      sendRaw({
+        type: `stranger.${kind}`,
+        message_id: messageId,
+        ...(kind === "react" ? { emoji: value ?? null } : kind === "edit" ? { content: value } : {}),
+      }),
     [sendRaw],
   );
 
@@ -268,10 +299,11 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       cancel,
       leave,
       send,
+      act,
       typing,
       finishInterstitial,
     }),
-    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, socketLive, interstitial, start, next, cancel, leave, send, typing, finishInterstitial],
+    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, socketLive, interstitial, start, next, cancel, leave, send, act, typing, finishInterstitial],
   );
 
   return <StrangerContext.Provider value={value}>{children}</StrangerContext.Provider>;

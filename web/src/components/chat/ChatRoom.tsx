@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   blockUser,
@@ -18,7 +18,9 @@ import AdSlot from "@/components/AdSlot";
 import { HEARTBEAT_MS, useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
 import { useDock } from "./Dock";
-import { Icon } from "./bits";
+import Composer from "./messages/Composer";
+import MessageList, { JumpToLatest, type Msg, type MsgAction } from "./messages/MessageList";
+import { useStickyScroll } from "./messages/useStickyScroll";
 
 type Status = "connecting" | "live" | "reconnecting" | "missing";
 
@@ -46,12 +48,12 @@ export default function ChatRoom({ slug }: { slug: string }) {
   const [hasMore, setHasMore] = useState(false);
   const [status, setStatus] = useState<Status>("connecting");
   const [notice, setNotice] = useState("");
-  const [draft, setDraft] = useState("");
   const [blocked, setBlocked] = useState<Set<number>>(() => new Set());
-  const [reporting, setReporting] = useState<number | null>(null);
+  const [reporting, setReporting] = useState<ChatMessage | null>(null);
+  const [replying, setReplying] = useState<Msg | null>(null);
+  const [editing, setEditing] = useState<Msg | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const stickToBottom = useRef(true);
 
   // Connect, authenticate inside the socket, and reconnect with backoff.
   // Every (re)connect reloads recent history, so messages missed while offline appear.
@@ -90,7 +92,7 @@ export default function ChatRoom({ slug }: { slug: string }) {
           heartbeat = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
           }, HEARTBEAT_MS);
-        } else if (data.type === "message") {
+        } else if (data.type === "message" || data.type === "message.update") {
           setMessages((prev) => mergeMessages(prev, [data.message]));
         } else if (data.type === "error") {
           setNotice(data.detail);
@@ -120,15 +122,29 @@ export default function ChatRoom({ slug }: { slug: string }) {
     };
   }, [slug, getAccess]);
 
-  // Follow new messages only if the reader is already at the bottom.
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  const scroll = useStickyScroll(listRef, messages.length);
 
-  const onScroll = useCallback(() => {
-    const el = listRef.current;
-    if (el) stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  const live = useCallback(
+    (payload: Record<string, unknown>) => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        setNotice("You're offline. Reconnecting…");
+        return false;
+      }
+      ws.send(JSON.stringify(payload));
+      return true;
+    },
+    [],
+  );
+  const onReact = useCallback((id: number, emoji: string | null) => live({ type: "react", message_id: id, emoji }), [live]);
+  const onDelete = useCallback((m: Msg) => live({ type: "delete", message_id: m.id }), [live]);
+  const onReply = useCallback((m: Msg) => {
+    setEditing(null);
+    setReplying(m);
+  }, []);
+  const onEdit = useCallback((m: Msg) => {
+    setReplying(null);
+    setEditing(m);
   }, []);
 
   async function loadOlder() {
@@ -137,7 +153,7 @@ export default function ChatRoom({ slug }: { slug: string }) {
     const fromBottom = el ? el.scrollHeight - el.scrollTop : 0;
     try {
       const page = await fetchHistory(slug, await getAccess(), messages[0].id);
-      stickToBottom.current = false;
+      scroll.hold();
       setMessages((prev) => mergeMessages(page.messages, prev).slice(0, MAX_KEPT));
       setHasMore(page.has_more);
       requestAnimationFrame(() => {
@@ -148,14 +164,17 @@ export default function ChatRoom({ slug }: { slug: string }) {
     }
   }
 
-  function send(e: FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
-    const ws = wsRef.current;
-    if (!text || !ws || ws.readyState !== WebSocket.OPEN || status !== "live") return;
-    stickToBottom.current = true;
-    ws.send(JSON.stringify({ type: "message", content: text, client_id: crypto.randomUUID() }));
-    setDraft("");
+  function send(text: string): boolean {
+    if (status !== "live") return false;
+    if (editing) {
+      if (!live({ type: "edit", message_id: editing.id, content: text })) return false;
+      setEditing(null);
+      return true;
+    }
+    scroll.follow();
+    if (!live({ type: "message", content: text, client_id: crypto.randomUUID(), reply_to: replying?.id })) return false;
+    setReplying(null);
+    return true;
   }
 
   async function block(user: ChatUser) {
@@ -178,7 +197,50 @@ export default function ChatRoom({ slug }: { slug: string }) {
     }
   }
 
-  const visible = messages.filter((m) => !blocked.has(m.sender.id));
+  const visible = useMemo(() => messages.filter((m) => !blocked.has(m.sender.id)), [messages, blocked]);
+  const items = useMemo<Msg[]>(
+    () =>
+      visible.map((m) => {
+        const rel = relation(m.sender.id);
+        return {
+          id: m.id,
+          mine: rel === "self",
+          senderId: m.sender.id,
+          senderName: m.sender.nickname,
+          senderTag: rel === "friend" ? "friend" : undefined,
+          content: m.content,
+          attachment: null,
+          createdAt: m.created_at,
+          replyTo: m.reply_to,
+          reactions: m.reactions ?? {},
+          edited: m.edited,
+          deleted: m.deleted,
+        };
+      }),
+    [visible, relation],
+  );
+  const byId = useMemo(() => new Map(visible.map((m) => [m.id, m])), [visible]);
+
+  const extraActions = useCallback(
+    (msg: Msg): MsgAction[] => {
+      const m = byId.get(msg.id);
+      if (!m || msg.mine) return [];
+      const rel = relation(m.sender.id);
+      const out: MsgAction[] = [];
+      if (rel === "friend") out.push({ label: `Message ${m.sender.nickname}`, icon: "chat", onClick: () => openChat(m.sender.id) });
+      if (rel === "none" || rel === "incoming")
+        out.push({
+          label: rel === "incoming" ? "Accept friend" : "Add friend",
+          icon: "plus",
+          onClick: async () => setNotice(await addFriend(m.sender)),
+        });
+      out.push({ label: "Report…", icon: "shield", onClick: () => setReporting(m) });
+      out.push({ label: `Block ${m.sender.nickname}`, icon: "close", danger: true, onClick: () => block(m.sender) });
+      return out;
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- block/report read the latest state when clicked
+    [byId, relation, openChat, addFriend],
+  );
   // Counts refresh every 30 s; never show fewer than the one person we know is here (you).
   const hereNow = Math.max(presenceCounts?.rooms[slug] ?? 0, status === "live" ? 1 : 0);
   const statusLabel = { connecting: "Connecting…", live: "Live", reconnecting: "Reconnecting…", missing: "Room not found" }[
@@ -201,7 +263,7 @@ export default function ChatRoom({ slug }: { slug: string }) {
       {/* Phone only: below the header, away from the typing box (no accidental taps). */}
       <AdSlot kind="anchor" className="room-anchor" />
 
-      <div className="messages" ref={listRef} onScroll={onScroll} aria-live="polite" aria-relevant="additions">
+      <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
         {hasMore && (
           <button className="load-more" type="button" onClick={loadOlder}>
             Load earlier messages
@@ -215,56 +277,35 @@ export default function ChatRoom({ slug }: { slug: string }) {
         {status !== "missing" && visible.length === 0 && (
           <p className="empty">No messages yet. Say hi and get the conversation going.</p>
         )}
-        {visible.map((m) => {
-          const rel = relation(m.sender.id);
-          const mine = rel === "self";
-          return (
-            <div key={m.id} className={`b${mine ? " me" : ""}`}>
-              {!mine && (
-                <span className="who c-rose">
-                  {m.sender.nickname}
-                  {rel === "friend" && <small>friend</small>}
-                </span>
-              )}
-              <div className="t">{m.content}</div>
-              {!mine && (
-                <div className="msg-actions">
-                  {rel === "friend" && (
-                    <button type="button" onClick={() => openChat(m.sender.id)}>
-                      Message
-                    </button>
-                  )}
-                  {(rel === "none" || rel === "incoming") && (
-                    <button type="button" onClick={async () => setNotice(await addFriend(m.sender))}>
-                      {rel === "incoming" ? "Accept friend" : "Add friend"}
-                    </button>
-                  )}
-                  {rel === "requested" && (
-                    <button type="button" disabled>
-                      Requested
-                    </button>
-                  )}
-                  <button type="button" onClick={() => setReporting(reporting === m.id ? null : m.id)}>
-                    Report
-                  </button>
-                  <button type="button" onClick={() => block(m.sender)}>
-                    Block
-                  </button>
-                </div>
-              )}
-              {reporting === m.id && (
-                <div className="report-menu" role="group" aria-label={`Report ${m.sender.nickname} for`}>
-                  {REPORT_REASONS.map(([reason, label]) => (
-                    <button key={reason} type="button" onClick={() => report(m, reason)}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        <MessageList
+          items={items}
+          me={me ?? undefined}
+          showNames
+          onReact={onReact}
+          onReply={onReply}
+          onEdit={onEdit}
+          onDelete={onDelete}
+          extraActions={extraActions}
+        />
       </div>
+      <JumpToLatest away={scroll.away} unseen={scroll.unseen} onClick={scroll.jump} />
+
+      {reporting && (
+        <div className="msg-sheet-veil" onClick={() => setReporting(null)}>
+          <div className="link-guard" role="dialog" aria-label={`Report ${reporting.sender.nickname} for`} onClick={(e) => e.stopPropagation()}>
+            <p>
+              Report <b>{reporting.sender.nickname}</b> for
+            </p>
+            <div className="report-menu">
+              {REPORT_REASONS.map(([reason, label]) => (
+                <button key={reason} type="button" onClick={() => report(reporting, reason)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="composer-wrap">
         {notice && (
@@ -272,23 +313,17 @@ export default function ChatRoom({ slug }: { slug: string }) {
             {notice}
           </p>
         )}
-        <form className="composer" onSubmit={send}>
-          <input
-            id="chat-input"
-            className="composer-input"
-            type="text"
-            placeholder={status === "live" ? "Say something nice…" : "Connecting…"}
-            maxLength={1000}
-            autoComplete="off"
-            enterKeyHint="send"
-            aria-label="Message"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <button className="send-btn" type="submit" disabled={status !== "live" || !draft.trim()} aria-label="Send">
-            <Icon name="send" />
-          </button>
-        </form>
+        <Composer
+          id="chat-input"
+          placeholder={status === "live" ? "Say something nice…" : "Connecting…"}
+          disabled={status !== "live"}
+          onSend={send}
+          replying={replying}
+          replyName={replying ? (replying.mine ? "yourself" : replying.senderName) : undefined}
+          onCancelReply={() => setReplying(null)}
+          editing={editing}
+          onCancelEdit={() => setEditing(null)}
+        />
       </div>
     </div>
   );

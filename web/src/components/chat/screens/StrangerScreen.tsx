@@ -1,11 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdSlot from "@/components/AdSlot";
 import { ADS_ON } from "@/lib/ads";
 import { ApiError, blockUser, reportUser, uploadMedia, type ReportReason } from "@/lib/api";
 import { useCalls } from "../calls/CallProvider";
-import MediaBubble from "../media/MediaBubble";
+import { voiceFilename } from "../media/useRecorder";
+import Composer from "../messages/Composer";
+import MessageList, { JumpToLatest, type Msg } from "../messages/MessageList";
+import { useStickyScroll } from "../messages/useStickyScroll";
 import { useRoomPresence } from "@/lib/presence";
 import { REGION_ROOMS, findRoom } from "@/lib/rooms";
 import { useChat } from "../ChatProvider";
@@ -168,14 +171,29 @@ function SearchingView() {
 }
 
 function ChatView() {
-  const { getAccess, relation, addFriend, premium, setPremium } = useChat();
+  const { me, getAccess, relation, addFriend, premium, setPremium } = useChat();
   const { start: startCall } = useCalls();
-  const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, typing } = useStranger();
-  const [draft, setDraft] = useState("");
+  const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, act, typing } = useStranger();
+  const [replying, setReplying] = useState<Msg | null>(null);
+  const [editing, setEditing] = useState<Msg | null>(null);
   const [uploading, setUploading] = useState<number | null>(null);
   const [unlockPhotos, setUnlockPhotos] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   const photosUnlocked = !!premium?.plus || (premium?.grants.random_photos?.uses_left ?? 0) > 0;
+
+  async function sendVoice(blob: Blob) {
+    setNotice("");
+    setUploading(0);
+    const replyTo = replying?.id;
+    setReplying(null);
+    try {
+      const up = await uploadMedia(blob, "audio", await getAccess(), setUploading, voiceFilename(blob));
+      if (!send("", up.id, replyTo)) setNotice("You're offline. Reconnecting…");
+    } catch (e) {
+      setNotice(e instanceof ApiError ? e.message : "Couldn't send the voice message.");
+    }
+    setUploading(null);
+  }
 
   async function sendPhoto(file: File) {
     setNotice("");
@@ -196,18 +214,36 @@ function ChatView() {
   const [menu, setMenu] = useState<null | "main" | "report">(null);
   const [escArmed, setEscArmed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
   const ended = phase === "ended";
   const rel = partner ? relation(partner.id) : "none";
+  const scroll = useStickyScroll(listRef, lines.length, [partnerTyping, ended, uploading !== null]);
 
-  useLayoutEffect(() => {
-    const el = listRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [lines, partnerTyping, ended]);
-
-  useEffect(() => {
-    if (!ended) inputRef.current?.focus({ preventScroll: true });
-  }, [ended, session]);
+  const items = useMemo<Msg[]>(
+    () =>
+      lines.map((l) => ({
+        id: l.id,
+        mine: l.mine,
+        senderId: l.senderId,
+        content: l.content,
+        attachment: l.attachment,
+        createdAt: l.at,
+        replyTo: l.replyTo,
+        reactions: l.reactions,
+        edited: l.edited,
+        deleted: l.deleted,
+      })),
+    [lines],
+  );
+  const onReact = useCallback((id: number, emoji: string | null) => act("react", id, emoji), [act]);
+  const onDelete = useCallback((m: Msg) => act("delete", m.id), [act]);
+  const onReply = useCallback((m: Msg) => {
+    setEditing(null);
+    setReplying(m);
+  }, []);
+  const onEdit = useCallback((m: Msg) => {
+    setReplying(null);
+    setEditing(m);
+  }, []);
 
   // Esc twice skips (once just arms it), so nobody loses a good chat by a stray key.
   useEffect(() => {
@@ -229,12 +265,23 @@ function ChatView() {
     };
   }, [ended, escArmed, next]);
 
-  function submit(e: FormEvent) {
-    e.preventDefault();
-    const text = draft.trim();
-    if (!text || ended) return;
-    if (send(text)) setDraft("");
-    else setNotice("You're offline. Reconnecting…");
+  function submit(text: string): boolean {
+    if (ended) return false;
+    if (editing) {
+      if (!act("edit", editing.id, text)) {
+        setNotice("You're offline. Reconnecting…");
+        return false;
+      }
+      setEditing(null);
+      return true;
+    }
+    scroll.follow();
+    if (!send(text, undefined, replying?.id)) {
+      setNotice("You're offline. Reconnecting…");
+      return false;
+    }
+    setReplying(null);
+    return true;
   }
 
   async function report(reason: ReportReason) {
@@ -324,18 +371,25 @@ function ChatView() {
         }
       />
 
-      <div className="messages" ref={listRef} aria-live="polite" aria-relevant="additions">
+      <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
         <p className="sys-line">You&apos;re chatting with a stranger{partner.region !== "any" ? ` from ${regionName(partner.region)}` : ""}. Say hi!</p>
-        {lines.map((l) => (
-          <div key={l.id} className={`b${l.mine ? " me" : ""}${l.attachment ? " has-media" : ""}`}>
-            {/* A stranger's photo stays blurred until you choose to look. */}
-            {l.attachment && <MediaBubble attachment={l.attachment} blurUntilTap={!l.mine} />}
-            {l.content && <div className="t">{l.content}</div>}
-          </div>
-        ))}
+        {/* Strangers' photos stay blurred until you choose to look; their links ask first. */}
+        <MessageList
+          items={items}
+          me={me ?? undefined}
+          stranger
+          onReact={ended ? () => undefined : onReact}
+          onReply={onReply}
+          onEdit={ended ? undefined : onEdit}
+          onDelete={ended ? undefined : onDelete}
+        />
         {uploading !== null && (
-          <div className="b me uploading">
-            <div className="t">Sending photo… {Math.round(uploading * 100)}%</div>
+          <div className="m me last uploading">
+            <div className="m-row">
+              <div className="bubble">
+                <span className="txt">Sending… {Math.round(uploading * 100)}%</span>
+              </div>
+            </div>
           </div>
         )}
         {partnerTyping && !ended && (
@@ -351,6 +405,7 @@ function ChatView() {
           </p>
         )}
       </div>
+      <JumpToLatest away={scroll.away} unseen={scroll.unseen} onClick={scroll.jump} />
 
       {unlockPhotos && (
         <UnlockSheet
@@ -375,51 +430,47 @@ function ChatView() {
             </button>
           </div>
         ) : (
-          <form className="composer" onSubmit={submit}>
-            <button type="button" className={`next-btn${escArmed ? " armed" : ""}`} onClick={next} title="Next stranger (Esc twice)">
-              {escArmed ? "Esc again" : "Next"}
-            </button>
-            <button
-              type="button"
-              className={`icon-btn${photosUnlocked ? "" : " locked-media"}`}
-              aria-label={photosUnlocked ? "Send a photo" : "Photos (locked)"}
-              disabled={uploading !== null}
-              onClick={() => (photosUnlocked ? photoRef.current?.click() : setUnlockPhotos(true))}
-            >
-              <Icon name={photosUnlocked ? "image" : "lock"} size={18} />
-            </button>
-            <input
-              ref={photoRef}
-              id="stranger-photo"
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = "";
-                if (file) sendPhoto(file);
-              }}
-            />
-            <input
-              ref={inputRef}
-              id="stranger-input"
-              className="composer-input"
-              type="text"
-              placeholder="Say something nice…"
-              maxLength={1000}
-              autoComplete="off"
-              enterKeyHint="send"
-              aria-label="Message the stranger"
-              value={draft}
-              onChange={(e) => {
-                setDraft(e.target.value);
-                if (e.target.value) typing();
-              }}
-            />
-            <button className="send-btn" type="submit" disabled={!draft.trim()} aria-label="Send">
-              <Icon name="send" />
-            </button>
-          </form>
+          <Composer
+            id="stranger-input"
+            placeholder="Say something nice…"
+            onSend={submit}
+            onTyping={typing}
+            replying={replying}
+            replyName={replying ? (replying.mine ? "yourself" : "Stranger") : undefined}
+            onCancelReply={() => setReplying(null)}
+            editing={editing}
+            onCancelEdit={() => setEditing(null)}
+            onVoice={sendVoice}
+            autoFocusKey={session}
+            left={
+              <>
+                <button type="button" className={`next-btn${escArmed ? " armed" : ""}`} onClick={next} title="Next stranger (Esc twice)">
+                  {escArmed ? "Esc again" : "Next"}
+                </button>
+                <button
+                  type="button"
+                  className={`icon-btn${photosUnlocked ? "" : " locked-media"}`}
+                  aria-label={photosUnlocked ? "Send a photo" : "Photos (locked)"}
+                  disabled={uploading !== null}
+                  onClick={() => (photosUnlocked ? photoRef.current?.click() : setUnlockPhotos(true))}
+                >
+                  <Icon name={photosUnlocked ? "image" : "lock"} size={18} />
+                </button>
+                <input
+                  ref={photoRef}
+                  id="stranger-photo"
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) sendPhoto(file);
+                  }}
+                />
+              </>
+            }
+          />
         )}
       </div>
     </div>

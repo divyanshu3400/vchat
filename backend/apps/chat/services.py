@@ -47,12 +47,30 @@ def blocked_user_ids(user_id: int) -> set[int]:
 
 
 def message_payload(message: Message) -> dict:
+    from . import message_ops
+
     sender = message.sender
     return {
         "id": message.id,
         "room": message.room.slug,
         "sender": {"id": sender.id, "nickname": sender.nickname, "gender": sender.gender},
-        "content": message.content,
+        "content": message_ops.visible_content(message),
         "content_type": message.content_type,
         "created_at": message.created_at.isoformat(),
+        **message_ops.extras(message),
     }
+
+
+def load_message(room: Room, message_id) -> Message | None:
+    """A message of this room, with everything its payload needs."""
+    from . import message_ops
+
+    if not isinstance(message_id, int) or isinstance(message_id, bool):
+        return None
+    select, prefetch = message_ops.related_fields(Message)
+    return (
+        Message.objects.select_related("room", *select)
+        .prefetch_related(*prefetch)
+        .filter(id=message_id, room=room)
+        .first()
+    )

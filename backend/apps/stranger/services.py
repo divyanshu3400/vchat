@@ -3,6 +3,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import User
+from apps.chat import message_ops
 from apps.media import services as media
 from apps.premium import services as premium
 from apps.premium.models import RewardGrant
@@ -43,25 +44,66 @@ def end_session(session_id, ended_by_id: int | None) -> None:
     )
 
 
-def save_message(session_id, sender: User, text: str, attachment_id=None) -> dict:
-    """Photos with strangers need Plus or a rewarded-ad unlock; each photo spends one use."""
+def save_message(session_id, sender: User, text: str, attachment_id=None, reply_id=None) -> dict:
+    """Voice messages are free. Photos with strangers need Plus or a rewarded-ad unlock; each photo
+    spends one use."""
     with transaction.atomic():
         attachment = None
         if attachment_id:
-            if not premium.consume(sender, RewardGrant.Kind.RANDOM_PHOTOS):
-                raise PhotoLocked("locked_photos", "Photos with strangers need vChat Plus or a short ad.")
+            pending = media.pending_kind(sender.id, attachment_id)
+            if pending == "audio":
+                kinds = ("audio",)
+            elif pending == "image":
+                if not premium.consume(sender, RewardGrant.Kind.RANDOM_PHOTOS):
+                    raise PhotoLocked("locked_photos", "Photos with strangers need vChat Plus or a short ad.")
+                kinds = ("image",)
+            else:
+                raise PhotoLocked("invalid_attachment", "Only photos and voice messages can be sent to strangers.")
             try:
-                attachment = media.claim_for_message(sender.id, attachment_id, ("image",))
+                attachment = media.claim_for_message(sender.id, attachment_id, kinds)
             except (media.UploadError, ValueError, ValidationError):
-                raise PhotoLocked("invalid_attachment", "Only photos can be sent to strangers.")
+                raise PhotoLocked("invalid_attachment", "That file can't be sent. Try again.")
+        reply_to = message_ops.find_reply(StrangerMessage, reply_id, session_id=session_id)
         message = StrangerMessage.objects.create(
-            session_id=session_id, sender_id=sender.id, content=text, attachment=attachment
+            session_id=session_id, sender_id=sender.id, content=text, attachment=attachment, reply_to=reply_to
         )
+    return message_payload(load_message(session_id, message.id))
+
+
+def load_message(session_id, message_id) -> StrangerMessage | None:
+    if not isinstance(message_id, int) or isinstance(message_id, bool):
+        return None
+    select, prefetch = message_ops.related_fields(StrangerMessage)
+    return (
+        StrangerMessage.objects.select_related(*select)
+        .prefetch_related(*prefetch)
+        .filter(id=message_id, session_id=session_id)
+        .first()
+    )
+
+
+def message_payload(message: StrangerMessage) -> dict:
+    deleted = message.deleted_at is not None
     return {
         "id": message.id,
-        "session": str(session_id),
-        "sender_id": sender.id,
-        "content": message.content,
-        "attachment": media.payload(attachment),
+        "session": str(message.session_id),
+        "sender_id": message.sender_id,
+        "content": message_ops.visible_content(message),
+        "attachment": None if deleted else media.payload(message.attachment),
         "created_at": message.created_at.isoformat(),
+        **message_ops.extras(message),
     }
+
+
+def change_message(session_id, user: User, kind: str, message_id, value=None) -> dict:
+    """React to, edit or delete a message of the current random chat."""
+    message = load_message(session_id, message_id)
+    if message is None:
+        raise message_ops.MessageOpError("not_found", "That message is gone.")
+    if kind == "react":
+        message_ops.react(message, user, value)
+    elif kind == "edit":
+        message_ops.edit(message, user, value)
+    else:
+        message_ops.delete(message, user)
+    return message_payload(load_message(session_id, message.id))

@@ -14,7 +14,7 @@ def test_room_list_is_public(room):
 
 
 @pytest.mark.django_db
-def test_history_pages_backwards_and_hides_deleted(room, alice):
+def test_history_pages_backwards_and_blanks_deleted(room, alice):
     msgs = [Message.objects.create(room=room, sender=alice, content=f"m{i}") for i in range(5)]
     Message.objects.filter(id=msgs[1].id).update(deleted_at=msgs[1].created_at)
     client = auth_client(alice)
@@ -24,7 +24,8 @@ def test_history_pages_backwards_and_hides_deleted(room, alice):
     assert first["has_more"] is True
 
     older = client.get(f"/api/rooms/random/messages/?limit=10&before={first['messages'][0]['id']}").data
-    assert [m["content"] for m in older["messages"]] == ["m0", "m2"]
+    # A deleted message keeps its place, without its text.
+    assert [(m["content"], m["deleted"]) for m in older["messages"]] == [("m0", False), ("", True), ("m2", False)]
     assert older["has_more"] is False
 
 

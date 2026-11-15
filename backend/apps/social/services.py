@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from apps.accounts.models import User
-from apps.chat import presence
+from apps.chat import message_ops, presence
 from apps.media import services as media
 from apps.chat.models import Block
 from apps.chat.realtime import push_to_user
@@ -39,14 +39,51 @@ def request_payload(req: FriendRequest) -> dict:
 
 
 def dm_payload(message: DirectMessage, recipient_id: int) -> dict:
+    deleted = message.deleted_at is not None
     return {
         "id": message.id,
         "sender": brief(message.sender),
         "recipient_id": recipient_id,
-        "content": message.content,
-        "attachment": media.payload(message.attachment),  # fresh signed link each time
+        "content": message_ops.visible_content(message),
+        # fresh signed link each time; none once deleted
+        "attachment": None if deleted else media.payload(message.attachment),
         "created_at": message.created_at.isoformat(),
+        **message_ops.extras(message),
     }
+
+
+def _load_dm(message_id) -> DirectMessage | None:
+    if not isinstance(message_id, int) or isinstance(message_id, bool):
+        return None
+    select, prefetch = message_ops.related_fields(DirectMessage)
+    return (
+        DirectMessage.objects.select_related("conversation", *select)
+        .prefetch_related(*prefetch)
+        .filter(id=message_id)
+        .first()
+    )
+
+
+def change_dm(user: User, kind: str, message_id, value=None) -> tuple[dict, int]:
+    """React to, edit or delete a message in one of your chats. Returns (payload, partner id)."""
+    message = _load_dm(message_id)
+    if message is None or user.id not in (message.conversation.user_a_id, message.conversation.user_b_id):
+        raise SocialError("not_found", "That message is gone.")
+    c = message.conversation
+    partner_id = c.user_b_id if c.user_a_id == user.id else c.user_a_id
+    try:
+        if kind == "react":
+            if is_blocked_between(user.id, partner_id):
+                raise SocialError("not_found", "That message is gone.")
+            message_ops.react(message, user, value)
+        elif kind == "edit":
+            message_ops.edit(message, user, value)
+        else:
+            message_ops.delete(message, user)
+    except message_ops.MessageOpError as exc:
+        raise SocialError(exc.code, exc.detail)
+    message = _load_dm(message.id)
+    return dm_payload(message, partner_id if message.sender_id == user.id else user.id), partner_id
 
 
 ATTACHMENT_PREVIEW = {"image": "📷 Photo", "video": "🎬 Video", "audio": "🎤 Voice note"}
@@ -206,7 +243,7 @@ def _conversation(a: int, b: int) -> Conversation | None:
     return Conversation.objects.filter(user_a_id=x, user_b_id=y).first()
 
 
-def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None) -> dict:
+def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None, reply_id=None) -> dict:
     """Text, an attachment (photo, video, voice note), or both."""
     if not isinstance(recipient_id, int) or recipient_id == sender.id:
         raise SocialError("invalid", "Pick someone to message.")
@@ -221,22 +258,26 @@ def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None) -> d
             except (media.UploadError, ValueError, ValidationError):
                 raise SocialError("invalid_attachment", "That file can't be sent. Try uploading it again.")
         conversation, _ = Conversation.objects.get_or_create(user_a_id=x, user_b_id=y)
+        reply_to = message_ops.find_reply(DirectMessage, reply_id, conversation=conversation)
         message = DirectMessage.objects.create(
-            conversation=conversation, sender=sender, content=text, attachment=attachment
+            conversation=conversation, sender=sender, content=text, attachment=attachment, reply_to=reply_to
         )
         Conversation.objects.filter(pk=conversation.pk).update(last_message_at=message.created_at)
         # Your own message counts as read for you.
         _advance_read(conversation, sender.id, message.id)
-    return dm_payload(message, recipient_id)
+    return dm_payload(_load_dm(message.id), recipient_id)
 
 
 def dm_history(user: User, partner_id: int, before: int | None, limit: int) -> tuple[list[dict], bool]:
     conversation = _conversation(user.id, partner_id)
     if conversation is None:
         return [], False
+    select, prefetch = message_ops.related_fields(DirectMessage)
     qs = (
-        DirectMessage.objects.filter(conversation=conversation, deleted_at__isnull=True)
-        .select_related("sender", "attachment")
+        # Deleted messages stay as "This message was deleted" in their place.
+        DirectMessage.objects.filter(conversation=conversation)
+        .select_related(*select)
+        .prefetch_related(*prefetch)
         .order_by("-id")
     )
     if before:
@@ -246,16 +287,25 @@ def dm_history(user: User, partner_id: int, before: int | None, limit: int) -> t
     return messages, len(page) == limit
 
 
-def _advance_read(conversation: Conversation, user_id: int, last_id: int) -> None:
+def _advance_read(conversation: Conversation, user_id: int, last_id: int) -> bool:
     field = "a_last_read_id" if conversation.user_a_id == user_id else "b_last_read_id"
     # Only ever moves forward, even with several tabs racing.
-    Conversation.objects.filter(pk=conversation.pk, **{f"{field}__lt": last_id}).update(**{field: last_id})
+    return bool(Conversation.objects.filter(pk=conversation.pk, **{f"{field}__lt": last_id}).update(**{field: last_id}))
 
 
 def mark_read(user: User, partner_id: int, last_id: int) -> None:
+    """Also tells the partner, for the "seen" ticks under their messages."""
     conversation = _conversation(user.id, partner_id)
-    if conversation:
-        _advance_read(conversation, user.id, last_id)
+    if conversation and _advance_read(conversation, user.id, last_id):
+        _on_commit_push(partner_id, {"type": "dm.read", "user_id": user.id, "last_id": last_id})
+
+
+def partner_read_id(user: User, partner_id: int) -> int:
+    """The newest message of this chat the partner has seen."""
+    conversation = _conversation(user.id, partner_id)
+    if conversation is None:
+        return 0
+    return conversation.b_last_read_id if conversation.user_a_id == user.id else conversation.a_last_read_id
 
 
 def conversations_of(user: User, limit: int = 100) -> list[dict]:

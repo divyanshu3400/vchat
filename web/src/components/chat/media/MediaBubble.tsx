@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Attachment } from "@/lib/api";
 import { Icon } from "../bits";
+import AudioPlayer from "./AudioPlayer";
 
 /**
  * A photo, video or voice note inside a message bubble.
@@ -13,13 +14,7 @@ export default function MediaBubble({ attachment, blurUntilTap = false }: { atta
   const [open, setOpen] = useState(false);
   const ratio = attachment.width && attachment.height ? attachment.width / attachment.height : 4 / 3;
 
-  if (attachment.kind === "audio") {
-    return (
-      <audio className="media-audio" controls preload="metadata" src={attachment.url}>
-        Your browser can&apos;t play this voice note.
-      </audio>
-    );
-  }
+  if (attachment.kind === "audio") return <AudioPlayer src={attachment.url} />;
 
   if (attachment.kind === "video") {
     return (

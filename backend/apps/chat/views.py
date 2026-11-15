@@ -13,6 +13,7 @@ from apps.accounts.models import User
 from apps.social.services import remove_social_links
 
 from . import presence, services
+from . import message_ops
 from .models import Block, Message, Room
 from .realtime import push_control
 from .serializers import ReportCreateSerializer, RoomSerializer
@@ -58,10 +59,13 @@ class RoomMessagesView(APIView):
         if limit < 1:
             raise ValidationError("limit must be at least 1.")
 
+        select, prefetch = message_ops.related_fields(Message)
         qs = (
-            Message.objects.filter(room=room, deleted_at__isnull=True)
+            # Deleted messages stay as "This message was deleted" in their place.
+            Message.objects.filter(room=room)
             .exclude(sender_id__in=services.blocked_user_ids(request.user.id))
-            .select_related("sender", "room")
+            .select_related("room", *select)
+            .prefetch_related(*prefetch)
             .order_by("-id")
         )
         if before:

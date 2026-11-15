@@ -7,6 +7,7 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
+import { cleanWordsOn, setCleanWords } from "../messages/richText";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
@@ -15,6 +16,7 @@ export default function MeScreen() {
   const { me, friends, premium } = useChat();
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [clean, setClean] = useState(() => (typeof window === "undefined" ? true : cleanWordsOn()));
 
   async function leave() {
     setBusy(true);
@@ -90,6 +92,22 @@ export default function MeScreen() {
             </span>
             <ThemeToggle />
           </div>
+          <label className="setting">
+            <span>
+              <b>Hide swear words</b>
+              <small>Shows f••• instead, in every chat on this device</small>
+            </span>
+            <input
+              type="checkbox"
+              className="switch"
+              checked={clean}
+              suppressHydrationWarning
+              onChange={(e) => {
+                setClean(e.target.checked);
+                setCleanWords(e.target.checked);
+              }}
+            />
+          </label>
           <div className="setting">
             <span>
               <b>Keep your friends on other devices</b>
