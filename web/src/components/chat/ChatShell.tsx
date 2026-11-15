@@ -174,7 +174,7 @@ function Frame({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AdblockWall />
-      <div className={`app${inConversation ? " in-conversation" : ""}${typing ? " typing" : ""}${adsShown ? " ads-on" : ""}`}>
+      <div className={`app${inConversation ? " in-conversation" : ""}${typing ? " kb-open" : ""}${adsShown ? " ads-on" : ""}`}>
         <Rail pathname={pathname} />
         <aside className="list-pane" aria-label="Conversations">
           <ConversationList />
