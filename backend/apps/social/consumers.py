@@ -3,6 +3,7 @@ from channels.db import database_sync_to_async
 from apps.chat import presence
 from apps.chat import services as chat_services
 from apps.chat.realtime import user_group
+from apps.calls.consumer import CallMixin
 from apps.chat.ws_auth import AuthenticatedJsonConsumer
 from apps.stranger.consumer import StrangerMixin
 
@@ -10,13 +11,14 @@ from . import services
 from .services import SocialError
 
 
-class UserConsumer(StrangerMixin, AuthenticatedJsonConsumer):
+class UserConsumer(CallMixin, StrangerMixin, AuthenticatedJsonConsumer):
     """The personal socket (/ws/me/): one per open tab, carries everything private to a user.
 
     client -> {"type": "dm", "to": <user id>, "content": "...", "client_id": "..."}
     server -> {"type": "dm", "message": {...}, "client_id": "..."}      to both people
     server -> {"type": "friend_request" | "friend_added" | "friend_removed" | "friend_request_removed", ...}
-    Random 1-on-1 chat ("stranger.*") is documented in apps/stranger/consumer.py.
+    Random 1-on-1 chat ("stranger.*") is documented in apps/stranger/consumer.py,
+    calls ("call.*") in apps/calls/consumer.py.
     """
 
     async def on_authenticated(self):
@@ -27,6 +29,7 @@ class UserConsumer(StrangerMixin, AuthenticatedJsonConsumer):
             await self._announce(online=True)
 
     async def on_leave(self):
+        await self.call_disconnect()
         await self.stranger_disconnect()
         await self.channel_layer.group_discard(user_group(self.user.id), self.channel_name)
         went_offline = await database_sync_to_async(presence.disconnect_user)(self.user.id, self.channel_name)
@@ -46,6 +49,8 @@ class UserConsumer(StrangerMixin, AuthenticatedJsonConsumer):
 
     async def handle(self, kind, content):
         if isinstance(kind, str) and kind.startswith("stranger.") and await self.stranger_handle(kind, content):
+            return
+        if isinstance(kind, str) and kind.startswith("call.") and await self.call_handle(kind, content):
             return
         if kind != "dm":
             return await self.error("unknown_type", "Unknown message type.")

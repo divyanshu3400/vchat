@@ -83,6 +83,30 @@ The dumps stay on this server. Copy them off it (NAS, another machine) to surviv
 - Files live in the `vchat_media` Docker volume and are only reachable through signed links
   that expire after 6 hours. `backup.sh` archives the volume next to the database dump.
 
+### Voice and video calls
+
+Calls are WebRTC: media goes phone to phone; the backend only relays the call setup. Without a
+TURN relay, calls work on many networks but fail when both sides are behind strict NAT (common
+on mobile data). To turn the relay on:
+
+1. **Network (router/firewall):** forward from `1.22.197.176` to `10.10.11.6`:
+   UDP 3478, TCP 3478, UDP 49160–49200.
+2. **ufw on 10.10.11.6** (host networking isn't covered by Docker's rules):
+   ```bash
+   sudo ufw allow 3478/udp && sudo ufw allow 3478/tcp && sudo ufw allow 49160:49200/udp
+   ```
+3. **Start it and point the app at it** (in `~/vchat/deploy/.env`):
+   ```
+   TURN_URLS=turn:1.22.197.176:3478?transport=udp,turn:1.22.197.176:3478?transport=tcp
+   STUN_URLS=stun:1.22.197.176:3478
+   ```
+   ```bash
+   docker compose --profile turn up -d turn && docker compose up -d backend
+   ```
+
+`TURN_SECRET` is in `.env` (made by `make_env.sh`); TURN logins are derived from it and expire
+after 6 hours. The relay refuses to forward into private networks.
+
 ## First time
 
 ### On 10.10.11.6 (app server)

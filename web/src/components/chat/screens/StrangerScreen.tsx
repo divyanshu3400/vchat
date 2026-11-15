@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import AdSlot from "@/components/AdSlot";
 import { ADS_ON } from "@/lib/ads";
 import { ApiError, blockUser, reportUser, uploadMedia, type ReportReason } from "@/lib/api";
+import { useCalls } from "../calls/CallProvider";
 import MediaBubble from "../media/MediaBubble";
 import { useRoomPresence } from "@/lib/presence";
 import { REGION_ROOMS, findRoom } from "@/lib/rooms";
@@ -168,6 +169,7 @@ function SearchingView() {
 
 function ChatView() {
   const { getAccess, relation, addFriend, premium, setPremium } = useChat();
+  const { start: startCall } = useCalls();
   const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, typing } = useStranger();
   const [draft, setDraft] = useState("");
   const [uploading, setUploading] = useState<number | null>(null);
@@ -271,6 +273,17 @@ function ChatView() {
         subtitle={<span className={ended ? "" : "on"}>{ended ? "Chat ended" : `Stranger · ${sub}`}</span>}
         actions={
           <>
+            {!ended && (
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Ask for a voice call"
+                title="Voice call (starts only if they accept)"
+                onClick={() => startCall({ id: partner.id, nickname: "Stranger" }, "voice", true)}
+              >
+                <Icon name="phone" />
+              </button>
+            )}
             {(rel === "none" || rel === "incoming") && (
               <button type="button" className="pill-btn add-friend" onClick={async () => setNotice(await addFriend(partner))}>
                 <Icon name="plus" size={15} /> <span className="hide-phone">Add friend</span>

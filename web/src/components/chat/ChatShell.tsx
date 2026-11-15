@@ -8,6 +8,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import { ADS_ON } from "@/lib/ads";
 import { usePlus } from "@/lib/plus";
 import AdblockWall from "./AdblockWall";
+import CallProvider from "./calls/CallProvider";
+import CallScreen from "./calls/CallScreen";
 import { useChat } from "./ChatProvider";
 import ConversationList from "./ConversationList";
 import { DockProvider } from "./Dock";
@@ -150,7 +152,10 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
   return (
     <DockProvider>
       <StrangerProvider>
-        <Frame>{children}</Frame>
+        <CallProvider>
+          <Frame>{children}</Frame>
+          <CallScreen />
+        </CallProvider>
       </StrangerProvider>
     </DockProvider>
   );

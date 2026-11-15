@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "apps.stranger",
     "apps.premium",
     "apps.media",
+    "apps.calls",
 ]
 
 MIDDLEWARE = [
@@ -179,6 +180,12 @@ VCHAT = {
     # Signed links to photos, videos and voice notes stop working after this long.
     # Clients get fresh links whenever they load the messages again.
     "MEDIA_LINK_SECONDS": 6 * 3600,
+    # Calls (WebRTC). Comma-separated URLs. TURN relays media when phones can't connect
+    # directly; its credentials are derived from TURN_SECRET (coturn use-auth-secret).
+    "STUN_URLS": os.environ.get("STUN_URLS", "stun:stun.l.google.com:19302"),
+    "TURN_URLS": os.environ.get("TURN_URLS", ""),
+    "TURN_SECRET": os.environ.get("TURN_SECRET", ""),
+    "TURN_CREDENTIAL_SECONDS": 6 * 3600,
 }
 
 # Uploaded attachments. Served only through signed links (apps/media), never as plain files.

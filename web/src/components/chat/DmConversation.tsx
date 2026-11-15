@@ -11,6 +11,7 @@ import {
   type ChatUser,
   type DirectMessage,
 } from "@/lib/api";
+import { useCalls } from "./calls/CallProvider";
 import MediaBubble from "./media/MediaBubble";
 import VoiceRecorder from "./media/VoiceRecorder";
 import { useChat } from "./ChatProvider";
@@ -57,6 +58,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const rel = relation(userId);
   const isFriend = rel === "friend";
   const partnerOnline = friends.some((f) => f.user.id === userId && f.online);
+  const { start: startCall } = useCalls();
   const isWindow = variant === "window";
 
   // History once per conversation.
@@ -204,6 +206,17 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     </div>
   );
 
+  const callButtons = isFriend && partner && (
+    <>
+      <button type="button" className="icon-btn" aria-label={`Voice call ${name}`} onClick={() => startCall(partner, "voice")}>
+        <Icon name="phone" size={isWindow ? 18 : 20} />
+      </button>
+      <button type="button" className="icon-btn" aria-label={`Video call ${name}`} onClick={() => startCall(partner, "video")}>
+        <Icon name="video" size={isWindow ? 18 : 20} />
+      </button>
+    </>
+  );
+
   const header = isWindow ? (
     <header className="win-head" onClick={(e) => !(e.target as HTMLElement).closest("button") && onToggleMin?.()}>
       <Avatar name={name} size={34} online={isFriend ? partnerOnline : undefined} />
@@ -211,6 +224,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
         <b>{name}</b>
         <small className={partnerOnline && isFriend ? "on" : ""}>{status}</small>
       </div>
+      {!minimized && callButtons}
       {!minimized && menu}
       <button type="button" className="icon-btn" aria-label={minimized ? "Expand" : "Minimise"} onClick={onToggleMin}>
         <Icon name={minimized ? "expand" : "min"} size={18} />
@@ -225,7 +239,12 @@ export default function DmConversation({ userId, variant = "page", minimized = f
       back="/chat/inbox"
       avatar={<Avatar name={name} size={38} online={isFriend ? partnerOnline : undefined} />}
       subtitle={<span className={partnerOnline && isFriend ? "on" : ""}>{status}</span>}
-      actions={menu}
+      actions={
+        <>
+          {callButtons}
+          {menu}
+        </>
+      }
     />
   );
 

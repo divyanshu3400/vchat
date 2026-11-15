@@ -167,7 +167,21 @@ export type UserEvent =
   | { type: "stranger.message"; message: StrangerMessage; client_id: string }
   | { type: "stranger.typing" }
   | { type: "stranger.ended"; by: "you" | "stranger" | "connection"; session: string }
-  | { type: "stranger.idle" };
+  | { type: "stranger.idle" }
+  | { type: "call.ringing"; call_id: string }
+  | { type: "call.incoming"; call_id: string; kind: CallKind; stranger: boolean; from: ChatUser }
+  | { type: "call.accepted"; call_id: string }
+  | { type: "call.declined"; call_id: string }
+  | { type: "call.taken"; call_id: string }
+  | { type: "call.ended"; call_id: string; reason: string }
+  | { type: "call.signal"; call_id: string; data: { sdp?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit } };
+
+export type CallKind = "voice" | "video";
+
+/** STUN/TURN servers with short-lived TURN credentials, fetched right before each call. */
+export function fetchIceServers(access: string) {
+  return request<{ ice_servers: RTCIceServer[]; ttl: number; relay: boolean }>("/api/calls/ice", { access });
+}
 
 export type StrangerPartner = { id: number; nickname: string; gender: string; region: string };
 export type StrangerMessage = {

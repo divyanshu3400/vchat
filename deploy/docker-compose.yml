@@ -128,6 +128,51 @@ services:
       - backend
       - web
 
+  # TURN relay for calls (coturn). Relays audio/video when two phones can't connect directly
+  # (mobile carriers, office Wi-Fi). Off until the public ports are forwarded; then:
+  #   docker compose --profile turn up -d turn
+  # Needs: UDP+TCP 3478 and UDP 49160-49200 forwarded from TURN_PUBLIC_IP to 10.10.11.6,
+  # and allowed in ufw (host networking is not covered by Docker's port rules).
+  turn:
+    image: coturn/coturn:4.6.2
+    profiles: ["turn"]
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -n
+      - --log-file=stdout
+      - --listening-ip=${BIND_ADDR:-10.10.11.6}
+      - --relay-ip=${BIND_ADDR:-10.10.11.6}
+      - --external-ip=${TURN_PUBLIC_IP:-1.22.197.176}/${BIND_ADDR:-10.10.11.6}
+      - --listening-port=3478
+      - --min-port=49160
+      - --max-port=49200
+      - --realm=vchat.ssmm.online
+      - --use-auth-secret
+      - --static-auth-secret=${TURN_SECRET:-}
+      - --fingerprint
+      - --no-cli
+      - --no-tls
+      - --no-dtls
+      - --no-multicast-peers
+      - --no-software-attribute
+      - --stale-nonce=600
+      - --user-quota=10
+      - --total-quota=400
+      # Never relay into private networks (stops the relay being used to reach the LAN),
+      # except this server itself, for two relayed callers meeting here.
+      - --denied-peer-ip=0.0.0.0-0.255.255.255
+      - --denied-peer-ip=10.0.0.0-10.255.255.255
+      - --denied-peer-ip=127.0.0.0-127.255.255.255
+      - --denied-peer-ip=169.254.0.0-169.254.255.255
+      - --denied-peer-ip=172.16.0.0-172.31.255.255
+      - --denied-peer-ip=192.168.0.0-192.168.255.255
+      - --allowed-peer-ip=${BIND_ADDR:-10.10.11.6}
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
 volumes:
   static:
   media:

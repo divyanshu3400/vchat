@@ -40,6 +40,14 @@ ADBLOCK_WALL=off
 # Rewarded ads unlock features (gender filter). Turn on together with live ads.
 REWARDED_ADS=0
 
+# Calls. TURN relay (coturn, compose profile "turn"); fill TURN_URLS once the ports are forwarded:
+#   TURN_URLS=turn:$TURN_PUBLIC_IP:3478?transport=udp,turn:$TURN_PUBLIC_IP:3478?transport=tcp
+#   STUN_URLS=stun:$TURN_PUBLIC_IP:3478
+TURN_SECRET=$(token)
+TURN_PUBLIC_IP=1.22.197.176
+TURN_URLS=
+STUN_URLS=stun:stun.l.google.com:19302
+
 # Where the edge (10.10.11.4) reaches this server. 8080 is SadasyaSetu's.
 BIND_ADDR=10.10.11.6
 HTTP_PORT=8081
