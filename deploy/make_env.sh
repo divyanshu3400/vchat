@@ -2,6 +2,7 @@
 # Writes deploy/.env with fresh secrets for a new server. Refuses to touch an existing one.
 #   sh make_env.sh                       # vchat.ssmm.online + api.vchat.ssmm.online
 #   sh make_env.sh <host> <api host>     # other names
+#   PGDATA_PATH=~/vchat-data/pgdata sh make_env.sh   # database folder without sudo
 set -eu
 HOST=${1:-vchat.ssmm.online}
 API_HOST=${2:-api.$HOST}
@@ -26,7 +27,7 @@ LOG_LEVEL=INFO
 
 POSTGRES_PASSWORD=$DB_PASSWORD
 DATABASE_URL=postgres://vchat:$DB_PASSWORD@postgres:5432/vchat
-PGDATA_PATH=/srv/vchat/pgdata
+PGDATA_PATH=${PGDATA_PATH:-/srv/vchat/pgdata}
 REDIS_URL=redis://redis:6379/0
 
 # Public address of the site (canonical URLs, sitemap). Changing it needs a rebuild of web.
