@@ -96,13 +96,31 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Redis backs the channel layer (fan-out across servers), rate limits and presence.
 # Without REDIS_URL everything stays in-process: fine for one dev server, wrong for production.
 REDIS_URL = os.environ.get("REDIS_URL", "")
-if REDIS_URL and not TESTING:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {"hosts": [REDIS_URL]},
-        }
+
+
+def redis_channel_layer(url: str) -> dict:
+    """The channel layer waits for socket messages with a Redis read that blocks for 5 s
+    (channels_redis brpop_timeout). redis-py 8 times out every read after 5 s by default, so
+    an idle socket's wait failed and killed the socket every few seconds. The read timeout
+    must stay well above the blocking wait."""
+    return {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                {
+                    "address": url,
+                    "socket_timeout": 30,
+                    "socket_connect_timeout": 5,
+                    "socket_keepalive": True,
+                    "health_check_interval": 30,
+                }
+            ]
+        },
     }
+
+
+if REDIS_URL and not TESTING:
+    CHANNEL_LAYERS = {"default": redis_channel_layer(REDIS_URL)}
     CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": REDIS_URL}}
 else:
     CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
