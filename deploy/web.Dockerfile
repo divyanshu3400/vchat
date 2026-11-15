@@ -9,8 +9,11 @@ COPY web/ ./
 ARG NEXT_PUBLIC_SITE_URL
 # off | placeholder | live (see web/src/lib/ads.ts)
 ARG NEXT_PUBLIC_ADS_MODE=off
+# on: block the chat app for visitors whose ad blocker hides our ads (only while ads are on)
+ARG NEXT_PUBLIC_ADBLOCK_WALL=off
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
     NEXT_PUBLIC_ADS_MODE=$NEXT_PUBLIC_ADS_MODE \
+    NEXT_PUBLIC_ADBLOCK_WALL=$NEXT_PUBLIC_ADBLOCK_WALL \
     BACKEND_URL=http://backend:8000 \
     NEXT_TELEMETRY_DISABLED=1
 RUN test -n "$NEXT_PUBLIC_SITE_URL" && npm run build

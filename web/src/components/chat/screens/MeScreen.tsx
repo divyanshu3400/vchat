@@ -12,7 +12,7 @@ const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
 export default function MeScreen() {
   const router = useRouter();
-  const { me, friends } = useChat();
+  const { me, friends, premium } = useChat();
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -36,14 +36,50 @@ export default function MeScreen() {
           </div>
         </section>
 
-        <section className="plus-card" id="plus" aria-labelledby="plus-title">
-          <span className="plus-icon">
-            <Icon name="crown" size={24} />
-          </span>
-          <div>
-            <h2 id="plus-title">vChat Plus</h2>
-            <p>No ads, women/men-only matching, photos in random chat, rematch with a stranger you skipped. Coming soon.</p>
+        <section className={`plus-card${premium?.plus ? " active" : ""}`} id="plus" aria-labelledby="plus-title">
+          <div className="plus-head">
+            <span className="plus-icon">
+              <Icon name="crown" size={24} />
+            </span>
+            <div>
+              <h2 id="plus-title">vChat Plus</h2>
+              <p>
+                {premium?.plus && premium.plus_until
+                  ? `Active until ${new Date(premium.plus_until).toLocaleDateString([], { day: "numeric", month: "long", year: "numeric" })}. Thanks for supporting vChat.`
+                  : "Chat the way you like, without ads."}
+              </p>
+            </div>
           </div>
+          <ul className="plus-perks">
+            <li>No ads anywhere</li>
+            <li>Women-only or men-only matching, always</li>
+            <li>Photos and videos with strangers</li>
+            <li>Rematch a stranger you skipped by mistake</li>
+            <li>Plus badge and faster matching</li>
+          </ul>
+          {!premium?.plus && (
+            <>
+              <div className="plans-row">
+                <div className="plan-opt">
+                  <b>₹99</b>
+                  <small>per month</small>
+                </div>
+                <div className="plan-opt best">
+                  <b>₹699</b>
+                  <small>per year · save 41%</small>
+                </div>
+              </div>
+              <button type="button" className="start-btn wide" disabled>
+                Payments open soon
+              </button>
+              <p className="muted-text small">UPI, cards and wallets in India; cards worldwide. Cancel anytime.</p>
+            </>
+          )}
+          {!premium?.plus && premium?.grants.gender_filter && (
+            <p className="perk-line">
+              Unlocked with an ad: women/men-only matching, {premium.grants.gender_filter.uses_left} chats left
+            </p>
+          )}
         </section>
 
         <section className="settings" aria-label="Settings">

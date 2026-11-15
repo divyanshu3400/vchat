@@ -4,7 +4,8 @@ A chat belongs to the one tab (socket) that started looking, not to the user, so
 can browse rooms without being pulled into it. Messages go straight from one socket to the
 other's channel; nothing is broadcast.
 
-client -> {"type": "stranger.find", "region": "any" | "<region slug>"}
+client -> {"type": "stranger.find", "region": "any" | "<region slug>", "want": "any" | "F" | "M"}
+          ("want" other than "any" needs Plus or a rewarded-ad grant: else error "locked_filter")
 server -> {"type": "stranger.waiting", "waiting": <people in the queue>}
 server -> {"type": "stranger.matched", "session": "<uuid>", "partner": {id, nickname, gender, region}}
 client -> {"type": "stranger.message", "content": "...", "client_id": "..."}
@@ -23,6 +24,8 @@ from django.core.cache import cache
 
 from apps.chat import services as chat_services
 from apps.chat.rooms_meta import REGION_SLUGS
+from apps.premium import services as premium
+from apps.premium.models import RewardGrant
 
 from . import matchmaker, services
 
@@ -52,17 +55,27 @@ class StrangerMixin:
         region = content.get("region", "any")
         if region != "any" and region not in REGION_SLUGS:
             region = "any"
+        want = content.get("want", "any")
+        if want not in ("any", "F", "M"):
+            want = "any"
         # Rapid Next-Next-Next: at most one search per cooldown per user.
         cooldown = settings.VCHAT["STRANGER_FIND_COOLDOWN"]
         if cooldown and not await database_sync_to_async(cache.add)(f"st:cool:{self.user.id}", 1, cooldown):
             return await self.error("rate_limited", "Slow down a little before the next stranger.")
+        if want != "any":
+            # Checked and paid for on the server: one use per search (Plus members pay nothing).
+            allowed = await database_sync_to_async(premium.consume)(self.user, RewardGrant.Kind.GENDER_FILTER)
+            if not allowed:
+                return await self.error(
+                    "locked_filter", "Women-only and men-only matching need vChat Plus or a short ad."
+                )
         if self.stranger:
             await self._st_end(by="you")
 
         blocked = await database_sync_to_async(chat_services.blocked_user_ids)(self.user.id)
         me = matchmaker.Entry(
             channel=self.channel_name, user_id=self.user.id, nickname=self.user.nickname,
-            gender=self.user.gender, region=region,
+            gender=self.user.gender, region=region, want=want,
         )
         partner = await database_sync_to_async(matchmaker.find_or_wait)(me, blocked)
         if partner is None:

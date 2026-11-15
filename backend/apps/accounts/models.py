@@ -18,6 +18,12 @@ class User(AbstractUser):
     gender = models.CharField(max_length=1, choices=Gender.choices, blank=True)
     is_guest = models.BooleanField(default=True)
     age_confirmed_at = models.DateTimeField(null=True, blank=True)
+    # vChat Plus is active until this moment (no ads, all filters). Set by payments or an admin.
+    plus_until = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_plus(self) -> bool:
+        return self.plus_until is not None and self.plus_until > timezone.now()
 
     @classmethod
     def create_guest(cls, *, nickname: str, gender: str = "") -> "User":

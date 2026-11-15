@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { setPlus } from "@/lib/plus";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   answerFriendRequest,
@@ -16,6 +17,8 @@ import {
   wsUrl,
   type ChatUser,
   type ConversationSummary,
+  fetchPremiumStatus,
+  type PremiumStatus,
   type Friend,
   type FriendRequest,
   type UserEvent,
@@ -48,6 +51,9 @@ type ChatContextValue = {
   watchDm: (userId: number) => () => void;
   /** DM threads, most recent first, kept current from live messages. */
   conversations: ConversationSummary[];
+  /** Plus and rewarded-ad unlocks. null until loaded. */
+  premium: PremiumStatus | null;
+  setPremium: (status: PremiumStatus) => void;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -79,7 +85,13 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   const [outgoing, setOutgoing] = useState<FriendRequest[]>([]);
   const [unread, setUnread] = useState<Record<number, number>>({});
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [premium, setPremiumState] = useState<PremiumStatus | null>(null);
   const [socketLive, setSocketLive] = useState(false);
+
+  const setPremium = useCallback((status: PremiumStatus) => {
+    setPremiumState(status);
+    setPlus(status.plus); // ad slots everywhere hide for Plus
+  }, []);
 
   const accessRef = useRef<{ token: string; exp: number } | null>(null);
   const inflight = useRef<Promise<string> | null>(null);
@@ -116,7 +128,13 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   // Full resync of friends, requests and unread counts: on start and after every reconnect.
   const resync = useCallback(async () => {
     const access = await getAccess();
-    const [f, r, c] = await Promise.all([fetchFriends(access), fetchFriendRequests(access), fetchConversations(access)]);
+    const [f, r, c, p] = await Promise.all([
+      fetchFriends(access),
+      fetchFriendRequests(access),
+      fetchConversations(access),
+      fetchPremiumStatus(access),
+    ]);
+    setPremium(p);
     setFriends(f);
     setIncoming(r.incoming);
     setOutgoing(r.outgoing);
@@ -124,7 +142,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     setUnread(
       Object.fromEntries(c.filter((x) => x.unread > 0 && !watched.current.has(x.user.id)).map((x) => [x.user.id, x.unread])),
     );
-  }, [getAccess]);
+  }, [getAccess, setPremium]);
 
   useEffect(() => {
     friendsRef.current = friends;
@@ -379,8 +397,10 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       markRead,
       watchDm,
       conversations,
+      premium,
+      setPremium,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -9,6 +9,8 @@ Matching rules, in order:
   - never yourself (another tab of yours), never someone either of you blocked
   - not someone you were matched with in the last RECENT_SECONDS
   - region: compatible when either side picked "any" or both picked the same region
+  - gender filter (Plus / rewarded ad): someone wanting women only meets women only, and is
+    only offered to people whose own filter (if any) fits them
   - otherwise whoever has waited longest
 """
 
@@ -36,9 +38,14 @@ class Entry:
     gender: str
     region: str  # "any" or a region room slug
     ts: float = 0.0
+    want: str = "any"  # "any", or a gender ("F", "M") for Plus / rewarded-ad users
 
     def compatible(self, other: "Entry") -> bool:
-        return self.region == "any" or other.region == "any" or self.region == other.region
+        region_ok = self.region == "any" or other.region == "any" or self.region == other.region
+        # Gender filters work both ways: each side's wish must fit the other person.
+        mine_ok = self.want == "any" or other.gender == self.want
+        theirs_ok = other.want == "any" or self.gender == other.want
+        return region_ok and mine_ok and theirs_ok
 
 
 # --- storage backends ------------------------------------------------------------

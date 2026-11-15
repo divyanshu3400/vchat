@@ -35,6 +35,10 @@ SITE_URL=https://$HOST
 
 # Ad slots: off | placeholder (dashed boxes for review) | live. Needs a rebuild of web.
 ADS_MODE=off
+# on: chat app blocked for ad-blocker users (only while ads are on). Needs a rebuild of web.
+ADBLOCK_WALL=off
+# Rewarded ads unlock features (gender filter). Turn on together with live ads.
+REWARDED_ADS=0
 
 # Where the edge (10.10.11.4) reaches this server. 8080 is SadasyaSetu's.
 BIND_ADDR=10.10.11.6

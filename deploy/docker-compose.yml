@@ -92,6 +92,7 @@ services:
         NEXT_PUBLIC_SITE_URL: ${SITE_URL:?set SITE_URL in .env}
         # off until an ad network approves the site; "placeholder" shows the reserved boxes.
         NEXT_PUBLIC_ADS_MODE: ${ADS_MODE:-off}
+        NEXT_PUBLIC_ADBLOCK_WALL: ${ADBLOCK_WALL:-off}
     image: vchat-web
     restart: unless-stopped
     healthcheck:

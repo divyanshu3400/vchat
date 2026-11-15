@@ -2,7 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { ApiError, guestSignup, refreshSession, type ChatUser } from "@/lib/api";
+import { ApiError, fetchPremiumStatus, guestSignup, refreshSession, type ChatUser } from "@/lib/api";
+import { setPlus } from "@/lib/plus";
 import { findRoom } from "@/lib/rooms";
 
 export default function JoinForm() {
@@ -26,7 +27,13 @@ export default function JoinForm() {
       .then((session) => {
         if (cancelled) return;
         if (valid) setRoom(valid);
-        if (session) setExisting(session.user);
+        if (session) {
+          setExisting(session.user);
+          // Plus members see no ads on public pages either.
+          fetchPremiumStatus(session.access)
+            .then((s) => setPlus(s.plus))
+            .catch(() => undefined);
+        }
       })
       .catch(() => {
         /* offline or API down: show the normal form */

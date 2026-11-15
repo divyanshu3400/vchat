@@ -130,6 +130,28 @@ export type UserEvent =
 export type StrangerPartner = { id: number; nickname: string; gender: string; region: string };
 export type StrangerMessage = { id: number; session: string; sender_id: number; content: string; created_at: string };
 
+// --- Plus and rewarded unlocks ------------------------------------------------
+
+export type RewardKind = "gender_filter";
+export type PremiumStatus = {
+  plus: boolean;
+  plus_until: string | null;
+  grants: Record<RewardKind, { uses_left: number; expires_at: string } | null>;
+  rewarded_ads: boolean;
+};
+
+export function fetchPremiumStatus(access: string) {
+  return request<PremiumStatus>("/api/premium/status", { access });
+}
+
+/** Call only after a rewarded ad reported it was watched to the end. */
+export function claimReward(kind: RewardKind, access: string) {
+  return request<{ kind: RewardKind; uses_left: number; expires_at: string; status: PremiumStatus }>(
+    "/api/premium/reward",
+    { method: "POST", body: JSON.stringify({ kind }), access },
+  );
+}
+
 export function fetchFriends(access: string) {
   return request<Friend[]>("/api/friends", { access });
 }

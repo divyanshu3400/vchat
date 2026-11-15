@@ -9,6 +9,7 @@ import { REGION_ROOMS, findRoom } from "@/lib/rooms";
 import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
+import UnlockSheet from "../premium/UnlockSheet";
 import { useStranger } from "../stranger/StrangerProvider";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
@@ -53,8 +54,29 @@ function Interstitial({ onDone }: { onDone: () => void }) {
 }
 
 function IdleView() {
-  const { region, setRegion, start, notice, setNotice, endedBy } = useStranger();
+  const { region, setRegion, want, setWant, start, notice, endedBy } = useStranger();
+  const { premium } = useChat();
   const presence = useRoomPresence();
+  const [unlockFor, setUnlockFor] = useState<string | null>(null);
+  const grant = premium?.grants.gender_filter;
+  const unlocked = !!premium?.plus || (grant?.uses_left ?? 0) > 0;
+
+  function pick(g: string) {
+    if (g === "any" || unlocked) setWant(g);
+    else setUnlockFor(g);
+  }
+
+  const option = (g: string, label: string) => (
+    <button
+      type="button"
+      className={`chip${want === g ? " on" : ""}${g !== "any" && !unlocked ? " locked" : ""}`}
+      aria-pressed={want === g}
+      onClick={() => pick(g)}
+    >
+      {g !== "any" && !unlocked && <Icon name="lock" size={13} />} {label}
+    </button>
+  );
+
   return (
     <div className="page-scroll center">
       <div className="st-start">
@@ -66,17 +88,30 @@ function IdleView() {
         {endedBy === "connection" && <p className="chat-notice">Your connection dropped, so that chat ended.</p>}
 
         <div className="st-field">
-          <span className="st-label">I want to talk to</span>
+          <span className="st-label">
+            I want to talk to
+            {premium?.plus ? (
+              <span className="perk">Plus</span>
+            ) : grant && grant.uses_left > 0 ? (
+              <span className="perk">{grant.uses_left} filtered chats left</span>
+            ) : null}
+          </span>
           <div className="chips">
-            <span className="chip on">Anyone</span>
-            <button type="button" className="chip locked" onClick={() => setNotice("Women-only matching comes with vChat Plus.")}>
-              <Icon name="lock" size={13} /> Women
-            </button>
-            <button type="button" className="chip locked" onClick={() => setNotice("Men-only matching comes with vChat Plus.")}>
-              <Icon name="lock" size={13} /> Men
-            </button>
+            {option("any", "Anyone")}
+            {option("F", "Women")}
+            {option("M", "Men")}
           </div>
         </div>
+        {unlockFor && (
+          <UnlockSheet
+            kind="gender_filter"
+            onClose={() => setUnlockFor(null)}
+            onUnlocked={() => {
+              setWant(unlockFor);
+              setUnlockFor(null);
+            }}
+          />
+        )}
         <label className="st-field" htmlFor="st-region">
           <span className="st-label">From</span>
           <select id="st-region" className="st-select" value={region} onChange={(e) => setRegion(e.target.value)}>
@@ -102,7 +137,7 @@ function IdleView() {
 }
 
 function SearchingView() {
-  const { waiting, cancel, region, notice } = useStranger();
+  const { waiting, cancel, region, want, notice } = useStranger();
   const [tip, setTip] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setTip((i) => (i + 1) % TIPS.length), 4500);
@@ -114,7 +149,10 @@ function SearchingView() {
         <span className="radar" aria-hidden="true">
           <Icon name="shuffle" size={28} />
         </span>
-        <h2>Finding someone{region !== "any" ? ` in ${regionName(region)}` : ""}…</h2>
+        <h2>
+          Finding {want === "F" ? "a woman" : want === "M" ? "a man" : "someone"}
+          {region !== "any" ? ` in ${regionName(region)}` : ""}…
+        </h2>
         <p className="muted-text">{waiting > 1 ? `${waiting} people are looking right now` : "Hang on, matching usually takes a few seconds"}</p>
         <p className="st-tip">{TIPS[tip]}</p>
         {notice && <p className="chat-notice">{notice}</p>}

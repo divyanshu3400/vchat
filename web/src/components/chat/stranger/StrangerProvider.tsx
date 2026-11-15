@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ADS_ON } from "@/lib/ads";
+import { usePlus } from "@/lib/plus";
 import type { StrangerPartner } from "@/lib/api";
 import { useChat } from "../ChatProvider";
 
@@ -29,6 +30,9 @@ type StrangerValue = {
   waiting: number;
   endedBy: EndedBy | null;
   region: string;
+  /** "any", or "F" / "M" (Plus or a rewarded-ad unlock; the server checks). */
+  want: string;
+  setWant: (want: string) => void;
   notice: string;
   interstitial: boolean;
   setRegion: (region: string) => void;
@@ -60,10 +64,13 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   const [waiting, setWaiting] = useState(0);
   const [endedBy, setEndedBy] = useState<EndedBy | null>(null);
   const [region, setRegion] = useState("any");
+  const [want, setWant] = useState("any");
   const [notice, setNotice] = useState("");
   const [interstitial, setInterstitial] = useState(false);
 
+  const plus = usePlus();
   const meRef = useRef(me);
+  const plusRef = useRef(plus);
   const phaseRef = useRef(phase);
   const skips = useRef(0);
   const lastInterstitial = useRef(-Infinity);
@@ -72,7 +79,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
 
   useEffect(() => {
     meRef.current = me;
-  }, [me]);
+    plusRef.current = plus;
+  }, [me, plus]);
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
@@ -135,6 +143,12 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             break;
           case "error":
             if (event.code === "rate_limited" || event.code === "no_chat") setNotice(event.detail);
+            if (event.code === "locked_filter") {
+              // The unlock ran out (or never existed): fall back to "Anyone" and say why.
+              setWant("any");
+              setPhase("idle");
+              setNotice("Your women/men-only unlock has run out. Unlock it again or match with anyone.");
+            }
             break;
         }
       }),
@@ -142,20 +156,20 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   );
 
   const find = useCallback(() => {
-    if (!sendRaw({ type: "stranger.find", region })) {
+    if (!sendRaw({ type: "stranger.find", region, want })) {
       setNotice("You're offline. Reconnecting…");
       return;
     }
     setNotice("");
     setPhase("searching");
-  }, [region, sendRaw]);
+  }, [region, want, sendRaw]);
 
   const start = useCallback(() => find(), [find]);
 
   const next = useCallback(() => {
     skips.current += 1;
     const due = skips.current % SKIPS_PER_INTERSTITIAL === 0;
-    if (ADS_ON && due && Date.now() - lastInterstitial.current > INTERSTITIAL_GAP_MS) {
+    if (ADS_ON && !plusRef.current && due && Date.now() - lastInterstitial.current > INTERSTITIAL_GAP_MS) {
       lastInterstitial.current = Date.now();
       // End the current chat now; the next search starts when the ad is closed.
       if (phaseRef.current === "chatting") sendRaw({ type: "stranger.leave" });
@@ -203,6 +217,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       waiting,
       endedBy,
       region,
+      want,
+      setWant,
       notice,
       interstitial,
       setRegion,
@@ -215,7 +231,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       typing,
       finishInterstitial,
     }),
-    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, notice, interstitial, start, next, cancel, leave, send, typing, finishInterstitial],
+    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, interstitial, start, next, cancel, leave, send, typing, finishInterstitial],
   );
 
   return <StrangerContext.Provider value={value}>{children}</StrangerContext.Provider>;

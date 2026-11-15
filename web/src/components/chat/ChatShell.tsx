@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import AdSlot from "@/components/AdSlot";
 import ThemeToggle from "@/components/ThemeToggle";
 import { ADS_ON } from "@/lib/ads";
+import { usePlus } from "@/lib/plus";
+import AdblockWall from "./AdblockWall";
 import { useChat } from "./ChatProvider";
 import ConversationList from "./ConversationList";
 import { DockProvider } from "./Dock";
@@ -158,13 +160,16 @@ function Frame({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const typing = useTyping();
   const { phase } = useStranger();
+  const plus = usePlus();
   // A random chat in progress takes the whole phone screen, like any other conversation.
   const strangerChat = pathname === "/chat/stranger" && (phase === "chatting" || phase === "ended");
   const inConversation = !TAB_SCREENS.has(pathname) || strangerChat;
+  const adsShown = ADS_ON && !plus;
 
   return (
     <>
-      <div className={`app${inConversation ? " in-conversation" : ""}${typing ? " typing" : ""}${ADS_ON ? " ads-on" : ""}`}>
+      <AdblockWall />
+      <div className={`app${inConversation ? " in-conversation" : ""}${typing ? " typing" : ""}${adsShown ? " ads-on" : ""}`}>
         <Rail pathname={pathname} />
         <aside className="list-pane" aria-label="Conversations">
           <ConversationList />

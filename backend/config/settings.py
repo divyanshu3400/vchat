@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     "apps.chat",
     "apps.social",
     "apps.stranger",
+    "apps.premium",
 ]
 
 MIDDLEWARE = [
@@ -122,6 +123,7 @@ REST_FRAMEWORK = {
         "guest_signup": "10/hour",
         "reports": "30/hour",
         "friend_requests": "40/hour",
+        "rewards": "20/hour",
     },
 }
 
@@ -151,6 +153,9 @@ VCHAT = {
     "STRANGER_RECENT_SECONDS": 600,
     # Seconds between two searches by the same person (stops skip-spam).
     "STRANGER_FIND_COOLDOWN": 1,
+    # Rewarded ads unlock features (e.g. gender filter). Off in production until an ad network is live.
+    "REWARDED_ADS": env_bool("REWARDED_ADS", DEBUG),
+    "REWARDS_PER_DAY": 6,
 }
 
 LANGUAGE_CODE = "en-us"
