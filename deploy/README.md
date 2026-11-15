@@ -46,6 +46,9 @@ Both must resolve before `setup_edge.sh` runs: certbot proves each name over por
   `~/vchat-data/backups`.
 - All six containers healthy; port `10.10.11.6:8081`; the app nginx returns 403 to anything
   but 10.10.11.4.
+- Edge 10.10.11.4 (user `hashkmpcl`): site `vchat` enabled, one Let's Encrypt certificate for
+  both names (renews with the edge's certbot timer). Checked from outside: HTTP→HTTPS
+  redirect, health on both names, two guests chatting live over `wss://`.
 
 **Update** (from your machine, in the repo):
 
