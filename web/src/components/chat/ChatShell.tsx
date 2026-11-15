@@ -10,6 +10,7 @@ import { useChat } from "./ChatProvider";
 import ConversationList from "./ConversationList";
 import { DockProvider } from "./Dock";
 import { Icon } from "./bits";
+import StrangerProvider, { useStranger } from "./stranger/StrangerProvider";
 
 /** Screens reached from the tab bar. Everything else under /chat is a conversation. */
 const TAB_SCREENS = new Set(["/chat", "/chat/rooms", "/chat/stranger", "/chat/inbox", "/chat/me"]);
@@ -82,7 +83,14 @@ function isActive(pathname: string, href: string) {
   return href === "/chat" ? pathname === "/chat" : pathname.startsWith(href);
 }
 
+/** A live random chat while you're on another screen: a dot on the Random tab. */
+function useStrangerLive(pathname: string) {
+  const { phase } = useStranger();
+  return pathname !== "/chat/stranger" && (phase === "chatting" || phase === "searching");
+}
+
 function Rail({ pathname }: { pathname: string }) {
+  const strangerLive = useStrangerLive(pathname);
   return (
     <nav className="rail" aria-label="Main">
       <Link href="/" className="rail-logo" aria-label="vChat home page">
@@ -90,7 +98,10 @@ function Rail({ pathname }: { pathname: string }) {
       </Link>
       {NAV.filter((n) => !("phoneOnly" in n)).map((n) => (
         <Link key={n.href} href={n.href} className={`rail-item${isActive(pathname, n.href) ? " on" : ""}`}>
-          <Icon name={n.icon} size={22} />
+          <span className="tab-icon">
+            <Icon name={n.icon} size={22} />
+            {n.href === "/chat/stranger" && strangerLive && <span className="live-ping" aria-label="Random chat in progress" />}
+          </span>
           <span>{n.label}</span>
         </Link>
       ))}
@@ -105,6 +116,7 @@ function Rail({ pathname }: { pathname: string }) {
 
 function TabBar({ pathname }: { pathname: string }) {
   const { unread, incoming } = useChat();
+  const strangerLive = useStrangerLive(pathname);
   const waiting = Object.values(unread).reduce((a, b) => a + b, 0) + incoming.length;
   return (
     <nav className="tabbar" aria-label="Main">
@@ -118,6 +130,7 @@ function TabBar({ pathname }: { pathname: string }) {
           <span className="tab-icon">
             <Icon name={n.icon} size={"primary" in n ? 24 : 22} />
             {n.href === "/chat/inbox" && waiting > 0 && <span className="badge">{waiting > 99 ? "99+" : waiting}</span>}
+            {n.href === "/chat/stranger" && strangerLive && <span className="live-ping" aria-label="Random chat in progress" />}
           </span>
           <span className="tab-label">{n.label}</span>
         </Link>
@@ -132,12 +145,25 @@ function TabBar({ pathname }: { pathname: string }) {
  * Laptop (1280 px +): the same, plus a 300×600 ad rail and floating chat windows.
  */
 export default function ChatShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const typing = useTyping();
-  const inConversation = !TAB_SCREENS.has(pathname);
-
   return (
     <DockProvider>
+      <StrangerProvider>
+        <Frame>{children}</Frame>
+      </StrangerProvider>
+    </DockProvider>
+  );
+}
+
+function Frame({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const typing = useTyping();
+  const { phase } = useStranger();
+  // A random chat in progress takes the whole phone screen, like any other conversation.
+  const strangerChat = pathname === "/chat/stranger" && (phase === "chatting" || phase === "ended");
+  const inConversation = !TAB_SCREENS.has(pathname) || strangerChat;
+
+  return (
+    <>
       <div className={`app${inConversation ? " in-conversation" : ""}${typing ? " typing" : ""}${ADS_ON ? " ads-on" : ""}`}>
         <Rail pathname={pathname} />
         <aside className="list-pane" aria-label="Conversations">
@@ -150,6 +176,6 @@ export default function ChatShell({ children }: { children: React.ReactNode }) {
         {!inConversation && <AdSlot kind="anchor" className="phone-anchor" />}
         {!inConversation && <TabBar pathname={pathname} />}
       </div>
-    </DockProvider>
+    </>
   );
 }

@@ -211,6 +211,39 @@
 .home-leader { display: none; }
 .ad-rail { grid-area: ads; flex-direction: column; align-items: center; gap: 16px; padding: 16px; border-left: 1px solid var(--line); background: var(--surface); position: sticky; top: 0; }
 
+/* ---------- random chat (stranger) ---------- */
+.st-screen { position: relative; }
+.st-start, .st-searching { width: min(100%, 460px); display: grid; justify-items: center; gap: 14px; text-align: center; margin-top: 3vh; }
+.st-start h2, .st-searching h2 { font-size: clamp(26px, 6vw, 34px); font-weight: 800; letter-spacing: -0.02em; }
+.st-orb { width: 84px; height: 84px; border-radius: 28px; background: var(--grad); color: #1d0a11; display: grid; place-items: center; box-shadow: 0 18px 40px -16px #ff4f79; }
+.st-field { width: 100%; display: grid; gap: 8px; justify-items: start; text-align: left; }
+.st-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+.st-field .chips { margin-top: 0; }
+button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700; color: inherit; cursor: pointer; }
+.chip.on { border-color: var(--rose); background: color-mix(in srgb, var(--rose) 12%, var(--surface)); color: var(--rose); }
+.st-select { width: 100%; appearance: auto; background: var(--surface); border: 1px solid var(--line); color: var(--fg); font: inherit; font-size: 16px; padding: 11px 12px; border-radius: 12px; }
+.start-btn { border: 0; cursor: pointer; }
+.start-btn.wide { width: 100%; }
+.st-rules { font-size: 12.5px; color: var(--faint); }
+.radar { width: 120px; height: 120px; border-radius: 50%; position: relative; display: grid; place-items: center; color: var(--rose); background: color-mix(in srgb, var(--rose) 10%, transparent); }
+.radar::before, .radar::after { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--rose); opacity: 0; animation: radar-ping 2s infinite; }
+.radar::after { animation-delay: 1s; }
+@keyframes radar-ping { 0% { transform: scale(0.5); opacity: 0.8; } 100% { transform: scale(1.45); opacity: 0; } }
+.st-tip { font-size: 13.5px; color: var(--muted); min-height: 2.6em; max-width: 36ch; }
+.st-rect { margin-block: 4px; }
+.sys-line { align-self: center; text-align: center; font-size: 12.5px; color: var(--muted); border: 1px dashed var(--line); border-radius: 999px; padding: 4px 12px; max-width: 90%; }
+.st-endbar { display: flex; gap: 10px; padding: 10px max(12px, env(safe-area-inset-right, 0px)) 12px max(12px, env(safe-area-inset-left, 0px)); }
+.st-endbar .start-btn { flex: 1; font-size: 18px; padding: 14px; }
+.next-btn { appearance: none; border: 0; cursor: pointer; flex: none; height: 44px; padding: 0 16px; border-radius: 14px; background: var(--grad); color: #1d0a11; font-family: var(--display); font-weight: 800; font-size: 15px; transition: transform 0.15s; }
+.next-btn.armed { background: var(--fg); color: var(--bg); }
+.next-btn:active { transform: scale(0.97); }
+.locked-media { color: var(--amber); width: 40px; height: 40px; }
+.add-friend { padding: 6px 10px; }
+.live-ping { position: absolute; top: -3px; right: -5px; width: 10px; height: 10px; border-radius: 50%; background: var(--online); border: 2px solid var(--surface); animation: pulse 2s infinite; }
+.rail .live-ping { border-color: var(--fg); }
+.interstitial { position: absolute; inset: 0; z-index: 20; background: var(--surface); display: grid; grid-template-rows: auto 1fr auto; justify-items: center; align-items: center; gap: 12px; padding: max(14px, env(safe-area-inset-top, 0px)) 16px max(18px, env(safe-area-inset-bottom, 0px)); }
+.interstitial-top { width: 100%; display: flex; justify-content: space-between; align-items: center; }
+
 /* ---------- floating chat windows (laptop) ---------- */
 .dock { position: fixed; right: 16px; bottom: 0; z-index: 40; display: flex; align-items: flex-end; gap: 12px; pointer-events: none; }
 .app.ads-on ~ .dock { right: 348px; }

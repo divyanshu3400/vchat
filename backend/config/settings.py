@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.chat",
     "apps.social",
+    "apps.stranger",
 ]
 
 MIDDLEWARE = [
@@ -144,6 +145,12 @@ VCHAT = {
     "PRESENCE_TTL": 70,
     # Room counts are cached this long so busy landing pages don't hit Redis on every view.
     "PRESENCE_COUNTS_CACHE": 10,
+    # Random chat: a waiting socket that hasn't pinged for this long leaves the queue.
+    "STRANGER_QUEUE_TTL": 60,
+    # Two people who just chatted aren't matched again for this long.
+    "STRANGER_RECENT_SECONDS": 600,
+    # Seconds between two searches by the same person (stops skip-spam).
+    "STRANGER_FIND_COOLDOWN": 1,
 }
 
 LANGUAGE_CODE = "en-us"

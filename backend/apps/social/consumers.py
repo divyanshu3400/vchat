@@ -4,17 +4,19 @@ from apps.chat import presence
 from apps.chat import services as chat_services
 from apps.chat.realtime import user_group
 from apps.chat.ws_auth import AuthenticatedJsonConsumer
+from apps.stranger.consumer import StrangerMixin
 
 from . import services
 from .services import SocialError
 
 
-class UserConsumer(AuthenticatedJsonConsumer):
+class UserConsumer(StrangerMixin, AuthenticatedJsonConsumer):
     """The personal socket (/ws/me/): one per open tab, carries everything private to a user.
 
     client -> {"type": "dm", "to": <user id>, "content": "...", "client_id": "..."}
     server -> {"type": "dm", "message": {...}, "client_id": "..."}      to both people
     server -> {"type": "friend_request" | "friend_added" | "friend_removed" | "friend_request_removed", ...}
+    Random 1-on-1 chat ("stranger.*") is documented in apps/stranger/consumer.py.
     """
 
     async def on_authenticated(self):
@@ -25,6 +27,7 @@ class UserConsumer(AuthenticatedJsonConsumer):
             await self._announce(online=True)
 
     async def on_leave(self):
+        await self.stranger_disconnect()
         await self.channel_layer.group_discard(user_group(self.user.id), self.channel_name)
         went_offline = await database_sync_to_async(presence.disconnect_user)(self.user.id, self.channel_name)
         if went_offline:
@@ -32,6 +35,7 @@ class UserConsumer(AuthenticatedJsonConsumer):
 
     async def on_ping(self):
         await database_sync_to_async(presence.ping_user)(self.user.id, self.channel_name)
+        await self.stranger_heartbeat()
 
     async def _announce(self, online: bool):
         """Tell this user's friends they came online or went offline (only on the first/last tab)."""
@@ -41,6 +45,8 @@ class UserConsumer(AuthenticatedJsonConsumer):
             await self.channel_layer.group_send(user_group(fid), event)
 
     async def handle(self, kind, content):
+        if isinstance(kind, str) and kind.startswith("stranger.") and await self.stranger_handle(kind, content):
+            return
         if kind != "dm":
             return await self.error("unknown_type", "Unknown message type.")
         client_id = str(content.get("client_id", ""))[:64]

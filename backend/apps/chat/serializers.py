@@ -12,12 +12,16 @@ class RoomSerializer(serializers.ModelSerializer):
 class ReportCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Report
-        fields = ["id", "reported_user", "message", "reason", "note"]
+        fields = ["id", "reported_user", "message", "stranger_session", "reason", "note"]
 
     def validate(self, attrs):
-        if attrs["reported_user"] == self.context["request"].user:
+        me = self.context["request"].user
+        if attrs["reported_user"] == me:
             raise serializers.ValidationError("You can't report yourself.")
         message = attrs.get("message")
         if message and message.sender_id != attrs["reported_user"].id:
             raise serializers.ValidationError("That message wasn't sent by this user.")
+        session = attrs.get("stranger_session")
+        if session and not (session.has_user(me.id) and session.has_user(attrs["reported_user"].id)):
+            raise serializers.ValidationError("You can only report someone from your own chat with them.")
         return attrs

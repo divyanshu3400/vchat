@@ -82,7 +82,10 @@ export function blockUser(userId: number, access: string) {
   return request<null>(`/api/users/${userId}/block`, { method: "POST", access });
 }
 
-export function reportUser(input: { reported_user: number; message?: number; reason: ReportReason }, access: string) {
+export function reportUser(
+  input: { reported_user: number; message?: number; stranger_session?: string; reason: ReportReason },
+  access: string,
+) {
   return request<unknown>("/api/reports", { method: "POST", body: JSON.stringify(input), access });
 }
 
@@ -116,7 +119,16 @@ export type UserEvent =
   | { type: "friend_removed"; user_id: number }
   | { type: "presence"; user_id: number; online: boolean }
   | { type: "pong" }
-  | { type: "error"; code: string; detail: string; client_id: string };
+  | { type: "error"; code: string; detail: string; client_id: string }
+  | { type: "stranger.waiting"; waiting: number }
+  | { type: "stranger.matched"; session: string; partner: StrangerPartner }
+  | { type: "stranger.message"; message: StrangerMessage; client_id: string }
+  | { type: "stranger.typing" }
+  | { type: "stranger.ended"; by: "you" | "stranger" | "connection"; session: string }
+  | { type: "stranger.idle" };
+
+export type StrangerPartner = { id: number; nickname: string; gender: string; region: string };
+export type StrangerMessage = { id: number; session: string; sender_id: number; content: string; created_at: string };
 
 export function fetchFriends(access: string) {
   return request<Friend[]>("/api/friends", { access });

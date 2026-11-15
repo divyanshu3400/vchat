@@ -82,6 +82,10 @@ class Report(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reports_received"
     )
     message = models.ForeignKey(Message, on_delete=models.SET_NULL, null=True, blank=True)
+    # A report from a random 1-on-1 chat: the moderator reads that chat's messages.
+    stranger_session = models.ForeignKey(
+        "stranger.StrangerSession", on_delete=models.SET_NULL, null=True, blank=True, related_name="reports"
+    )
     reason = models.CharField(max_length=12, choices=Reason.choices)
     note = models.CharField(max_length=500, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.OPEN)

@@ -37,6 +37,8 @@ type ChatContextValue = {
   socketLive: boolean;
   relation: (userId: number) => Relation;
   sendDm: (to: number, content: string) => boolean;
+  /** Send any message on the personal socket. False while it is reconnecting. */
+  sendRaw: (payload: Record<string, unknown>) => boolean;
   subscribe: (fn: (event: UserEvent) => void) => () => void;
   addFriend: (user: ChatUser) => Promise<string>;
   answerRequest: (id: number, action: "accept" | "decline" | "cancel") => Promise<void>;
@@ -279,6 +281,13 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     return true;
   }, []);
 
+  const sendRaw = useCallback((payload: Record<string, unknown>) => {
+    const ws = socket.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(JSON.stringify(payload));
+    return true;
+  }, []);
+
   const subscribe = useCallback((fn: (e: UserEvent) => void) => {
     listeners.current.add(fn);
     return () => {
@@ -362,6 +371,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       socketLive,
       relation,
       sendDm,
+      sendRaw,
       subscribe,
       addFriend,
       answerRequest,
@@ -370,7 +380,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       watchDm,
       conversations,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

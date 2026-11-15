@@ -3,4 +3,5 @@
 pytest>=8.3,<9
 pytest-django>=4.10,<5
 pytest-asyncio>=0.25,<1.1
-fakeredis>=2.26,<3  # exercises the Redis presence store without a Redis server
+# Exercises the Redis stores without a Redis server; [lua] runs the scripts behind Redis locks.
+fakeredis[lua]>=2.26,<3
