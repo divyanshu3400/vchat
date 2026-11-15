@@ -1,14 +1,20 @@
 import type { NextConfig } from "next";
 
-// Django API. The browser always calls same-origin /api/*, so the refresh cookie
-// stays first-party and no CORS setup is needed.
+// In production the app nginx sends /api/ and /ws/ straight to Django, so this rewrite is
+// only used by `next dev` (and as a fallback). It keeps the browser on one origin, so the
+// refresh cookie stays first-party and no CORS setup is needed.
 const BACKEND_URL = process.env.BACKEND_URL ?? "http://localhost:8000";
 
 const nextConfig: NextConfig = {
+  // A self-contained server in .next/standalone for the Docker image.
+  output: "standalone",
   poweredByHeader: false,
+  // Django URLs end with "/": pass them through instead of redirecting to the slash-less form.
+  skipTrailingSlashRedirect: true,
   async rewrites() {
-    // Client calls /api/auth/guest  ->  Django /api/auth/guest/ (Django URLs end with a slash).
-    return [{ source: "/api/:path*", destination: `${BACKEND_URL}/api/:path*/` }];
+    // The slash is written out on both sides: `:path*` alone drops it, and Django then
+    // refuses POSTs to the slash-less URL.
+    return [{ source: "/api/:path*/", destination: `${BACKEND_URL}/api/:path*/` }];
   },
   async headers() {
     return [

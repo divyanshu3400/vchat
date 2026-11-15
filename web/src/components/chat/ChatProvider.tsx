@@ -13,7 +13,7 @@ import {
   refreshSession,
   removeFriend,
   sendFriendRequest,
-  WS_URL,
+  wsUrl,
   type ChatUser,
   type Friend,
   type FriendRequest,
@@ -180,7 +180,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         return scheduleRetry();
       }
       if (cancelled) return;
-      const ws = new WebSocket(`${WS_URL}/ws/me/`);
+      const ws = new WebSocket(wsUrl("/ws/me/"));
       socket.current = ws;
       ws.onopen = () => ws.send(JSON.stringify({ type: "auth", token: access }));
       ws.onmessage = (ev) => {

@@ -80,7 +80,10 @@ TEMPLATES = [
 DATABASES = {
     "default": dj_database_url.config(
         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=60,
+        # 0 under ASGI: Django's persistent connections are per thread, and async code
+        # hops threads, so reuse can leak connections. Raise only behind PgBouncer.
+        conn_max_age=int(os.environ.get("DB_CONN_MAX_AGE", "0")),
+        conn_health_checks=True,
     )
 }
 
@@ -105,6 +108,9 @@ else:
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    # Rate limits are per visitor IP. Behind the app nginx, X-Forwarded-For holds exactly the
+    # visitor's address (nginx overwrites it), so trust one proxy hop. Unset in development.
+    "NUM_PROXIES": int(os.environ["NUM_PROXIES"]) if os.environ.get("NUM_PROXIES") else None,
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -149,6 +155,9 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# TLS ends at the edge nginx (10.10.11.4), which redirects HTTP to HTTPS and sends HSTS.
+# Doing it again here would redirect the plain-HTTP hops inside the private network.
+SILENCED_SYSTEM_CHECKS = ["security.W004", "security.W008"]
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 

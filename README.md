@@ -21,7 +21,7 @@ docker compose up -d
 cd backend
 python -m venv .venv
 .venv\Scripts\activate            # macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 set DJANGO_DEBUG=1                # macOS/Linux: export DJANGO_DEBUG=1
 python manage.py migrate
 python manage.py seed_rooms
@@ -37,9 +37,17 @@ npm run dev
 ## Tests and checks
 
 ```bash
-cd backend && python -m pytest          # API + WebSocket tests
+cd backend && pip install -r requirements-dev.txt && python -m pytest   # API + WebSocket tests
 cd web && npm run lint && npm run build
 ```
+
+In development `NEXT_PUBLIC_WS_URL` must point at the Django server (see `web/.env.example`),
+because `next dev` doesn't proxy WebSockets. In production it stays empty: sockets use the
+page's own host.
+
+## Deploying
+
+Docker on 10.10.11.6 behind the nginx edge on 10.10.11.4: see [deploy/README.md](deploy/README.md).
 
 ## How it fits together
 
@@ -67,4 +75,4 @@ Default rooms are defined twice and must stay in sync:
 4. Legal pages (Privacy, Terms, Rules, Report abuse) and EU/UK cookie consent before ads
 5. Google sign-in to save a guest profile across devices
 6. Voice notes, voice rooms, then 1:1 calls (WebRTC)
-7. Production: Postgres + Redis required, `DJANGO_DEBUG` off, HTTPS/WSS, multiple ASGI workers behind Nginx
+7. A real nickname/link/word filter and auto-mute after repeated reports

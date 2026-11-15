@@ -54,6 +54,13 @@ def test_refresh_cookie_returns_new_access_token():
 
 
 @pytest.mark.django_db
+def test_health_reports_database_and_cache():
+    res = APIClient().get("/api/health/")
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok", "database": "ok", "cache": "ok"}
+
+
+@pytest.mark.django_db
 def test_refresh_without_cookie_or_for_banned_user_is_rejected():
     assert APIClient().post("/api/auth/refresh/").status_code == 401
 

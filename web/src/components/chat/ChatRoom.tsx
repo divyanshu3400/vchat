@@ -7,7 +7,7 @@ import {
   blockUser,
   fetchHistory,
   reportUser,
-  WS_URL,
+  wsUrl,
   type ChatMessage,
   type ChatUser,
   type ReportReason,
@@ -71,7 +71,7 @@ export default function ChatRoom({ slug }: { slug: string }) {
         return scheduleRetry();
       }
 
-      const ws = new WebSocket(`${WS_URL}/ws/rooms/${encodeURIComponent(slug)}/`);
+      const ws = new WebSocket(wsUrl(`/ws/rooms/${encodeURIComponent(slug)}/`));
       wsRef.current = ws;
       ws.onopen = () => ws.send(JSON.stringify({ type: "auth", token: access }));
       ws.onmessage = (ev) => {

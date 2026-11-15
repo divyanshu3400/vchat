@@ -32,9 +32,16 @@ function firstErrorMessage(body: unknown): string | undefined {
   return undefined;
 }
 
+// Django routes end with "/". Adding it here means a request reaches Django as-is, whether it
+// goes through the production nginx or the Next.js dev rewrite, and never gets a redirect.
+function withTrailingSlash(path: string) {
+  const [route, query] = path.split("?");
+  return (route.endsWith("/") ? route : `${route}/`) + (query ? `?${query}` : "");
+}
+
 async function request<T>(path: string, init: RequestInit & { access?: string } = {}): Promise<T> {
   const { access, headers, ...rest } = init;
-  const res = await fetch(path, {
+  const res = await fetch(withTrailingSlash(path), {
     ...rest,
     credentials: "same-origin",
     headers: {
@@ -160,4 +167,11 @@ export function markDmRead(userId: number, lastId: number, access: string) {
   return request<null>(`/api/dms/${userId}/read`, { method: "POST", body: JSON.stringify({ last_id: lastId }), access });
 }
 
-export const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? "ws://localhost:8000";
+/** WebSocket URL for a backend path. In production the socket is on the same host as the page
+ * (nginx routes /ws/ to the backend), so nothing is baked into the build. In development set
+ * NEXT_PUBLIC_WS_URL to the Django server, because `next dev` doesn't proxy WebSockets. */
+export function wsUrl(path: string) {
+  const base =
+    process.env.NEXT_PUBLIC_WS_URL || `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
+  return `${base}${path}`;
+}

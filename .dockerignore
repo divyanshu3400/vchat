@@ -1,0 +1,14 @@
+# Build context is the repo root (see deploy/*.Dockerfile). Keep it small and secret-free.
+.git
+**/.env
+**/.env.local
+deploy/.env
+
+backend/.venv
+backend/db.sqlite3
+backend/staticfiles
+**/__pycache__
+**/.pytest_cache
+
+web/node_modules
+web/.next
