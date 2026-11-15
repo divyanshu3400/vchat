@@ -64,6 +64,12 @@ services:
 
   backend:
     <<: *backend
+    environment:
+      MEDIA_ROOT: /app/media
+    volumes:
+      # Photos, videos and voice notes. A named volume keeps the container user's ownership
+      # without sudo on the host; backup.sh archives it.
+      - media:/app/media
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -121,3 +127,4 @@ services:
 
 volumes:
   static:
+  media:

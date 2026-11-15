@@ -2,7 +2,17 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ApiError, blockUser, fetchDmHistory, type ChatUser, type DirectMessage } from "@/lib/api";
+import {
+  ApiError,
+  blockUser,
+  fetchDmHistory,
+  uploadMedia,
+  type AttachmentKind,
+  type ChatUser,
+  type DirectMessage,
+} from "@/lib/api";
+import MediaBubble from "./media/MediaBubble";
+import VoiceRecorder from "./media/VoiceRecorder";
 import { useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
 import { Avatar, Icon } from "./bits";
@@ -39,6 +49,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const [notice, setNotice] = useState("");
   const [confirming, setConfirming] = useState<"unfriend" | "block" | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [uploading, setUploading] = useState<number | null>(null);
+  const [recording, setRecording] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const rel = relation(userId);
@@ -123,6 +136,20 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     } else {
       setNotice("You're offline. Reconnecting…");
     }
+  }
+
+  async function sendFile(file: Blob, kind: AttachmentKind, filename: string) {
+    if (!isFriend) return;
+    setNotice("");
+    stickToBottom.current = true;
+    setUploading(0);
+    try {
+      const up = await uploadMedia(file, kind, await getAccess(), setUploading, filename);
+      if (!sendDm(userId, "", up.id)) setNotice("You're offline. Reconnecting…");
+    } catch (e) {
+      setNotice(e instanceof ApiError ? e.message : "Couldn't send that file.");
+    }
+    setUploading(null);
   }
 
   async function confirmAction() {
@@ -233,12 +260,20 @@ export default function DmConversation({ userId, variant = "page", minimized = f
             {messages.map((m) => {
               const mine = m.sender.id === me?.id;
               return (
-                <div key={m.id} className={`b${mine ? " me" : ""}`}>
-                  <div className="t">{m.content}</div>
+                <div key={m.id} className={`b${mine ? " me" : ""}${m.attachment ? " has-media" : ""}`}>
+                  {m.attachment && <MediaBubble attachment={m.attachment} />}
+                  {m.content && <div className="t">{m.content}</div>}
                   <span className="when">{timeLabel(m.created_at)}</span>
                 </div>
               );
             })}
+            {uploading !== null && (
+              <div className="b me uploading">
+                <div className="t">
+                  Sending… {Math.round(uploading * 100)}%
+                </div>
+              </div>
+            )}
           </div>
           <div className="composer-wrap">
             {notice && (
@@ -258,7 +293,38 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                 )}
               </p>
             )}
+            {recording ? (
+              <VoiceRecorder
+                onCancel={() => setRecording(false)}
+                onDone={(blob) => {
+                  setRecording(false);
+                  const ext = blob.type.includes("mp4") ? "m4a" : blob.type.includes("ogg") ? "ogg" : "webm";
+                  sendFile(blob, "audio", `voice.${ext}`);
+                }}
+              />
+            ) : (
             <form className="composer" onSubmit={send}>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*,video/mp4,video/webm"
+                hidden
+                id={`dm-file-${userId}-${variant}`}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (file) sendFile(file, file.type.startsWith("video/") ? "video" : "image", file.name);
+                }}
+              />
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label="Send a photo or video"
+                disabled={!isFriend || uploading !== null}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Icon name="image" />
+              </button>
               <input
                 id={`dm-input-${userId}-${variant}`}
                 className="composer-input"
@@ -272,10 +338,23 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                 disabled={!isFriend}
                 onChange={(e) => setDraft(e.target.value)}
               />
-              <button className="send-btn" type="submit" disabled={!isFriend || !draft.trim()} aria-label="Send">
-                <Icon name="send" />
-              </button>
+              {draft.trim() ? (
+                <button className="send-btn" type="submit" disabled={!isFriend} aria-label="Send">
+                  <Icon name="send" />
+                </button>
+              ) : (
+                <button
+                  className="send-btn"
+                  type="button"
+                  disabled={!isFriend || uploading !== null}
+                  aria-label="Record a voice note"
+                  onClick={() => setRecording(true)}
+                >
+                  <Icon name="mic" />
+                </button>
+              )}
             </form>
+            )}
           </div>
         </>
       )}

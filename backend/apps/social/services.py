@@ -5,8 +5,11 @@ from django.db.models import Case, Count, IntegerField, OuterRef, Q, Subquery, V
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
+from django.core.exceptions import ValidationError
+
 from apps.accounts.models import User
 from apps.chat import presence
+from apps.media import services as media
 from apps.chat.models import Block
 from apps.chat.realtime import push_to_user
 
@@ -41,8 +44,12 @@ def dm_payload(message: DirectMessage, recipient_id: int) -> dict:
         "sender": brief(message.sender),
         "recipient_id": recipient_id,
         "content": message.content,
+        "attachment": media.payload(message.attachment),  # fresh signed link each time
         "created_at": message.created_at.isoformat(),
     }
+
+
+ATTACHMENT_PREVIEW = {"image": "📷 Photo", "video": "🎬 Video", "audio": "🎤 Voice note"}
 
 
 def is_blocked_between(a: int, b: int) -> bool:
@@ -199,15 +206,24 @@ def _conversation(a: int, b: int) -> Conversation | None:
     return Conversation.objects.filter(user_a_id=x, user_b_id=y).first()
 
 
-def send_dm(sender: User, recipient_id: int, text: str) -> dict:
+def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None) -> dict:
+    """Text, an attachment (photo, video, voice note), or both."""
     if not isinstance(recipient_id, int) or recipient_id == sender.id:
         raise SocialError("invalid", "Pick someone to message.")
     if not are_friends(sender.id, recipient_id):
         raise SocialError("not_friends", "You can only message friends. Send a friend request first.")
     x, y = ordered_pair(sender.id, recipient_id)
     with transaction.atomic():
+        attachment = None
+        if attachment_id:
+            try:
+                attachment = media.claim_for_message(sender.id, attachment_id, ("image", "video", "audio"))
+            except (media.UploadError, ValueError, ValidationError):
+                raise SocialError("invalid_attachment", "That file can't be sent. Try uploading it again.")
         conversation, _ = Conversation.objects.get_or_create(user_a_id=x, user_b_id=y)
-        message = DirectMessage.objects.create(conversation=conversation, sender=sender, content=text)
+        message = DirectMessage.objects.create(
+            conversation=conversation, sender=sender, content=text, attachment=attachment
+        )
         Conversation.objects.filter(pk=conversation.pk).update(last_message_at=message.created_at)
         # Your own message counts as read for you.
         _advance_read(conversation, sender.id, message.id)
@@ -220,7 +236,7 @@ def dm_history(user: User, partner_id: int, before: int | None, limit: int) -> t
         return [], False
     qs = (
         DirectMessage.objects.filter(conversation=conversation, deleted_at__isnull=True)
-        .select_related("sender")
+        .select_related("sender", "attachment")
         .order_by("-id")
     )
     if before:
@@ -263,6 +279,7 @@ def conversations_of(user: User, limit: int = 100) -> list[dict]:
         .select_related("user_a", "user_b")
         .annotate(
             last_content=Subquery(last.values("content")[:1]),
+            last_kind=Subquery(last.values("attachment__kind")[:1]),
             last_sender_id=Subquery(last.values("sender_id")[:1]),
             unread=Coalesce(
                 Case(
@@ -278,7 +295,7 @@ def conversations_of(user: User, limit: int = 100) -> list[dict]:
     return [
         {
             "user": brief(c.user_b if c.user_a_id == user.id else c.user_a),
-            "last_message": c.last_content,
+            "last_message": c.last_content or ATTACHMENT_PREVIEW.get(c.last_kind or "", ""),
             "last_from_me": c.last_sender_id == user.id,
             "last_message_at": c.last_message_at.isoformat(),
             "unread": c.unread,

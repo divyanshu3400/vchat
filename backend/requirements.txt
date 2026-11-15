@@ -7,3 +7,4 @@ daphne>=4.1,<4.3  # `runserver` in development
 uvicorn[standard]>=0.32,<1  # production ASGI server (HTTP + WebSockets, several workers)
 dj-database-url>=2.3,<3
 psycopg[binary]>=3.2,<3.3
+Pillow>=11,<12  # checks and re-encodes uploaded photos (drops EXIF/location)

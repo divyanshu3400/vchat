@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "apps.social",
     "apps.stranger",
     "apps.premium",
+    "apps.media",
 ]
 
 MIDDLEWARE = [
@@ -124,6 +125,7 @@ REST_FRAMEWORK = {
         "reports": "30/hour",
         "friend_requests": "40/hour",
         "rewards": "20/hour",
+        "uploads": "60/hour",
     },
 }
 
@@ -156,7 +158,14 @@ VCHAT = {
     # Rewarded ads unlock features (e.g. gender filter). Off in production until an ad network is live.
     "REWARDED_ADS": env_bool("REWARDED_ADS", DEBUG),
     "REWARDS_PER_DAY": 6,
+    # Signed links to photos, videos and voice notes stop working after this long.
+    # Clients get fresh links whenever they load the messages again.
+    "MEDIA_LINK_SECONDS": 6 * 3600,
 }
+
+# Uploaded attachments. Served only through signed links (apps/media), never as plain files.
+MEDIA_ROOT = os.environ.get("MEDIA_ROOT", str(BASE_DIR / "media"))
+MEDIA_URL = "/media-private/"  # not routed anywhere on purpose
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"

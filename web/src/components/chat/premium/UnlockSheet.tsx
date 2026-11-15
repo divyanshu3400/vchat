@@ -9,6 +9,7 @@ import { Icon } from "../bits";
 
 const COPY: Record<RewardKind, { title: string; reward: string }> = {
   gender_filter: { title: "Choose who you meet", reward: "Women-only or men-only matching for 15 chats (2 hours)" },
+  random_photos: { title: "Send photos to strangers", reward: "3 photos in the next 30 minutes" },
 };
 const AD_SECONDS = 15;
 

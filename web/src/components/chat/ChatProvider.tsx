@@ -39,7 +39,7 @@ type ChatContextValue = {
   unread: Record<number, number>;
   socketLive: boolean;
   relation: (userId: number) => Relation;
-  sendDm: (to: number, content: string) => boolean;
+  sendDm: (to: number, content: string, attachmentId?: string) => boolean;
   /** Send any message on the personal socket. False while it is reconnecting. */
   sendRaw: (payload: Record<string, unknown>) => boolean;
   subscribe: (fn: (event: UserEvent) => void) => () => void;
@@ -292,10 +292,10 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     [me, friends, outgoing, incoming],
   );
 
-  const sendDm = useCallback((to: number, content: string) => {
+  const sendDm = useCallback((to: number, content: string, attachmentId?: string) => {
     const ws = socket.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
-    ws.send(JSON.stringify({ type: "dm", to, content, client_id: crypto.randomUUID() }));
+    ws.send(JSON.stringify({ type: "dm", to, content, attachment: attachmentId, client_id: crypto.randomUUID() }));
     return true;
   }, []);
 

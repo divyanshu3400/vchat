@@ -53,8 +53,11 @@ class UserConsumer(StrangerMixin, AuthenticatedJsonConsumer):
         recipient_id = content.get("to")
         if not isinstance(recipient_id, int) or isinstance(recipient_id, bool):
             return await self.error("invalid", "Pick someone to message.", client_id)
+        attachment_id = content.get("attachment") or None
+        raw = content.get("content") or ""
         try:
-            text = chat_services.clean_content(content.get("content"))
+            # With an attachment the text is an optional caption.
+            text = chat_services.clean_content(raw) if (raw or not attachment_id) else ""
         except chat_services.InvalidMessage as exc:
             return await self.error("invalid_message", str(exc), client_id)
 
@@ -62,7 +65,7 @@ class UserConsumer(StrangerMixin, AuthenticatedJsonConsumer):
             return await self.error("rate_limited", "You're sending messages too fast. Wait a moment.", client_id)
 
         try:
-            payload = await database_sync_to_async(services.send_dm)(self.user, recipient_id, text)
+            payload = await database_sync_to_async(services.send_dm)(self.user, recipient_id, text, attachment_id)
         except SocialError as exc:
             return await self.error(exc.code, exc.detail, client_id)
 

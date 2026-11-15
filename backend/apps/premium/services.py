@@ -19,6 +19,7 @@ from .models import RewardGrant
 # What one watched ad gives.
 REWARDS = {
     RewardGrant.Kind.GENDER_FILTER: {"uses": 15, "minutes": 120},
+    RewardGrant.Kind.RANDOM_PHOTOS: {"uses": 3, "minutes": 30},
 }
 
 

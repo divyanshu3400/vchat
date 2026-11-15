@@ -31,7 +31,11 @@ class StrangerMessage(models.Model):
 
     session = models.ForeignKey(StrangerSession, on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
-    content = models.TextField()
+    content = models.TextField(blank=True)
+    # Photos only, and only after an unlock (Plus or a rewarded ad).
+    attachment = models.OneToOneField(
+        "media.Attachment", on_delete=models.SET_NULL, null=True, blank=True, related_name="stranger_message"
+    )
     enc_version = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 

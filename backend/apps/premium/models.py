@@ -7,6 +7,7 @@ class RewardGrant(models.Model):
 
     class Kind(models.TextChoices):
         GENDER_FILTER = "gender_filter", "Women-only / men-only matching"
+        RANDOM_PHOTOS = "random_photos", "Photos in random chat"
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reward_grants")
     kind = models.CharField(max_length=20, choices=Kind.choices)

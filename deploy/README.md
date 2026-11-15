@@ -68,6 +68,14 @@ test-run on 2026-11-15 (the dump restored its table list with `pg_restore --list
 
 The dumps stay on this server. Copy them off it (NAS, another machine) to survive a disk loss.
 
+### Photos, videos and voice notes (added after the first deploy)
+
+- Uploads go to `POST /api/media/` (up to 25 MB); both nginx hops allow 30 MB on that one path.
+  **The edge needs its updated site once:** copy `deploy/edge/` to 10.10.11.4 and run
+  `sudo sh setup_edge.sh` again (it only rewrites the `vchat` site).
+- Files live in the `vchat_media` Docker volume and are only reachable through signed links
+  that expire after 6 hours. `backup.sh` archives the volume next to the database dump.
+
 ## First time
 
 ### On 10.10.11.6 (app server)

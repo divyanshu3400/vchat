@@ -94,13 +94,55 @@ export function reportUser(
 export type Friend = { user: ChatUser; since: string; online: boolean };
 export type RoomPresence = { rooms: Record<string, number>; online: number };
 export type FriendRequest = { id: number; from_user: ChatUser; to_user: ChatUser; created_at: string };
+export type AttachmentKind = "image" | "video" | "audio";
+export type Attachment = {
+  id: string;
+  kind: AttachmentKind;
+  mime: string;
+  url: string; // signed, expires after a few hours; reload messages for a fresh one
+  width: number | null;
+  height: number | null;
+  size: number;
+};
 export type DirectMessage = {
   id: number;
   sender: ChatUser;
   recipient_id: number;
   content: string;
+  attachment: Attachment | null;
   created_at: string;
 };
+
+/** Upload with progress (0–1). Resolves to the attachment id to send in a message. */
+export function uploadMedia(
+  file: Blob,
+  kind: AttachmentKind,
+  access: string,
+  onProgress?: (fraction: number) => void,
+  filename = "upload",
+): Promise<{ id: string; kind: AttachmentKind }> {
+  return new Promise((resolve, reject) => {
+    const form = new FormData();
+    form.append("kind", kind);
+    form.append("file", file, filename);
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/media/");
+    xhr.setRequestHeader("Authorization", `Bearer ${access}`);
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total);
+    xhr.onload = () => {
+      let body: unknown = null;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        /* not JSON (e.g. a proxy error page) */
+      }
+      if (xhr.status >= 200 && xhr.status < 300) resolve(body as { id: string; kind: AttachmentKind });
+      else reject(new ApiError(xhr.status, body ?? { detail: xhr.status === 413 ? "That file is too big." : "Upload failed." }));
+    };
+    xhr.onerror = () => reject(new ApiError(0, { detail: "Upload failed. Check your connection." }));
+    xhr.send(form);
+  });
+}
 export type ConversationSummary = {
   user: ChatUser;
   last_message: string;
@@ -128,11 +170,18 @@ export type UserEvent =
   | { type: "stranger.idle" };
 
 export type StrangerPartner = { id: number; nickname: string; gender: string; region: string };
-export type StrangerMessage = { id: number; session: string; sender_id: number; content: string; created_at: string };
+export type StrangerMessage = {
+  id: number;
+  session: string;
+  sender_id: number;
+  content: string;
+  attachment: Attachment | null;
+  created_at: string;
+};
 
 // --- Plus and rewarded unlocks ------------------------------------------------
 
-export type RewardKind = "gender_filter";
+export type RewardKind = "gender_filter" | "random_photos";
 export type PremiumStatus = {
   plus: boolean;
   plus_until: string | null;

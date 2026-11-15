@@ -13,8 +13,8 @@ COPY backend/ ./
 # Runs as a plain user. /app/staticfiles is shared with nginx through a volume; making it
 # here gives the volume this owner the first time it is created.
 RUN useradd --system --uid 10002 --home-dir /app vchat \
-    && mkdir -p /app/staticfiles \
-    && chown vchat /app/staticfiles
+    && mkdir -p /app/staticfiles /app/media \
+    && chown vchat /app/staticfiles /app/media
 USER vchat
 
 EXPOSE 8000

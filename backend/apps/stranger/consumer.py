@@ -106,15 +106,20 @@ class StrangerMixin:
         client_id = str(content.get("client_id", ""))[:64]
         if not self.stranger:
             return await self.error("no_chat", "You're not chatting with anyone right now.", client_id)
+        attachment_id = content.get("attachment") or None
+        raw = content.get("content") or ""
         try:
-            text = chat_services.clean_content(content.get("content"))
+            text = chat_services.clean_content(raw) if (raw or not attachment_id) else ""
         except chat_services.InvalidMessage as exc:
             return await self.error("invalid_message", str(exc), client_id)
         if not await database_sync_to_async(chat_services.allow_message)(self.user.id):
             return await self.error("rate_limited", "You're sending messages too fast. Wait a moment.", client_id)
 
         st = self.stranger
-        payload = await database_sync_to_async(services.save_message)(st["session"], self.user.id, text)
+        try:
+            payload = await database_sync_to_async(services.save_message)(st["session"], self.user, text, attachment_id)
+        except services.PhotoLocked as exc:
+            return await self.error(exc.code, exc.detail, client_id)
         event = {"type": "stranger.deliver", "session": st["session"], "payload": {"type": "stranger.message", "message": payload, "client_id": client_id}}
         await self.channel_layer.send(st["partner_channel"], event)
         await self.send_json(event["payload"])

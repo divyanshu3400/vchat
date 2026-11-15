@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { ADS_ON } from "@/lib/ads";
 import { usePlus } from "@/lib/plus";
-import type { StrangerPartner } from "@/lib/api";
+import type { Attachment, StrangerPartner } from "@/lib/api";
 import { useChat } from "../ChatProvider";
 
 /**
@@ -12,7 +12,7 @@ import { useChat } from "../ChatProvider";
  */
 export type Phase = "idle" | "searching" | "chatting" | "ended";
 export type EndedBy = "you" | "stranger" | "connection";
-export type Line = { id: number; mine: boolean; content: string; at: string };
+export type Line = { id: number; mine: boolean; content: string; at: string; attachment: Attachment | null };
 
 // Ad rules (blueprint): a full-screen ad on every 5th skip, at most once every 4 minutes,
 // only between strangers and never during a conversation.
@@ -41,7 +41,7 @@ type StrangerValue = {
   next: () => void;
   cancel: () => void;
   leave: () => void;
-  send: (text: string) => boolean;
+  send: (text: string, attachmentId?: string) => boolean;
   typing: () => void;
   finishInterstitial: () => void;
 };
@@ -108,7 +108,16 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             setLines((l) =>
               l.some((x) => x.id === m.id)
                 ? l
-                : [...l, { id: m.id, mine: m.sender_id === meRef.current?.id, content: m.content, at: m.created_at }],
+                : [
+                    ...l,
+                    {
+                      id: m.id,
+                      mine: m.sender_id === meRef.current?.id,
+                      content: m.content,
+                      at: m.created_at,
+                      attachment: m.attachment,
+                    },
+                  ],
             );
             break;
           }
@@ -142,7 +151,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             }
             break;
           case "error":
-            if (event.code === "rate_limited" || event.code === "no_chat") setNotice(event.detail);
+            if (["rate_limited", "no_chat", "locked_photos", "invalid_attachment"].includes(event.code)) setNotice(event.detail);
             if (event.code === "locked_filter") {
               // The unlock ran out (or never existed): fall back to "Anyone" and say why.
               setWant("any");
@@ -196,7 +205,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   }, [sendRaw]);
 
   const send = useCallback(
-    (text: string) => sendRaw({ type: "stranger.message", content: text, client_id: crypto.randomUUID() }),
+    (text: string, attachmentId?: string) =>
+      sendRaw({ type: "stranger.message", content: text, attachment: attachmentId, client_id: crypto.randomUUID() }),
     [sendRaw],
   );
 

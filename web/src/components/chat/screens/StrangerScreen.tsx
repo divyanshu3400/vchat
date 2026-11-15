@@ -3,7 +3,8 @@
 import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import AdSlot from "@/components/AdSlot";
 import { ADS_ON } from "@/lib/ads";
-import { ApiError, blockUser, reportUser, type ReportReason } from "@/lib/api";
+import { ApiError, blockUser, reportUser, uploadMedia, type ReportReason } from "@/lib/api";
+import MediaBubble from "../media/MediaBubble";
 import { useRoomPresence } from "@/lib/presence";
 import { REGION_ROOMS, findRoom } from "@/lib/rooms";
 import { useChat } from "../ChatProvider";
@@ -166,9 +167,30 @@ function SearchingView() {
 }
 
 function ChatView() {
-  const { getAccess, relation, addFriend } = useChat();
+  const { getAccess, relation, addFriend, premium, setPremium } = useChat();
   const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, typing } = useStranger();
   const [draft, setDraft] = useState("");
+  const [uploading, setUploading] = useState<number | null>(null);
+  const [unlockPhotos, setUnlockPhotos] = useState(false);
+  const photoRef = useRef<HTMLInputElement>(null);
+  const photosUnlocked = !!premium?.plus || (premium?.grants.random_photos?.uses_left ?? 0) > 0;
+
+  async function sendPhoto(file: File) {
+    setNotice("");
+    setUploading(0);
+    try {
+      const up = await uploadMedia(file, "image", await getAccess(), setUploading, file.name);
+      if (!send("", up.id)) setNotice("You're offline. Reconnecting…");
+      else if (premium && !premium.plus && premium.grants.random_photos) {
+        // Keep the "photos left" count honest without another request.
+        const g = premium.grants.random_photos;
+        setPremium({ ...premium, grants: { ...premium.grants, random_photos: g.uses_left > 1 ? { ...g, uses_left: g.uses_left - 1 } : null } });
+      }
+    } catch (e) {
+      setNotice(e instanceof ApiError ? e.message : "Couldn't send the photo.");
+    }
+    setUploading(null);
+  }
   const [menu, setMenu] = useState<null | "main" | "report">(null);
   const [escArmed, setEscArmed] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -292,10 +314,17 @@ function ChatView() {
       <div className="messages" ref={listRef} aria-live="polite" aria-relevant="additions">
         <p className="sys-line">You&apos;re chatting with a stranger{partner.region !== "any" ? ` from ${regionName(partner.region)}` : ""}. Say hi!</p>
         {lines.map((l) => (
-          <div key={l.id} className={`b${l.mine ? " me" : ""}`}>
-            <div className="t">{l.content}</div>
+          <div key={l.id} className={`b${l.mine ? " me" : ""}${l.attachment ? " has-media" : ""}`}>
+            {/* A stranger's photo stays blurred until you choose to look. */}
+            {l.attachment && <MediaBubble attachment={l.attachment} blurUntilTap={!l.mine} />}
+            {l.content && <div className="t">{l.content}</div>}
           </div>
         ))}
+        {uploading !== null && (
+          <div className="b me uploading">
+            <div className="t">Sending photo… {Math.round(uploading * 100)}%</div>
+          </div>
+        )}
         {partnerTyping && !ended && (
           <div className="typing" aria-label="Stranger is typing">
             <i />
@@ -310,6 +339,16 @@ function ChatView() {
         )}
       </div>
 
+      {unlockPhotos && (
+        <UnlockSheet
+          kind="random_photos"
+          onClose={() => setUnlockPhotos(false)}
+          onUnlocked={() => {
+            setUnlockPhotos(false);
+            photoRef.current?.click();
+          }}
+        />
+      )}
       <div className="composer-wrap">
         {notice && (
           <p className="chat-notice" role="alert">
@@ -329,12 +368,25 @@ function ChatView() {
             </button>
             <button
               type="button"
-              className="icon-btn locked-media"
-              aria-label="Photos (locked)"
-              onClick={() => setNotice("Photos with strangers unlock with a short ad or vChat Plus. Coming soon.")}
+              className={`icon-btn${photosUnlocked ? "" : " locked-media"}`}
+              aria-label={photosUnlocked ? "Send a photo" : "Photos (locked)"}
+              disabled={uploading !== null}
+              onClick={() => (photosUnlocked ? photoRef.current?.click() : setUnlockPhotos(true))}
             >
-              <Icon name="lock" size={18} />
+              <Icon name={photosUnlocked ? "image" : "lock"} size={18} />
             </button>
+            <input
+              ref={photoRef}
+              id="stranger-photo"
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) sendPhoto(file);
+              }}
+            />
             <input
               ref={inputRef}
               id="stranger-input"
