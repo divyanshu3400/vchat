@@ -38,6 +38,29 @@ api.vchat.ssmm.online   A   <public IP of 10.10.11.4>
 
 Both must resolve before `setup_edge.sh` runs: certbot proves each name over port 80.
 
+## Live on 10.10.11.6 (deployed 2026-11-15)
+
+- User `hashai`, code in `~/vchat` (cloned from a git bundle: the server can't reach GitHub,
+  same as SadasyaSetu), settings in `~/vchat/deploy/.env`.
+- Database in `~/vchat-data/pgdata` (no passwordless sudo, so not `/srv`), backups go to
+  `~/vchat-data/backups`.
+- All six containers healthy; port `10.10.11.6:8081`; the app nginx returns 403 to anything
+  but 10.10.11.4.
+
+**Update** (from your machine, in the repo):
+
+```bash
+git bundle create /tmp/vchat.bundle master
+scp /tmp/vchat.bundle hashai@10.10.11.6:/tmp/vchat.bundle
+ssh hashai@10.10.11.6 'cd ~/vchat && git pull -q /tmp/vchat.bundle master && cd deploy && docker compose up -d --build'
+```
+
+**Backups** (cron as `hashai`, no sudo needed):
+
+```bash
+( crontab -l 2>/dev/null; echo '30 2 * * * BACKUP_DIR=$HOME/vchat-data/backups $HOME/vchat/deploy/backup.sh >> $HOME/vchat-data/backups/backup.log 2>&1' ) | crontab -
+```
+
 ## First time
 
 ### On 10.10.11.6 (app server)
