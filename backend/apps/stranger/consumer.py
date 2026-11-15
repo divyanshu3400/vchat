@@ -16,7 +16,19 @@ client -> {"type": "stranger.leave"}            end this chat
 client -> {"type": "stranger.cancel"}           stop looking
 server -> {"type": "stranger.ended", "by": "you" | "stranger" | "connection"}
 server -> {"type": "stranger.idle"}
+
+A dropped socket does not end the chat straight away: phones lose their connection all the time
+(network switches, app switching). The partner hears {"type": "stranger.away"} and the chat waits
+STRANGER_RESUME_SECONDS for the new socket to send:
+client -> {"type": "stranger.resume", "session": "<uuid>"}
+server -> {"type": "stranger.resumed", "session": "<uuid>"}   (partner gets {"type": "stranger.back"})
+          or {"type": "stranger.ended", "by": "connection"} when it is too late.
+The partner's socket ends the chat if nobody comes back in time.
 """
+
+import asyncio
+import time
+
 
 from channels.db import database_sync_to_async
 from django.conf import settings
@@ -30,8 +42,25 @@ from apps.premium.models import RewardGrant
 from . import matchmaker, services
 
 
+def _owner_key(session: str, user_id: int) -> str:
+    """Which socket of this user holds the chat (a reconnect takes it over)."""
+    return f"st:own:{session}:{user_id}"
+
+
+def _away_key(session: str, user_id: int) -> str:
+    """When this user's socket dropped out of the chat."""
+    return f"st:away:{session}:{user_id}"
+
+
+_cache_get = database_sync_to_async(cache.get)
+_cache_set = database_sync_to_async(cache.set)
+_cache_delete = database_sync_to_async(cache.delete)
+_KEY_TTL = 6 * 3600
+
+
 class StrangerMixin:
-    stranger: dict | None = None  # {"session", "partner_channel", "partner_id"}
+    stranger: dict | None = None  # {"session", "partner_channel", "partner_id", "away"?}
+    _st_grace_task: asyncio.Task | None = None
 
     # --- client messages -------------------------------------------------------
 
@@ -44,6 +73,7 @@ class StrangerMixin:
             "stranger.next": self._st_next,
             "stranger.leave": self._st_leave,
             "stranger.cancel": self._st_cancel,
+            "stranger.resume": self._st_resume,
         }
         handler = handlers.get(kind)
         if handler is None:
@@ -85,6 +115,7 @@ class StrangerMixin:
         session = await database_sync_to_async(services.start_session)(partner.user_id, self.user.id)
         sid = str(session.id)
         self.stranger = {"session": sid, "partner_channel": partner.channel, "partner_id": partner.user_id}
+        await _cache_set(_owner_key(sid, self.user.id), self.channel_name, _KEY_TTL)
         await self.channel_layer.send(
             partner.channel,
             {
@@ -139,6 +170,34 @@ class StrangerMixin:
             await self._st_end(by="you")
         await self.send_json({"type": "stranger.idle"})
 
+    async def _st_resume(self, content):
+        """A new socket picking up the chat its dropped socket was in."""
+        sid = str(content.get("session", ""))[:64]
+        if self.stranger and self.stranger["session"] == sid:
+            return await self.send_json({"type": "stranger.resumed", "session": sid})
+        partner_id = await database_sync_to_async(services.open_partner_id)(sid, self.user.id)
+        partner_channel = partner_id and await _cache_get(_owner_key(sid, partner_id))
+        away_since = await _cache_get(_away_key(sid, self.user.id))
+        late = away_since is not None and time.time() - away_since > settings.VCHAT["STRANGER_RESUME_SECONDS"]
+        if not partner_channel or late or self.stranger:
+            if partner_id:
+                await database_sync_to_async(services.end_session)(sid, self.user.id)
+                if partner_channel:
+                    await self.channel_layer.send(partner_channel, {"type": "stranger.partner_left", "session": sid})
+            return await self.send_json({"type": "stranger.ended", "by": "connection", "session": sid})
+
+        old_channel = await _cache_get(_owner_key(sid, self.user.id))
+        await _cache_set(_owner_key(sid, self.user.id), self.channel_name, _KEY_TTL)
+        await _cache_delete(_away_key(sid, self.user.id))
+        if old_channel and old_channel != self.channel_name:
+            # The old socket may not know yet that it is dead (phones often vanish without a close).
+            await self.channel_layer.send(old_channel, {"type": "stranger.taken_over", "session": sid})
+        self.stranger = {"session": sid, "partner_channel": partner_channel, "partner_id": partner_id}
+        await self.channel_layer.send(
+            partner_channel, {"type": "stranger.partner_back", "session": sid, "channel": self.channel_name}
+        )
+        await self.send_json({"type": "stranger.resumed", "session": sid})
+
     async def _st_cancel(self, content):
         await database_sync_to_async(matchmaker.leave_queue)(self.channel_name)
         await self.send_json({"type": "stranger.idle"})
@@ -148,6 +207,7 @@ class StrangerMixin:
     async def _st_end(self, by: str):
         """End my current chat and tell the other side."""
         st, self.stranger = self.stranger, None
+        self._st_stop_grace()
         if not st:
             return
         await database_sync_to_async(services.end_session)(st["session"], self.user.id)
@@ -156,9 +216,34 @@ class StrangerMixin:
             await self.send_json({"type": "stranger.ended", "by": "you", "session": st["session"]})
 
     async def stranger_disconnect(self):
-        """Socket closing: leave the queue, end any chat."""
+        """Socket closing: leave the queue; keep any chat open a little for a reconnect."""
         await database_sync_to_async(matchmaker.leave_queue)(self.channel_name)
-        await self._st_end(by="connection")
+        st, self.stranger = self.stranger, None
+        self._st_stop_grace()
+        if not st:
+            return
+        sid = st["session"]
+        if await _cache_get(_owner_key(sid, self.user.id)) != self.channel_name:
+            return  # a newer socket of mine already took this chat over
+        if st.get("away"):
+            # Both of us are gone now: nobody is left to wait.
+            return await database_sync_to_async(services.end_session)(sid, self.user.id)
+        await _cache_set(_away_key(sid, self.user.id), time.time(), _KEY_TTL)
+        await self.channel_layer.send(st["partner_channel"], {"type": "stranger.partner_away", "session": sid})
+
+    def _st_stop_grace(self):
+        if self._st_grace_task:
+            self._st_grace_task.cancel()
+            self._st_grace_task = None
+
+    async def _st_wait_for_partner(self, sid: str):
+        await asyncio.sleep(settings.VCHAT["STRANGER_RESUME_SECONDS"])
+        st = self.stranger
+        if st and st["session"] == sid and st.get("away"):
+            self._st_grace_task = None  # finishing: nothing to cancel
+            self.stranger = None
+            await database_sync_to_async(services.end_session)(sid, st["partner_id"])
+            await self.send_json({"type": "stranger.ended", "by": "stranger", "session": sid})
 
     async def stranger_heartbeat(self):
         await database_sync_to_async(matchmaker.heartbeat)(self.channel_name)
@@ -167,13 +252,38 @@ class StrangerMixin:
 
     async def stranger_paired(self, event):
         self.stranger = {"session": event["session"], "partner_channel": event["partner_channel"], "partner_id": event["partner"]["id"]}
+        await _cache_set(_owner_key(event["session"], self.user.id), self.channel_name, _KEY_TTL)
         await self.send_json({"type": "stranger.matched", "session": event["session"], "partner": event["partner"]})
 
     async def stranger_deliver(self, event):
         if self.stranger and self.stranger["session"] == event["session"]:
             await self.send_json(event["payload"])
 
+    async def stranger_partner_away(self, event):
+        st = self.stranger
+        if st and st["session"] == event["session"]:
+            st["away"] = True
+            self._st_stop_grace()
+            self._st_grace_task = asyncio.ensure_future(self._st_wait_for_partner(st["session"]))
+            await self.send_json({"type": "stranger.away", "session": st["session"]})
+
+    async def stranger_partner_back(self, event):
+        st = self.stranger
+        if not (st and st["session"] == event["session"]):
+            # Too late: this side already ended the chat.
+            await self.channel_layer.send(event["channel"], {"type": "stranger.partner_left", "session": event["session"]})
+            return
+        self._st_stop_grace()
+        st.pop("away", None)
+        st["partner_channel"] = event["channel"]
+        await self.send_json({"type": "stranger.back", "session": st["session"]})
+
+    async def stranger_taken_over(self, event):
+        if self.stranger and self.stranger["session"] == event["session"]:
+            self.stranger = None
+
     async def stranger_partner_left(self, event):
         if self.stranger and self.stranger["session"] == event["session"]:
             self.stranger = None
+            self._st_stop_grace()
             await self.send_json({"type": "stranger.ended", "by": "stranger", "session": event["session"]})

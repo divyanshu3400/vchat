@@ -55,7 +55,7 @@ export function useStranger() {
 }
 
 export default function StrangerProvider({ children }: { children: React.ReactNode }) {
-  const { me, sendRaw, subscribe } = useChat();
+  const { me, sendRaw, subscribe, socketLive } = useChat();
   const [phase, setPhase] = useState<Phase>("idle");
   const [partner, setPartner] = useState<StrangerPartner | null>(null);
   const [session, setSession] = useState<string | null>(null);
@@ -72,6 +72,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   const meRef = useRef(me);
   const plusRef = useRef(plus);
   const phaseRef = useRef(phase);
+  const sessionRef = useRef(session);
+  const findRef = useRef<() => void>(() => undefined);
   const skips = useRef(0);
   const lastInterstitial = useRef(-Infinity);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -83,7 +85,17 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   }, [me, plus]);
   useEffect(() => {
     phaseRef.current = phase;
-  }, [phase]);
+    sessionRef.current = session;
+  }, [phase, session]);
+
+  // Closing the tab ends the chat at once; a dropped connection gets a grace period on the server.
+  useEffect(() => {
+    const onPageHide = (e: PageTransitionEvent) => {
+      if (!e.persisted && phaseRef.current === "chatting") sendRaw({ type: "stranger.leave" });
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [sendRaw]);
 
   useEffect(
     () =>
@@ -131,6 +143,10 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             if (event.by === "stranger") {
               setEndedBy("stranger");
               setPhase("ended");
+            } else if (event.by === "connection") {
+              setEndedBy("connection");
+              setNotice("");
+              setPhase("ended");
             } else if (event.by === "you") {
               setEndedBy("you");
               // A new search usually follows straight away ("Next"); "waiting" or "matched" will arrive.
@@ -144,11 +160,20 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             setSession(null);
             break;
           case "ready":
-            // The personal socket reconnected: the server ended whatever the old socket had going.
-            if (phaseRef.current === "chatting" || phaseRef.current === "searching") {
-              setEndedBy("connection");
-              setPhase(phaseRef.current === "chatting" ? "ended" : "idle");
+            // The personal socket reconnected: pick the chat back up, or get back in the queue.
+            if (phaseRef.current === "chatting" && sessionRef.current) {
+              sendRaw({ type: "stranger.resume", session: sessionRef.current });
+            } else if (phaseRef.current === "searching") {
+              findRef.current();
             }
+            break;
+          case "stranger.resumed":
+          case "stranger.back":
+            setNotice("");
+            break;
+          case "stranger.away":
+            setPartnerTyping(false);
+            setNotice("The stranger's connection dropped. Waiting a few seconds for them to come back…");
             break;
           case "error":
             if (["rate_limited", "no_chat", "locked_photos", "invalid_attachment"].includes(event.code)) setNotice(event.detail);
@@ -161,7 +186,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             break;
         }
       }),
-    [subscribe],
+    [subscribe, sendRaw],
   );
 
   const find = useCallback(() => {
@@ -172,6 +197,10 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
     setNotice("");
     setPhase("searching");
   }, [region, want, sendRaw]);
+
+  useEffect(() => {
+    findRef.current = find;
+  }, [find]);
 
   const start = useCallback(() => find(), [find]);
 
@@ -229,7 +258,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       region,
       want,
       setWant,
-      notice,
+      // While our own socket is down the chat is on hold, not over.
+      notice: !socketLive && phase === "chatting" ? "Connection lost. Reconnecting…" : notice,
       interstitial,
       setRegion,
       setNotice,
@@ -241,7 +271,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       typing,
       finishInterstitial,
     }),
-    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, interstitial, start, next, cancel, leave, send, typing, finishInterstitial],
+    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, socketLive, interstitial, start, next, cancel, leave, send, typing, finishInterstitial],
   );
 
   return <StrangerContext.Provider value={value}>{children}</StrangerContext.Provider>;

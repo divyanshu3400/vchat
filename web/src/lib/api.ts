@@ -168,6 +168,9 @@ export type UserEvent =
   | { type: "stranger.typing" }
   | { type: "stranger.ended"; by: "you" | "stranger" | "connection"; session: string }
   | { type: "stranger.idle" }
+  | { type: "stranger.away"; session: string }
+  | { type: "stranger.back"; session: string }
+  | { type: "stranger.resumed"; session: string }
   | { type: "call.ringing"; call_id: string }
   | { type: "call.incoming"; call_id: string; kind: CallKind; stranger: boolean; from: ChatUser }
   | { type: "call.accepted"; call_id: string }

@@ -26,6 +26,17 @@ def start_session(waiting_user_id: int, finder_id: int) -> StrangerSession:
     return StrangerSession.objects.create(user_a_id=waiting_user_id, user_b_id=finder_id)
 
 
+def open_partner_id(session_id, user_id: int) -> int | None:
+    """The other person in a random chat this user is in and that hasn't ended, else None."""
+    try:
+        s = StrangerSession.objects.filter(id=session_id, ended_at__isnull=True).first()
+    except (ValidationError, ValueError):
+        return None
+    if s is None or not s.has_user(user_id):
+        return None
+    return s.user_b_id if s.user_a_id == user_id else s.user_a_id
+
+
 def end_session(session_id, ended_by_id: int | None) -> None:
     StrangerSession.objects.filter(id=session_id, ended_at__isnull=True).update(
         ended_at=timezone.now(), ended_by_id=ended_by_id

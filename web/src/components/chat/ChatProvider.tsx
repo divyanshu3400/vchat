@@ -216,6 +216,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     let heartbeat: ReturnType<typeof setInterval> | undefined;
 
     async function connect() {
+      retry = undefined;
       let access: string;
       try {
         access = await getAccess();
@@ -251,11 +252,28 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
 
     function scheduleRetry() {
       attempt += 1;
-      retry = setTimeout(connect, Math.min(1000 * 2 ** attempt, 15_000));
+      retry = setTimeout(connect, Math.min(500 * 2 ** attempt, 15_000));
     }
+
+    // Phones pause sockets in the background: on return (or when the network is back),
+    // skip the remaining back-off. A socket that is open or still connecting is left alone.
+    function wake() {
+      if (cancelled || document.visibilityState !== "visible") return;
+      const ws = socket.current;
+      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+      if (retry === undefined) return; // a connect() is already in flight
+      clearTimeout(retry);
+      retry = undefined;
+      attempt = 0;
+      connect();
+    }
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
 
     connect();
     return () => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
       cancelled = true;
       clearTimeout(retry);
       clearInterval(heartbeat);
