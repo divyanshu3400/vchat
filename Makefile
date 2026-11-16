@@ -37,7 +37,7 @@ else
   server_tty = $(server)
 endif
 
-.PHONY: help install dev-api dev-web migrate migrations shell test lint typecheck check deploy deploy-web deploy-api _clean-tree _bundle _ship status ps logs logs-f version env-keys restart ssh server-shell createsuperuser purge-dry purge backup backups set-env
+.PHONY: sync _sync-only help install dev-api dev-web migrate migrations shell test lint typecheck check deploy deploy-web deploy-api _clean-tree _bundle _ship status ps logs logs-f version env-keys restart ssh server-shell createsuperuser purge-dry purge backup backups set-env
 help: ## Show this list
 	@echo "vChat commands (make <name>):"
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /|/' | awk -F'|' '{ printf "  \033[1m%-16s\033[0m %s\n", $$1, $$2 }'
@@ -87,6 +87,20 @@ deploy-web: _clean-tree lint typecheck _bundle ## Ship only the website (no back
 deploy-api: _clean-tree test _bundle ## Ship only the backend (runs migrations)
 	@$(MAKE) --no-print-directory _ship SERVICES="migrate backend"
 	@$(MAKE) --no-print-directory status
+
+sync: _clean-tree _bundle ## Send the code to the server without rebuilding anything (Makefiles, docs, scripts)
+ifeq ($(IN_WSL),1)
+	scp -i $(KEY) $(SSH_OPTS) .deploy.bundle $(HOST):/tmp/vchat.bundle
+	rm -f .deploy.bundle
+	$(SSH) 'cd ~/vchat && git pull -q origin $(BRANCH) && git log --oneline -1'
+else
+	@wsl --cd "$(WIN_DIR)" make --no-print-directory _sync-only
+endif
+
+_sync-only:
+	scp -i $(KEY) $(SSH_OPTS) .deploy.bundle $(HOST):/tmp/vchat.bundle
+	rm -f .deploy.bundle
+	$(SSH) 'cd ~/vchat && git pull -q origin $(BRANCH) && git log --oneline -1'
 
 _clean-tree:
 	@test "$$(git rev-parse --abbrev-ref HEAD)" = "$(BRANCH)" || { echo "Not on $(BRANCH)."; exit 1; }
