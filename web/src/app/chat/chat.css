@@ -1116,3 +1116,34 @@ html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); 
 .ep-ok { color: var(--brand); font-size: 12.5px; font-weight: 700; }
 .ep-field small { font-size: 12.5px; }
 .ep-buttons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+
+/* Custom rooms: invite card in chats, share sheet, Your rooms */
+.invite-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); min-width: 0; width: 280px; max-width: 100%; color: var(--fg); text-align: left; }
+.bubble .invite-card { margin: 2px 0 4px; }
+.invite-card.loading { height: 66px; background: linear-gradient(90deg, var(--line), var(--surface), var(--line)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.invite-card.gone { opacity: 0.8; }
+.invite-emoji { width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; flex: none; background: color-mix(in srgb, var(--brand) 14%, var(--surface)); font-weight: 800; color: var(--brand); }
+.invite-emoji.big { width: 56px; height: 56px; font-size: 30px; border-radius: 18px; }
+.invite-text { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.invite-text b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-text small { font-size: 12.5px; color: var(--muted); }
+.invite-join { flex: none; }
+.room-sheet { max-height: 88vh; overflow-y: auto; }
+.room-sheet-head { display: flex; align-items: center; gap: 12px; }
+.room-sheet-head h2 { font-size: 20px; font-weight: 800; }
+.invite-box { display: grid; gap: 10px; padding: 12px; border-radius: 16px; background: color-mix(in srgb, var(--brand) 8%, var(--surface)); border: 1px dashed color-mix(in srgb, var(--brand) 45%, var(--line)); }
+.invite-url { font-family: var(--mono); font-size: 13px; overflow-wrap: anywhere; }
+.invite-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.invite-actions a.pill-btn { text-decoration: none; }
+.room-members { display: grid; gap: 4px; max-height: 300px; overflow-y: auto; }
+.room-member { display: flex; align-items: center; gap: 10px; padding: 6px 2px; }
+.room-member-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; font-weight: 700; overflow: hidden; }
+.room-card.custom { border-color: color-mix(in srgb, var(--brand) 35%, var(--line)); }
+.room-emoji { margin-right: 2px; }
+.block-head { gap: 10px; }
+.emoji-pick { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; }
+.emoji-pick button { appearance: none; border: 1px solid var(--line); background: var(--surface); border-radius: 12px; aspect-ratio: 1; font-size: 20px; cursor: pointer; }
+.emoji-pick button.on { border-color: var(--brand); background: color-mix(in srgb, var(--brand) 14%, var(--surface)); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 35%, transparent); }
+.room-invite-btn { height: 34px; }
+.join-invite { align-items: center; gap: 14px; padding-top: 24px; }

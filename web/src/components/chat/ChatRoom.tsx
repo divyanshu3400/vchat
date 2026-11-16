@@ -5,11 +5,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   blockUser,
+  fetchCustomRoom,
   fetchHistory,
   reportUser,
   wsUrl,
   type ChatMessage,
   type ChatUser,
+  type CustomRoom,
   type ReportReason,
 } from "@/lib/api";
 import { refreshRoomPresence, useRoomPresence } from "@/lib/presence";
@@ -21,6 +23,9 @@ import { useDock } from "./Dock";
 import Composer from "./messages/Composer";
 import MessageList, { JumpToLatest, type Msg, type MsgAction } from "./messages/MessageList";
 import { useStickyScroll } from "./messages/useStickyScroll";
+import { useRouter } from "next/navigation";
+import { Icon } from "./bits";
+import RoomInfoSheet from "./rooms/RoomInfoSheet";
 
 type Status = "connecting" | "live" | "reconnecting" | "missing";
 
@@ -44,6 +49,11 @@ export default function ChatRoom({ slug }: { slug: string }) {
   const { openChat } = useDock();
   const presenceCounts = useRoomPresence();
   const room = findRoom(slug);
+  // A room someone made (private, joined by link): its name comes from the API.
+  const custom = slug.startsWith("c-");
+  const [info, setInfo] = useState<CustomRoom | null>(null);
+  const [sheet, setSheet] = useState(false);
+  const router = useRouter();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [status, setStatus] = useState<Status>("connecting");
@@ -121,6 +131,28 @@ export default function ChatRoom({ slug }: { slug: string }) {
       wsRef.current = null;
     };
   }, [slug, getAccess]);
+
+  useEffect(() => {
+    if (!custom) return;
+    let cancelled = false;
+    getAccess()
+      .then((a) => fetchCustomRoom(slug, a))
+      .then((r) => {
+        if (cancelled) return;
+        setInfo(r);
+        // Just created: open the share sheet straight away.
+        if (new URLSearchParams(window.location.search).get("share") === "1") {
+          setSheet(true);
+          window.history.replaceState(null, "", window.location.pathname);
+        }
+      })
+      .catch((e) => {
+        if (!cancelled && e instanceof ApiError && e.status === 404) setStatus("missing");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [custom, slug, getAccess]);
 
   const scroll = useStickyScroll(listRef, messages.length);
 
@@ -250,8 +282,16 @@ export default function ChatRoom({ slug }: { slug: string }) {
   return (
     <div className="conversation">
       <ChatHeader
-        title={`# ${room?.name ?? slug}`}
+        title={custom ? (info ? `${info.emoji ? `${info.emoji} ` : ""}${info.name}` : "Room") : `# ${room?.name ?? slug}`}
         back="/chat/rooms"
+        onTitleClick={custom && info ? () => setSheet(true) : undefined}
+        actions={
+          custom && info ? (
+            <button type="button" className="pill-btn primary room-invite-btn" onClick={() => setSheet(true)} aria-label="Invite and members">
+              <Icon name="plus" size={15} /> <span className="hide-phone">Invite</span>
+            </button>
+          ) : undefined
+        }
         subtitle={
           <>
             <span className={`dot ${status === "live" ? "pulse" : "off"}`} /> {statusLabel}
@@ -271,7 +311,8 @@ export default function ChatRoom({ slug }: { slug: string }) {
         )}
         {status === "missing" && (
           <p className="empty">
-            This room doesn&apos;t exist. <Link href="/chat/rooms">Pick another room</Link>.
+            {custom ? "This room is gone, or you're not in it any more." : "This room doesn't exist."}{" "}
+            <Link href="/chat/rooms">Pick another room</Link>.
           </p>
         )}
         {status !== "missing" && visible.length === 0 && (
@@ -305,6 +346,15 @@ export default function ChatRoom({ slug }: { slug: string }) {
             </div>
           </div>
         </div>
+      )}
+
+      {sheet && info && (
+        <RoomInfoSheet
+          room={info}
+          onClose={() => setSheet(false)}
+          onChanged={setInfo}
+          onGone={() => router.replace("/chat/rooms")}
+        />
       )}
 
       <div className="composer-wrap">

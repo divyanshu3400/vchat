@@ -164,8 +164,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       inflight.current = refreshSession()
         .then((session) => {
           if (!session) {
+            const invite = window.location.pathname.match(/^\/chat\/join\/([\w-]+)$/)?.[1];
             const room = window.location.pathname.match(/^\/chat\/([\w-]+)$/)?.[1];
-            router.replace(room ? `/?room=${room}#join` : "/#join");
+            router.replace(invite ? `/?invite=${invite}#join` : room && !room.startsWith("c-") ? `/?room=${room}#join` : "/#join");
             throw new ApiError(401, { detail: "Your session expired." });
           }
           meRef.current = session.user;

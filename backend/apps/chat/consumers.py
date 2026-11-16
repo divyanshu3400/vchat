@@ -1,9 +1,9 @@
 from channels.db import database_sync_to_async
 
-from . import automod, message_ops, presence, services
+from . import automod, custom_rooms, message_ops, presence, services
 from .models import Message, Room
 from .realtime import control_group
-from .ws_auth import AuthenticatedJsonConsumer
+from .ws_auth import CLOSE_NOT_FOUND, AuthenticatedJsonConsumer
 
 
 class RoomConsumer(AuthenticatedJsonConsumer):
@@ -29,6 +29,10 @@ class RoomConsumer(AuthenticatedJsonConsumer):
         return True
 
     async def on_authenticated(self):
+        # A custom room is for its members only (joined through the invite link).
+        if self.room.is_custom and not await database_sync_to_async(custom_rooms.is_member)(self.room, self.user.id):
+            await self.error("not_member", "Join this room with its invite link.")
+            return await self.close(code=CLOSE_NOT_FOUND)
         self.blocked = await database_sync_to_async(services.blocked_user_ids)(self.user.id)
         await database_sync_to_async(presence.join_room)(self.room.id, self.user.id, self.channel_name)
         await self.channel_layer.group_add(self.group, self.channel_name)
@@ -99,8 +103,13 @@ class RoomConsumer(AuthenticatedJsonConsumer):
 
     async def control_event(self, event):
         # Someone blocked or unblocked this user (or the reverse): reload who is hidden.
-        if event["payload"].get("type") == "blocks_changed":
+        payload = event["payload"]
+        if payload.get("type") == "blocks_changed":
             self.blocked = await database_sync_to_async(services.blocked_user_ids)(self.user.id)
+        elif payload.get("type") == "room_removed" and payload.get("room") == self.room.slug:
+            # Removed by the owner, left, or the room was deleted.
+            await self.error("room_removed", "You're no longer in this room.")
+            await self.close(code=CLOSE_NOT_FOUND)
 
     @database_sync_to_async
     def _get_room(self, slug):

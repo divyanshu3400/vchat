@@ -7,6 +7,7 @@ class Room(models.Model):
     class Kind(models.TextChoices):
         REGION = "region", "Region"
         TOPIC = "topic", "Topic"
+        CUSTOM = "custom", "Custom"  # made by a user; private, joined by invite link
 
     slug = models.SlugField(max_length=48, unique=True)
     name = models.CharField(max_length=64)
@@ -18,9 +19,18 @@ class Room(models.Model):
     sort_order = models.PositiveSmallIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # --- custom rooms only ---
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name="rooms_owned")
+    # The code in the invite link (/r/<code>). A new link replaces it; the old one stops working.
+    invite_code = models.CharField(max_length=16, unique=True, null=True, blank=True)
+    emoji = models.CharField(max_length=8, blank=True)
 
     class Meta:
         ordering = ["kind", "sort_order", "name"]
+
+    @property
+    def is_custom(self) -> bool:
+        return self.kind == self.Kind.CUSTOM
 
     def __str__(self) -> str:
         return self.name
@@ -109,3 +119,15 @@ class Report(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes = [models.Index(fields=["status", "-created_at"], name="report_queue")]
+
+
+class RoomMember(models.Model):
+    """Who is in a custom room. Removed people keep a row (removed_at) so the link can't bring them back."""
+
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="room_memberships")
+    joined_at = models.DateTimeField(auto_now_add=True)
+    removed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["room", "user"], name="uniq_room_member")]

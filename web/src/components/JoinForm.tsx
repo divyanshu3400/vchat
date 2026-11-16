@@ -24,17 +24,22 @@ export default function JoinForm() {
   const [existing, setExisting] = useState<ChatUser | null>(null);
   // Room pages link here as /?room=<slug>#join; otherwise people land on the app's home.
   const [room, setRoom] = useState<string | null>(null);
-  const destination = room ? `/chat/${room}` : "/chat";
+  // An invite link opened before signing up comes here as /?invite=<code>#join.
+  const [invite, setInvite] = useState<string | null>(null);
+  const destination = invite ? `/chat/join/${invite}` : room ? `/chat/${room}` : "/chat";
 
   useEffect(() => {
     // Room pages link here as /?room=<slug>#join.
     const wanted = new URLSearchParams(window.location.search).get("room");
     const valid = wanted && findRoom(wanted) ? wanted : null;
+    const code = new URLSearchParams(window.location.search).get("invite");
+    const inviteCode = code && /^[A-Za-z0-9_-]{6,16}$/.test(code) ? code : null;
     let cancelled = false;
     refreshSession()
       .then((session) => {
         if (cancelled) return;
         if (valid) setRoom(valid);
+        if (inviteCode) setInvite(inviteCode);
         if (session) {
           setExisting(session.user);
           // Plus members see no ads on public pages either.

@@ -8,6 +8,8 @@ import MediaBubble from "../media/MediaBubble";
 import { Icon } from "../bits";
 import EmojiPicker, { rememberEmoji } from "./EmojiPicker";
 import { cleanWordsOn, firstYoutube, isJumboEmoji, looksLikeContact, mentions, moodOf, renderRich, type Mood } from "./richText";
+import { inviteCodeIn } from "@/lib/api";
+import InviteCard from "../rooms/InviteCard";
 
 /** One message, whichever chat it came from (room, friend or random). */
 export type Msg = {
@@ -163,6 +165,9 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
   const gif = !m.deleted ? parseGif(m.content) : null;
   const jumbo = !gif && !m.deleted && !m.attachment && !m.replyTo && isJumboEmoji(m.content);
   const yt = !gif && !m.deleted && m.content ? firstYoutube(m.content) : null;
+  // A room invite link becomes a Join card; a message that is only the link shows just the card.
+  const invite = !gif && !m.deleted && m.content ? inviteCodeIn(m.content) : null;
+  const onlyInvite = !!invite && /^\S+$/.test(m.content.trim());
   const mentioned = !mine && !!meNick && mentions(m.content, meNick);
   const mineEmoji = myReaction(m, meId);
   const reactions = Object.entries(m.reactions).sort((a, b) => b[1].length - a[1].length);
@@ -292,7 +297,8 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
             <>
               {m.attachment && <MediaBubble attachment={m.attachment} ask={!mine} />}
               {gif && <GifBubble gif={gif} />}
-              {m.content && !gif && (
+              {invite && <InviteCard code={invite} />}
+              {m.content && !gif && !onlyInvite && (
                 <span className="txt">{renderRich(m.content, { me: meNick, clean, onLink: stranger && !mine ? onLink : undefined })}</span>
               )}
               {yt && (

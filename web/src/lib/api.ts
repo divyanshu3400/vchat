@@ -512,3 +512,75 @@ export function wsUrl(path: string) {
     process.env.NEXT_PUBLIC_WS_URL || `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
   return `${base}${path}`;
 }
+
+// --- custom rooms (made by people, joined by invite link) ------------------------------
+
+export type CustomRoom = {
+  slug: string;
+  name: string;
+  kind: "custom";
+  description: string;
+  emoji: string;
+  members: number;
+  /** People in the room right now (from "my rooms"). */
+  online?: number;
+  is_owner: boolean;
+  /** Owner only: the code in the invite link. */
+  invite_code?: string;
+};
+
+export type InvitePreview = { name: string; emoji: string; description: string; members: number; is_member?: boolean; slug?: string };
+
+export function inviteLink(code: string) {
+  const origin = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://vchat.ssmm.online");
+  return `${origin}/r/${code}`;
+}
+
+export function fetchMyRooms(access: string) {
+  return request<{ rooms: CustomRoom[] }>("/api/rooms/mine", { access });
+}
+
+export function createRoom(body: { name: string; description?: string; emoji?: string }, access: string) {
+  return request<CustomRoom>("/api/rooms/mine", { method: "POST", access, body: JSON.stringify(body) });
+}
+
+export function fetchCustomRoom(slug: string, access: string) {
+  return request<CustomRoom>(`/api/rooms/c/${encodeURIComponent(slug)}`, { access });
+}
+
+export function updateRoom(slug: string, body: { name?: string; description?: string; emoji?: string; new_link?: boolean }, access: string) {
+  return request<CustomRoom>(`/api/rooms/c/${encodeURIComponent(slug)}`, { method: "PATCH", access, body: JSON.stringify(body) });
+}
+
+export function deleteRoom(slug: string, access: string) {
+  return request<null>(`/api/rooms/c/${encodeURIComponent(slug)}`, { method: "DELETE", access });
+}
+
+export function leaveRoom(slug: string, access: string) {
+  return request<null>(`/api/rooms/c/${encodeURIComponent(slug)}/leave`, { method: "POST", access });
+}
+
+export function fetchRoomMembers(slug: string, access: string) {
+  return request<{ members: { user: ChatUser; is_owner: boolean; joined_at: string }[] }>(`/api/rooms/c/${encodeURIComponent(slug)}/members`, { access });
+}
+
+export function removeRoomMember(slug: string, userId: number, access: string) {
+  return request<null>(`/api/rooms/c/${encodeURIComponent(slug)}/members/${userId}`, { method: "DELETE", access });
+}
+
+export function fetchInvite(code: string, access?: string) {
+  return request<InvitePreview>(`/api/rooms/invite/${encodeURIComponent(code)}`, { access });
+}
+
+export function joinInvite(code: string, access: string) {
+  return request<CustomRoom>(`/api/rooms/invite/${encodeURIComponent(code)}`, { method: "POST", access });
+}
+
+/** The invite code in a message ("…/r/AbC123xy"), if it's one of our links. */
+export function inviteCodeIn(text: string): string | null {
+  const m = text.match(/(?:^|\s)(?:https?:\/\/)?([\w.-]+(?::\d+)?)\/r\/([A-Za-z0-9_-]{6,16})(?=$|[\s/?#.,!])/);
+  if (!m) return null;
+  const host = m[1].toLowerCase();
+  const ours = host === "vchat.ssmm.online" || host.startsWith("localhost") || host.startsWith("127.0.0.1") || (typeof window !== "undefined" && host === window.location.host);
+  return ours ? m[2] : null;
+}

@@ -285,3 +285,11 @@ p { margin: 0; }
 .banned-screen h1 { font-family: var(--display); font-size: 28px; color: var(--danger); }
 .banned-screen p { color: var(--muted); line-height: 1.6; }
 .banned-screen a { color: var(--brand); font-weight: 800; }
+
+/* /r/<code>: a room invite opened outside the app */
+.invite-page { max-width: 440px; margin: 48px auto; display: grid; justify-items: center; gap: 12px; text-align: center; }
+.invite-page-emoji { width: 88px; height: 88px; border-radius: 26px; display: grid; place-items: center; font-size: 46px; background: color-mix(in srgb, var(--brand) 14%, transparent); }
+.invite-page h1 { font-size: 30px; font-weight: 800; }
+.invite-page-about { color: var(--muted); }
+.invite-page .cta { justify-content: center; width: 100%; margin-top: 8px; }
+.invite-page small { color: var(--muted); }
