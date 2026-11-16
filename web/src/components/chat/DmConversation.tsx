@@ -27,6 +27,9 @@ function merge(prev: DirectMessage[], incoming: DirectMessage[]) {
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
+const AUTO_DELETE_DAYS = [1, 7, 30, 365];
+const AUTO_DELETE_SHORT: Record<number, string> = { 1: "1 day", 7: "1 week", 30: "1 month", 365: "1 year" };
+const AUTO_DELETE_LABEL: Record<number, string> = { 1: "1 day", 7: "1 week", 30: "1 month", 365: "1 year" };
 const TYPING_SHOW_MS = 3500;
 const TYPING_SEND_GAP_MS = 2000;
 // Errors from a react/edit/delete just sent from this chat.
@@ -43,8 +46,10 @@ type Props = {
 
 export default function DmConversation({ userId, variant = "page", minimized = false, onToggleMin, onClose }: Props) {
   const router = useRouter();
-  const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive } =
+  const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive, unread } =
     useChat();
+  const unreadElsewhere = Object.entries(unread).reduce((n, [id, c]) => (Number(id) === userId ? n : n + c), 0);
+  const [settingNote, setSettingNote] = useState("");
   const known = friends.find((f) => f.user.id === userId)?.user ?? conversations.find((c) => c.user.id === userId)?.user;
   const [partner, setPartner] = useState<ChatUser | null>(known ?? null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -54,6 +59,8 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const [replying, setReplying] = useState<Msg | null>(null);
   const [editing, setEditing] = useState<Msg | null>(null);
   const [partnerRead, setPartnerRead] = useState(0);
+  const [autoDelete, setAutoDelete] = useState(7);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastTypingSent = useRef(0);
@@ -82,6 +89,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
         setMessages((prev) => merge(prev, res.messages));
         setHasMore(res.has_more);
         setPartnerRead((r) => Math.max(r, res.partner_read_id ?? 0));
+        setAutoDelete(res.auto_delete_days ?? 7);
       })
       .catch((e) => {
         if (!cancelled && e instanceof ApiError && e.status === 404) setMissing(true);
@@ -106,6 +114,17 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               setPartnerTyping(false);
             }
           }
+        } else if (event.type === "dm.settings" && event.users.includes(userId)) {
+          setAutoDelete(event.auto_delete_days);
+          setSettingNote(
+            `${event.by.id === userId ? event.by.nickname : "You"} set messages to delete after ${AUTO_DELETE_LABEL[event.auto_delete_days] ?? `${event.auto_delete_days} days`}.`,
+          );
+        } else if (event.type === "conversations.changed") {
+          // A random chat with this person moved in here: reload.
+          getAccess()
+            .then((access) => fetchDmHistory(userId, access))
+            .then((res) => setMessages((prev) => merge(prev, res.messages)))
+            .catch(() => undefined);
         } else if (event.type === "dm.read" && event.user_id === userId) {
           setPartnerRead((r) => Math.max(r, event.last_id));
         } else if (event.type === "dm.typing" && event.user_id === userId) {
@@ -116,7 +135,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
           setNotice(event.detail);
         }
       }),
-    [subscribe, userId],
+    [subscribe, userId, getAccess],
   );
 
   const lastFromPartner = [...messages].reverse().find((m) => m.sender.id === userId)?.id;
@@ -259,6 +278,11 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     </div>
   );
 
+  function chooseAutoDelete(days: number) {
+    setMenuOpen(false);
+    if (days !== autoDelete && !sendRaw({ type: "dm.autodelete", to: userId, days })) setNotice("You're offline. Reconnecting…");
+  }
+
   const menu = (
     <div className="menu-wrap">
       <button type="button" className="icon-btn" aria-label="More" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
@@ -266,6 +290,23 @@ export default function DmConversation({ userId, variant = "page", minimized = f
       </button>
       {menuOpen && (
         <div className="menu" role="menu">
+          {isFriend && (
+            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setWatchSheet(true); }}>
+              Watch YouTube together
+            </button>
+          )}
+          {isFriend && (
+            <div className="menu-group" role="group" aria-label="Delete messages after">
+              <span className="menu-label">Delete messages after</span>
+              <div className="menu-chips">
+                {AUTO_DELETE_DAYS.map((d) => (
+                  <button key={d} type="button" className={d === autoDelete ? "on" : ""} aria-pressed={d === autoDelete} onClick={() => chooseAutoDelete(d)}>
+                    {AUTO_DELETE_SHORT[d]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           {isFriend && (
             <button type="button" role="menuitem" onClick={() => setConfirming("unfriend")}>
               Remove friend
@@ -281,9 +322,6 @@ export default function DmConversation({ userId, variant = "page", minimized = f
 
   const callButtons = isFriend && partner && (
     <>
-      <button type="button" className="icon-btn" aria-label="Watch YouTube together" title="Watch together" onClick={() => setWatchSheet(true)}>
-        <Icon name="play" size={isWindow ? 18 : 20} />
-      </button>
       <button type="button" className="icon-btn" aria-label={`Voice call ${name}`} onClick={() => startCall(partner, "voice")}>
         <Icon name="phone" size={isWindow ? 18 : 20} />
       </button>
@@ -313,7 +351,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     <ChatHeader
       title={name}
       back="/chat/inbox"
-      avatar={<Avatar name={name} size={38} online={isFriend ? partnerOnline : undefined} />}
+      backBadge={unreadElsewhere}
+      onTitleClick={() => setProfileOpen(true)}
+      avatar={<Avatar name={name} size={36} online={isFriend ? partnerOnline : undefined} />}
       subtitle={<span className={partnerOnline && isFriend ? "on" : ""}>{status}</span>}
       actions={
         <>
@@ -362,6 +402,11 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                 This is the start of your private chat with <b>{name}</b>. Only the two of you can see it.
               </p>
             )}
+            {isFriend && (
+              <button type="button" className="sys-line autodel-line" onClick={() => setProfileOpen(true)}>
+                🕑 Messages here delete after {AUTO_DELETE_LABEL[autoDelete] ?? `${autoDelete} days`} · Change
+              </button>
+            )}
             <MessageList
               items={items}
               me={me ?? undefined}
@@ -389,6 +434,59 @@ export default function DmConversation({ userId, variant = "page", minimized = f
             )}
           </div>
           <JumpToLatest away={scroll.away} unseen={scroll.unseen} onClick={scroll.jump} />
+          {settingNote && (
+            <p className="chat-notice setting-note" role="status" onAnimationEnd={() => setSettingNote("")}>
+              {settingNote}
+            </p>
+          )}
+          {profileOpen && partner && (
+            <div className="msg-sheet-veil" onClick={() => setProfileOpen(false)}>
+              <div className="account-sheet profile-sheet" role="dialog" aria-label={`About ${name}`} onClick={(e) => e.stopPropagation()}>
+                <button type="button" className="account-x" aria-label="Close" onClick={() => setProfileOpen(false)}>
+                  ×
+                </button>
+                <div className="profile-top">
+                  <Avatar name={name} size={64} online={isFriend ? partnerOnline : undefined} />
+                  <div>
+                    <h2>{name}</h2>
+                    <p className="account-why">
+                      {isFriend ? (partnerOnline ? "Online" : "Offline") : "Not friends"}
+                      {partner.gender ? ` · ${({ M: "Man", F: "Woman", O: "Other" } as Record<string, string>)[partner.gender] ?? ""}` : ""}
+                    </p>
+                  </div>
+                </div>
+                {isFriend && (
+                  <div className="profile-actions">
+                    <button type="button" onClick={() => { setProfileOpen(false); startCall(partner, "voice"); }}>
+                      <Icon name="phone" /> Call
+                    </button>
+                    <button type="button" onClick={() => { setProfileOpen(false); startCall(partner, "video"); }}>
+                      <Icon name="video" /> Video
+                    </button>
+                    <button type="button" onClick={() => { setProfileOpen(false); setWatchSheet(true); }}>
+                      <Icon name="play" /> Watch
+                    </button>
+                  </div>
+                )}
+                {isFriend && (
+                  <div className="menu-group">
+                    <span className="menu-label">Delete messages after</span>
+                    <div className="menu-chips">
+                      {AUTO_DELETE_DAYS.map((d) => (
+                        <button key={d} type="button" className={d === autoDelete ? "on" : ""} aria-pressed={d === autoDelete} onClick={() => chooseAutoDelete(d)}>
+                          {AUTO_DELETE_SHORT[d]}
+                        </button>
+                      ))}
+                    </div>
+                    <small className="menu-hint">For both of you. Either of you can change it.</small>
+                  </div>
+                )}
+                <button type="button" className="pill-btn danger" onClick={() => { setProfileOpen(false); setConfirming("block"); }}>
+                  Block {name}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="composer-wrap">
             {notice && (
               <p className="chat-notice" role="alert">

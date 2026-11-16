@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import User
@@ -39,9 +42,63 @@ def open_partner_id(session_id, user_id: int) -> int | None:
 
 
 def end_session(session_id, ended_by_id: int | None) -> None:
-    StrangerSession.objects.filter(id=session_id, ended_at__isnull=True).update(
+    ended = StrangerSession.objects.filter(id=session_id, ended_at__isnull=True).update(
         ended_at=timezone.now(), ended_by_id=ended_by_id
     )
+    if ended:
+        # Became friends during the chat: what they said after that moves to their friend chat too.
+        session = StrangerSession.objects.filter(id=session_id).first()
+        if session:
+            carry_to_friend_chat(session)
+
+
+def carry_recent_chat(a: int, b: int) -> int:
+    """Two people just became friends: if they met in random chat today, copy that chat into
+    their friend chat, so nothing they said is lost."""
+    session = (
+        StrangerSession.objects.filter(
+            Q(user_a_id=a, user_b_id=b) | Q(user_a_id=b, user_b_id=a),
+            started_at__gte=timezone.now() - timedelta(days=1),
+        )
+        .order_by("-started_at")
+        .first()
+    )
+    return carry_to_friend_chat(session) if session else 0
+
+
+def carry_to_friend_chat(session: StrangerSession) -> int:
+    """Copy the random chat's messages (not copied yet) into the two friends' chat. Photos move along."""
+    from apps.chat.realtime import push_to_user
+    from apps.social.models import Conversation, DirectMessage, ordered_pair
+    from apps.social.services import are_friends
+
+    if not are_friends(session.user_a_id, session.user_b_id):
+        return 0
+    messages = list(
+        StrangerMessage.objects.filter(session=session, id__gt=session.carried_upto, deleted_at__isnull=True)
+        .select_related("attachment")
+        .order_by("id")
+    )
+    if not messages:
+        return 0
+    x, y = ordered_pair(session.user_a_id, session.user_b_id)
+    with transaction.atomic():
+        conversation, _ = Conversation.objects.get_or_create(user_a_id=x, user_b_id=y)
+        for m in messages:
+            attachment = m.attachment
+            if attachment is not None:
+                StrangerMessage.objects.filter(pk=m.pk).update(attachment=None)
+            dm = DirectMessage.objects.create(
+                conversation=conversation, sender_id=m.sender_id, content=m.content, attachment=attachment
+            )
+            DirectMessage.objects.filter(pk=dm.pk).update(created_at=m.created_at)
+        StrangerSession.objects.filter(pk=session.pk).update(carried_upto=messages[-1].id)
+        latest = messages[-1].created_at
+        if not conversation.last_message_at or conversation.last_message_at < latest:
+            Conversation.objects.filter(pk=conversation.pk).update(last_message_at=latest)
+        for uid in (x, y):
+            transaction.on_commit(lambda uid=uid: push_to_user(uid, {"type": "conversations.changed"}))
+    return len(messages)
 
 
 def save_message(session_id, sender: User, text: str, attachment_id=None, reply_id=None) -> dict:

@@ -14,8 +14,9 @@ type Props = {
   id: string;
   placeholder: string;
   disabled?: boolean;
-  /** Sends text. Return false if it couldn't go (offline): the draft stays. */
-  onSend: (text: string) => boolean;
+  /** Sends text. Return (or resolve to) false if it didn't go (offline, or a warning the user
+   * backed out of): the draft stays. */
+  onSend: (text: string) => boolean | Promise<boolean>;
   onTyping?: () => void;
   replying?: Msg | null;
   replyName?: string;
@@ -88,10 +89,10 @@ export default function Composer({
     if (draft) el.style.height = `${Math.min(el.scrollHeight, MAX_ROWS_PX)}px`;
   }, [draft]);
 
-  function submit() {
+  async function submit() {
     const text = draft.trim();
     if (!text || disabled) return;
-    if (onSend(text)) {
+    if (await onSend(text)) {
       setDraft("");
       setPicker(false);
     }

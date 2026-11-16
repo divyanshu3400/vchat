@@ -1,5 +1,7 @@
 """Friends and direct messages. Views and the personal socket call these; nothing else writes these tables."""
 
+from datetime import timedelta
+
 from django.db import transaction
 from django.db.models import Case, Count, IntegerField, OuterRef, Q, Subquery, Value, When
 from django.db.models.functions import Coalesce
@@ -161,6 +163,10 @@ def _accept(req: FriendRequest) -> None:
         {"type": "friend_added", "friend": brief(req.from_user), "online": req.from_user_id in online, "request_id": req.id},
     )
     transaction.on_commit(lambda: push_events.request_accepted(req.from_user_id, req.to_user_id, req.to_user.nickname))
+    # Met in random chat? That chat continues in their friend chat.
+    from apps.stranger.services import carry_recent_chat
+
+    transaction.on_commit(lambda: carry_recent_chat(req.from_user_id, req.to_user_id))
 
 
 def respond_to_request(req_id: int, user: User, action: str) -> None:
@@ -271,14 +277,37 @@ def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None, repl
     return dm_payload(_load_dm(message.id), recipient_id)
 
 
+def auto_delete_days(user: User, partner_id: int) -> int:
+    conversation = _conversation(user.id, partner_id)
+    return conversation.auto_delete_days if conversation else Conversation._meta.get_field("auto_delete_days").default
+
+
+def set_auto_delete(user: User, partner_id: int, days) -> int:
+    """Either friend picks how long messages stay (1, 7, 30 or 365 days). Both are told."""
+    if days not in Conversation.AUTO_DELETE_CHOICES or isinstance(days, bool):
+        raise SocialError("invalid", "Pick 1 day, 1 week, 1 month or 1 year.")
+    if not isinstance(partner_id, int) or partner_id == user.id or not are_friends(user.id, partner_id):
+        raise SocialError("not_friends", "You can only change this in a chat with a friend.")
+    x, y = ordered_pair(user.id, partner_id)
+    with transaction.atomic():
+        conversation, _ = Conversation.objects.get_or_create(user_a_id=x, user_b_id=y)
+        Conversation.objects.filter(pk=conversation.pk).update(auto_delete_days=days, auto_delete_changed_by=user)
+        event = {"type": "dm.settings", "users": [x, y], "auto_delete_days": days, "by": brief(user)}
+        _on_commit_push(user.id, event)
+        _on_commit_push(partner_id, event)
+    return days
+
+
 def dm_history(user: User, partner_id: int, before: int | None, limit: int) -> tuple[list[dict], bool]:
     conversation = _conversation(user.id, partner_id)
     if conversation is None:
         return [], False
     select, prefetch = message_ops.related_fields(DirectMessage)
+    # Older than the chat's auto-delete setting: gone (the nightly purge removes them for good).
+    shown_from = timezone.now() - timedelta(days=conversation.auto_delete_days)
     qs = (
         # Deleted messages stay as "This message was deleted" in their place.
-        DirectMessage.objects.filter(conversation=conversation)
+        DirectMessage.objects.filter(conversation=conversation, created_at__gte=shown_from)
         .select_related(*select)
         .prefetch_related(*prefetch)
         .order_by("-id")

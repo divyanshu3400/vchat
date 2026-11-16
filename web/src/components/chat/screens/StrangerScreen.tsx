@@ -17,6 +17,8 @@ import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
 import UnlockSheet from "../premium/UnlockSheet";
 import { useStranger } from "../stranger/StrangerProvider";
+import { useDock } from "../Dock";
+import { looksLikeContact } from "../messages/richText";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 const REPORT_REASONS: [ReportReason, string][] = [
@@ -173,6 +175,9 @@ function SearchingView() {
 
 function ChatView() {
   const { me, getAccess, relation, addFriend, premium, setPremium } = useChat();
+  const { openChat } = useDock();
+  const [contactWarning, setContactWarning] = useState<string | null>(null);
+  const warnResolve = useRef<((sent: boolean) => void) | null>(null);
   const { start: startCall } = useCalls();
   const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, act, typing } = useStranger();
   const [replying, setReplying] = useState<Msg | null>(null);
@@ -268,8 +273,15 @@ function ChatView() {
     };
   }, [ended, escArmed, next]);
 
-  function submit(text: string): boolean {
+  function submit(text: string, confirmed = false): boolean | Promise<boolean> {
     if (ended) return false;
+    // Moving to WhatsApp/Instagram is how most blackmail scams start: ask once before sharing.
+    if (!confirmed && !editing && looksLikeContact(text)) {
+      return new Promise<boolean>((resolve) => {
+        warnResolve.current = resolve;
+        setContactWarning(text);
+      });
+    }
     if (editing) {
       if (!act("edit", editing.id, text)) {
         setNotice("You're offline. Reconnecting…");
@@ -285,6 +297,14 @@ function ChatView() {
     }
     setReplying(null);
     return true;
+  }
+
+  function answerWarning(send: boolean) {
+    const text = contactWarning;
+    setContactWarning(null);
+    const ok = send && text ? (submit(text, true) as boolean) : false;
+    warnResolve.current?.(ok);
+    warnResolve.current = null;
   }
 
   async function report(reason: ReportReason) {
@@ -391,7 +411,20 @@ function ChatView() {
       )}
       <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
         <p className="sys-line">You&apos;re chatting with a stranger{partner.region !== "any" ? ` from ${regionName(partner.region)}` : ""}. Say hi!</p>
-        {/* Strangers' photos stay blurred until you choose to look; their links ask first. */}
+        <p className="safety-tip">
+          <Icon name="shield" size={16} />
+          <span>
+            Keep it anonymous. Don&apos;t share nude photos or your face in intimate calls; the other person can record anything.
+            If someone threatens you: block, report, don&apos;t pay. India: call <b>1930</b> or{" "}
+            <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">
+              cybercrime.gov.in
+            </a>
+            .
+          </span>
+        </p>
+        {/* Strangers' photos and videos open only if you choose; their links ask first. When the chat
+            ends, the messages are gone from the screen (friends keep them in their friend chat). */}
+        {!ended && (
         <MessageList
           items={items}
           me={me ?? undefined}
@@ -402,6 +435,7 @@ function ChatView() {
           onDelete={ended ? undefined : onDelete}
           onWatch={ended ? undefined : (video) => watch.start(video)}
         />
+        )}
         {uploading !== null && (
           <div className="m me last uploading">
             <div className="m-row">
@@ -419,9 +453,24 @@ function ChatView() {
           </div>
         )}
         {ended && (
-          <p className="sys-line">
-            {endedBy === "stranger" ? "Stranger left the chat." : endedBy === "connection" ? "Connection lost. The chat ended." : "You left the chat."}
-          </p>
+          <div className="ended-card">
+            <b>
+              {endedBy === "stranger" ? "Stranger left the chat." : endedBy === "connection" ? "Connection lost. The chat ended." : "You left the chat."}
+            </b>
+            {rel === "friend" ? (
+              <>
+                <span>You&apos;re friends now, so your chat moved to Chats. It keeps going there.</span>
+                <button type="button" className="pill-btn primary" onClick={() => openChat(partner.id)}>
+                  Open your chat
+                </button>
+              </>
+            ) : (
+              <span>
+                The messages are gone. Random chats aren&apos;t saved for you; we keep them 7 days only so reports can be checked.
+                {lines.length > 0 && (rel === "none" || rel === "incoming") ? " Liked talking? Add them as a friend to keep chatting." : ""}
+              </span>
+            )}
+          </div>
         )}
       </div>
       <JumpToLatest away={scroll.away} unseen={scroll.unseen} onClick={scroll.jump} />
@@ -435,6 +484,26 @@ function ChatView() {
             photoRef.current?.click();
           }}
         />
+      )}
+      {contactWarning && (
+        <div className="msg-sheet-veil" onClick={() => answerWarning(false)}>
+          <div className="link-guard contact-guard" role="alertdialog" aria-label="Sharing contact details" onClick={(e) => e.stopPropagation()}>
+            <Icon name="shield" size={22} />
+            <p>
+              <b className="guard-title">Careful with contact details</b>
+              Moving to WhatsApp, Instagram or a phone number is how most blackmail scams start. Strangers can record calls
+              and save photos. Share only if you really trust them.
+            </p>
+            <div>
+              <button type="button" onClick={() => answerWarning(false)}>
+                Edit
+              </button>
+              <button type="button" className="go warn" onClick={() => answerWarning(true)}>
+                Send anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <div className="composer-wrap">
         {notice && (
@@ -468,6 +537,9 @@ function ChatView() {
                 </button>
                 <button type="button" className="end-btn" onClick={leave} title="End this chat">
                   <Icon name="close" size={17} /> End
+                </button>
+                <button type="button" className="strip-btn shield-btn" onClick={() => setMenu("report")} title="Report and leave" aria-label="Report and leave">
+                  <Icon name="shield" size={17} />
                 </button>
                 <span className="strip-gap" />
                 <button

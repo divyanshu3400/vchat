@@ -76,6 +76,15 @@ export function isJumboEmoji(text: string): boolean {
   return count > 0 && count <= 3;
 }
 
+// Phone numbers, emails and "add me on WhatsApp/Insta/Snap/Telegram": how strangers move people
+// off vChat, often to blackmail them. Random chat warns before sharing them and flags them coming in.
+const CONTACT_RE =
+  /(\+?\d[\d\s().-]{8,}\d)|([\w.+-]+@[\w-]+\.[\w.]{2,})|(whats\s?app|wa\.me|insta(?:gram)?|snap\s?chat|snap|telegram|t\.me|signal|ig\s?id|insta\s?id|my\s?(?:number|no\.?|num))/i;
+
+export function looksLikeContact(text: string): boolean {
+  return CONTACT_RE.test(text);
+}
+
 export function youtubeId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|live\/|embed\/)|youtu\.be\/)([\w-]{11})/i);
   return m ? m[1] : null;

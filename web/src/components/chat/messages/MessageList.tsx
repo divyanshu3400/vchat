@@ -5,7 +5,7 @@ import type { Attachment, ReplyPreview } from "@/lib/api";
 import MediaBubble from "../media/MediaBubble";
 import { Icon } from "../bits";
 import EmojiPicker, { rememberEmoji } from "./EmojiPicker";
-import { cleanWordsOn, firstYoutube, isJumboEmoji, mentions, moodOf, renderRich, type Mood } from "./richText";
+import { cleanWordsOn, firstYoutube, isJumboEmoji, looksLikeContact, mentions, moodOf, renderRich, type Mood } from "./richText";
 
 /** One message, whichever chat it came from (room, friend or random). */
 export type Msg = {
@@ -249,7 +249,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
             </span>
           ) : (
             <>
-              {m.attachment && <MediaBubble attachment={m.attachment} blurUntilTap={stranger && !mine} />}
+              {m.attachment && <MediaBubble attachment={m.attachment} ask={!mine} />}
               {m.content && (
                 <span className="txt">{renderRich(m.content, { me: meNick, clean, onLink: stranger && !mine ? onLink : undefined })}</span>
               )}
@@ -301,6 +301,11 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           </div>
         )}
       </div>
+      {stranger && !mine && !m.deleted && looksLikeContact(m.content) && (
+        <p className="contact-flag" role="note">
+          <Icon name="shield" size={13} /> Never share your number, photos or money with strangers.
+        </p>
+      )}
       {reactions.length > 0 && (
         <div className="reacts">
           {reactions.map(([emoji, ids]) => (

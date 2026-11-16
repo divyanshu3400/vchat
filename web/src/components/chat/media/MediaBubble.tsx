@@ -6,16 +6,89 @@ import type { Attachment } from "@/lib/api";
 import { Icon } from "../bits";
 import AudioPlayer from "./AudioPlayer";
 
+// Your View / Reject choices, so a reload doesn't ask again. Kept on this device only.
+const CHOICES_KEY = "vchat.mediaChoices";
+const CHOICES_KEPT = 500;
+type Choice = "view" | "reject";
+
+function readChoices(): Record<string, Choice> {
+  try {
+    return JSON.parse(localStorage.getItem(CHOICES_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+function saveChoice(id: string, choice: Choice) {
+  try {
+    const all = readChoices();
+    delete all[id];
+    all[id] = choice;
+    const keys = Object.keys(all);
+    for (const k of keys.slice(0, Math.max(0, keys.length - CHOICES_KEPT))) delete all[k];
+    localStorage.setItem(CHOICES_KEY, JSON.stringify(all));
+  } catch {
+    /* private mode: ask again next time */
+  }
+}
+
+function sizeLabel(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 /**
  * A photo, video or voice note inside a message bubble.
- * `blurUntilTap`: strangers' photos stay blurred until the receiver chooses to look.
+ * `ask`: someone else's photo or video. Nothing is downloaded until you tap View; Reject hides it
+ * on your side only (the sender isn't told).
  */
-export default function MediaBubble({ attachment, blurUntilTap = false }: { attachment: Attachment; blurUntilTap?: boolean }) {
-  const [revealed, setRevealed] = useState(!blurUntilTap);
+export default function MediaBubble({ attachment, ask = false }: { attachment: Attachment; ask?: boolean }) {
+  const [choice, setChoice] = useState<Choice | undefined>(() =>
+    ask && typeof window !== "undefined" ? readChoices()[attachment.id] : undefined,
+  );
   const [open, setOpen] = useState(false);
   const ratio = attachment.width && attachment.height ? attachment.width / attachment.height : 4 / 3;
 
   if (attachment.kind === "audio") return <AudioPlayer src={attachment.url} />;
+
+  const what = attachment.kind === "video" ? "video" : "photo";
+  if (ask && choice !== "view") {
+    const decide = (c: Choice) => {
+      saveChoice(attachment.id, c);
+      setChoice(c);
+    };
+    if (choice === "reject") {
+      return (
+        <span className="media-declined">
+          <Icon name="close" size={14} /> You declined this {what}.{" "}
+          <button type="button" className="inline-link" onClick={() => decide("view")}>
+            View anyway
+          </button>
+        </span>
+      );
+    }
+    return (
+      <div className="media-ask" role="group" aria-label={`A ${what} was sent to you`}>
+        <span className="media-ask-icon" aria-hidden="true">
+          <Icon name={attachment.kind === "video" ? "video" : "image"} size={22} />
+        </span>
+        <span className="media-ask-text">
+          <b>{what === "video" ? "Video" : "Photo"}</b>
+          <small>
+            {sizeLabel(attachment.size)} · opens only if you want
+          </small>
+        </span>
+        <span className="media-ask-actions">
+          <button type="button" className="pill-btn primary" onClick={() => decide("view")}>
+            View
+          </button>
+          <button type="button" className="pill-btn" onClick={() => decide("reject")}>
+            Reject
+          </button>
+        </span>
+      </div>
+    );
+  }
 
   if (attachment.kind === "video") {
     return (
@@ -29,19 +102,14 @@ export default function MediaBubble({ attachment, blurUntilTap = false }: { atta
     <>
       <button
         type="button"
-        className={`media-photo${revealed ? "" : " blurred"}`}
+        className="media-photo"
         // A fixed frame, like other chat apps: very tall or wide photos are cropped here, shown whole on tap.
         style={{ aspectRatio: String(Math.min(Math.max(ratio, 0.75), 1.6)) }}
-        onClick={() => (revealed ? setOpen(true) : setRevealed(true))}
-        aria-label={revealed ? "Open photo" : "Show photo from stranger"}
+        onClick={() => setOpen(true)}
+        aria-label="Open photo"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- signed private link, not a static asset */}
         <img src={attachment.url} alt="" loading="lazy" draggable={false} />
-        {!revealed && (
-          <span className="media-veil">
-            <Icon name="lock" size={18} /> Tap to view photo
-          </span>
-        )}
       </button>
       {open && <Lightbox src={attachment.url} onClose={() => setOpen(false)} />}
     </>

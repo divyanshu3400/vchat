@@ -64,6 +64,13 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
             return await self._dm_change(kind[3:], content)
         if kind == "dm.typing":
             return await self._dm_typing(content.get("to"))
+        if kind == "dm.autodelete":
+            # {"type": "dm.autodelete", "to": <friend id>, "days": 1 | 7 | 30 | 365}
+            try:
+                await database_sync_to_async(services.set_auto_delete)(self.user, content.get("to"), content.get("days"))
+            except SocialError as exc:
+                await self.error(exc.code, exc.detail)
+            return
         if kind == "visible":
             # {"type": "visible", "visible": bool}: is this tab on screen? Notifications skip people who are looking.
             self._visible = content.get("visible") is True

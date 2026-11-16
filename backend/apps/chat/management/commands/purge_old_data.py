@@ -1,7 +1,9 @@
-"""Deletes what the privacy policy says we don't keep. Run daily (cron): `manage.py purge_old_data`.
+"""Deletes what the privacy policy says we don't keep. Run hourly (cron): `manage.py purge_old_data`.
 
-  messages (rooms, friends, random chats) .. 1 year, unless a report from the last 2 years needs them
-  photos, videos, voice messages ........... 1 year; uploads never sent ......... 1 day
+  friend chats ............................. after each chat's auto-delete setting (1 day to 1 year)
+  random chats ............................. 7 days after they end, unless someone reported them
+  room messages ............................ 1 year, unless a report from the last 2 years needs them
+  photos, videos, voice messages ........... with their message, at most 1 year; unsent uploads: 1 day
   reports, contact messages ................ 2 years
   email codes .............................. 2 days; expired ban marks ........ 30 days
 """
@@ -15,11 +17,12 @@ from django.utils import timezone
 from apps.accounts.models import BanMark, EmailCode
 from apps.chat.models import Message, Report
 from apps.media.models import Attachment
-from apps.social.models import DirectMessage
+from apps.social.models import Conversation, DirectMessage
 from apps.stranger.models import StrangerSession
 from apps.support.models import ContactMessage
 
 MESSAGES = timedelta(days=365)
+RANDOM_CHATS = timedelta(days=7)
 MEDIA = timedelta(days=365)
 UNSENT_UPLOADS = timedelta(days=1)
 REPORTS = timedelta(days=730)
@@ -41,15 +44,30 @@ class Command(BaseCommand):
         # Messages a recent report points to stay as evidence until the report itself expires.
         reported_rooms = Report.objects.filter(message__isnull=False).values("message_id")
         self.purge("room messages", Message.objects.filter(created_at__lt=now - MESSAGES).exclude(id__in=reported_rooms))
-        self.purge("friend messages", DirectMessage.objects.filter(created_at__lt=now - MESSAGES))
+        for days in Conversation.AUTO_DELETE_CHOICES:
+            self.purge(
+                f"friend messages ({days}-day chats)",
+                DirectMessage.objects.filter(conversation__auto_delete_days=days, created_at__lt=now - timedelta(days=days)),
+            )
+        self.purge(
+            "friend messages (other settings)",
+            DirectMessage.objects.exclude(conversation__auto_delete_days__in=Conversation.AUTO_DELETE_CHOICES).filter(
+                created_at__lt=now - MESSAGES
+            ),
+        )
         reported_sessions = Report.objects.filter(stranger_session__isnull=False).values("stranger_session_id")
         self.purge(
             "random chats",
-            StrangerSession.objects.filter(started_at__lt=now - MESSAGES).exclude(id__in=reported_sessions),
+            StrangerSession.objects.filter(
+                Q(ended_at__lt=now - RANDOM_CHATS) | Q(ended_at__isnull=True, started_at__lt=now - RANDOM_CHATS)
+            ).exclude(id__in=reported_sessions),
         )
 
         old_files = Attachment.objects.filter(
-            Q(created_at__lt=now - MEDIA) | Q(used_at__isnull=True, created_at__lt=now - UNSENT_UPLOADS)
+            Q(created_at__lt=now - MEDIA)
+            | Q(used_at__isnull=True, created_at__lt=now - UNSENT_UPLOADS)
+            # sent, but its message is gone (auto-deleted, or the random chat expired)
+            | Q(used_at__isnull=False, dm_message__isnull=True, stranger_message__isnull=True)
         )
         count = old_files.count()
         if not dry_run:

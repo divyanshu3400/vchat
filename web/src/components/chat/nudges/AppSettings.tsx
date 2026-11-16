@@ -5,12 +5,14 @@ import { useInstall } from "@/lib/install";
 import { useChat } from "../ChatProvider";
 import { Icon } from "../bits";
 import IosInstallGuide from "./IosInstallGuide";
+import { inAppAlertsOn, setInAppAlerts } from "./MessageBanner";
 
 /** Me screen: install the app, and everything about notifications on this device. */
 export default function AppSettings() {
   const { push } = useChat();
   const { info, canPrompt, prompt } = useInstall();
   const [guide, setGuide] = useState(false);
+  const [alerts, setAlerts] = useState(() => (typeof window === "undefined" ? true : inAppAlertsOn()));
   const prefs = push.info?.prefs;
   const on = push.state === "granted" && (push.info?.devices ?? 0) > 0;
 
@@ -104,6 +106,23 @@ export default function AppSettings() {
           )}
         </>
       )}
+
+      <label className="setting">
+        <span>
+          <b>Alerts inside vChat</b>
+          <small>A banner, a soft sound and a buzz when a friend writes while you&apos;re in another chat</small>
+        </span>
+        <input
+          type="checkbox"
+          className="switch"
+          checked={alerts}
+          suppressHydrationWarning
+          onChange={(e) => {
+            setAlerts(e.target.checked);
+            setInAppAlerts(e.target.checked);
+          }}
+        />
+      </label>
 
       {guide && <IosInstallGuide notSafari={info?.iosNotSafari} onClose={() => setGuide(false)} />}
     </section>

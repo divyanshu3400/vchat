@@ -15,6 +15,7 @@ import ConversationList from "./ConversationList";
 import { DockProvider } from "./Dock";
 import { Icon } from "./bits";
 import StrangerProvider, { useStranger } from "./stranger/StrangerProvider";
+import MessageBanner from "./nudges/MessageBanner";
 import Nudges from "./nudges/Nudges";
 
 /** Screens reached from the tab bar. Everything else under /chat is a conversation. */
@@ -70,22 +71,26 @@ export function ChatHeader({
   subtitle,
   actions,
   back,
+  backBadge = 0,
   avatar,
+  onTitleClick,
 }: {
   title: string;
   subtitle?: React.ReactNode;
   actions?: React.ReactNode;
   /** Where the phone's back arrow goes. Hidden on wider screens, where the list is always visible. */
   back?: string;
+  /** Unread messages in other chats, shown on the back arrow. */
+  backBadge?: number;
   avatar?: React.ReactNode;
+  /** Conversations: tapping the name opens the person's card. */
+  onTitleClick?: () => void;
 }) {
-  return (
-    <header className="screen-head">
-      {back && (
-        <Link href={back} className="icon-btn back-btn" aria-label="Back">
-          <Icon name="back" />
-        </Link>
-      )}
+  // A conversation (it has an avatar) keeps its bar for the person and the calls; the
+  // light/dark switch lives on the list screens and in Me.
+  const conversation = !!avatar;
+  const who = (
+    <>
       {avatar}
       <div className="screen-title">
         <h1>{title}</h1>
@@ -95,9 +100,26 @@ export function ChatHeader({
           </span>
         )}
       </div>
+    </>
+  );
+  return (
+    <header className={`screen-head${conversation ? " convo-head" : ""}`}>
+      {back && (
+        <Link href={back} className="icon-btn back-btn" aria-label={backBadge ? `Back, ${backBadge} unread` : "Back"}>
+          <Icon name="back" />
+          {backBadge > 0 && <b className="back-badge">{backBadge > 99 ? "99+" : backBadge}</b>}
+        </Link>
+      )}
+      {onTitleClick ? (
+        <button type="button" className="head-who" onClick={onTitleClick} aria-label={`About ${title}`}>
+          {who}
+        </button>
+      ) : (
+        <div className="head-who">{who}</div>
+      )}
       <div className="screen-actions">
         {actions}
-        <ThemeToggle />
+        {!conversation && <ThemeToggle />}
       </div>
     </header>
   );
@@ -209,6 +231,7 @@ function Frame({ children }: { children: React.ReactNode }) {
         {!inConversation && <TabBar pathname={pathname} />}
       </div>
       <Nudges enabled={!inConversation} />
+      <MessageBanner />
     </>
   );
 }

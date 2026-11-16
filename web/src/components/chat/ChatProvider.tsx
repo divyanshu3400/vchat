@@ -62,6 +62,8 @@ type ChatContextValue = {
   askAccount: (reason?: string, then?: () => void) => void;
   /** Notifications on this device (permission, subscription, settings). */
   push: ReturnType<typeof usePush>;
+  /** Is this friend's chat on screen right now (a page or an open window)? */
+  isWatching: (userId: number) => boolean;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -254,6 +256,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       ws.onopen = () => ws.send(JSON.stringify({ type: "auth", token: access }));
       ws.onmessage = (ev) => {
         const event = JSON.parse(ev.data) as UserEvent;
+        if (event.type === "conversations.changed") resync().catch(() => undefined);
         if (event.type === "error" && event.code === "banned") {
           cancelled = true;
           setBanned(event.detail);
@@ -452,6 +455,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const push = usePush(getAccess, !!me);
+  const isWatching = useCallback((userId: number) => watched.current.has(userId), []);
 
   // Tell the server when this tab goes on or off screen.
   useEffect(() => {
@@ -492,8 +496,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       setPremium,
       askAccount,
       push,
+      isWatching,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount, push],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount, push, isWatching],
   );
 
   if (banned) {

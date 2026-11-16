@@ -14,6 +14,8 @@ export const SITE = {
   lastUpdated: "16 November 2026",
   retention: {
     messages: "1 year",
+    friendChatsDefault: "1 week",
+    randomChats: "7 days",
     media: "1 year",
     reports: "2 years",
     ipLogs: "90 days",

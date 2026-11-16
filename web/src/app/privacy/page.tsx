@@ -109,7 +109,15 @@ export default function PrivacyPage() {
 
       <h2>How long we keep it</h2>
       <ul>
-        <li>Messages: {r.messages}, then deleted. Photos, videos and voice messages: {r.media}.</li>
+        <li>
+          <b>Friend chats</b>: deleted automatically after the time the two of you pick for that chat (1 day, 1 week, 1 month
+          or 1 year; {r.friendChatsDefault} unless you change it), with their photos, videos and voice messages.
+        </li>
+        <li>
+          <b>Random chats</b>: gone from your screen when the chat ends, and deleted from our servers {r.randomChats} after
+          it ends. If you become friends, the chat moves into your friend chat and follows its setting.
+        </li>
+        <li>Room messages: {r.messages}.</li>
         <li>Reports and the messages they point to: {r.reports}, to handle appeals and repeat abuse.</li>
         <li>IP addresses in logs: {r.ipLogs}.</li>
         <li>Your account: until you delete it. Guest accounts that are never used again are removed after a while.</li>

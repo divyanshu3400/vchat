@@ -112,6 +112,7 @@ class DmMessagesView(APIView):
                 "messages": messages,
                 "has_more": has_more,
                 "partner_read_id": services.partner_read_id(request.user, partner.id),
+                "auto_delete_days": services.auto_delete_days(request.user, partner.id),
             }
         )
 

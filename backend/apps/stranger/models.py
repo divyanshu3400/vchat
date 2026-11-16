@@ -15,6 +15,8 @@ class StrangerSession(models.Model):
     ended_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
+    # When the two became friends, this chat was copied into their friend chat up to this message.
+    carried_upto = models.BigIntegerField(default=0)
 
     class Meta:
         indexes = [

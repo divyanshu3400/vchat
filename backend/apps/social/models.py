@@ -60,6 +60,16 @@ class Conversation(models.Model):
     last_message_at = models.DateTimeField(null=True, blank=True)
     a_last_read_id = models.BigIntegerField(default=0)
     b_last_read_id = models.BigIntegerField(default=0)
+    # Messages here are deleted this many days after they were sent. Either person can change it.
+    auto_delete_days = models.PositiveSmallIntegerField(default=7)
+    auto_delete_changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    AUTO_DELETE_CHOICES = (1, 7, 30, 365)
+
+    def has_user(self, user_id: int) -> bool:
+        return user_id in (self.user_a_id, self.user_b_id)
 
     class Meta:
         constraints = [

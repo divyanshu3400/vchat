@@ -260,6 +260,8 @@ export type UserEvent =
   | { type: "dm.update"; message: DirectMessage }
   | { type: "dm.read"; user_id: number; last_id: number }
   | { type: "dm.typing"; user_id: number }
+  | { type: "dm.settings"; users: number[]; auto_delete_days: number; by: ChatUser }
+  | { type: "conversations.changed" }
   | { type: "friend_request"; request: FriendRequest }
   | { type: "friend_request_removed"; request_id: number }
   | { type: "friend_added"; friend: ChatUser; online?: boolean; request_id: number }
@@ -386,6 +388,7 @@ export function fetchDmHistory(userId: number, access: string, before?: number) 
     messages: DirectMessage[];
     has_more: boolean;
     partner_read_id: number;
+    auto_delete_days: number;
   }>(
     `/api/dms/${userId}/messages?${qs}`,
     { access },
