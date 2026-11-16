@@ -92,7 +92,8 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UsernamePasswordSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=25, trim_whitespace=True)
+    # Optional: guests already have the @username they picked at sign-up.
+    username = serializers.CharField(max_length=25, trim_whitespace=True, required=False, allow_blank=True)
     password = serializers.CharField(max_length=128, trim_whitespace=False)
 
 

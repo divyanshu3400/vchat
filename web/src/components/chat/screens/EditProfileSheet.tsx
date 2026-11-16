@@ -174,7 +174,9 @@ export default function EditProfileSheet({ me, onClose }: { me: ChatUser; onClos
         <label className="ep-field">
           <span>Username</span>
           {guest ? (
-            <small className="muted-text">Save your account (Me → Save account) to pick a @username.</small>
+            <small className="muted-text">
+              {me.handle ? <b>@{me.handle}</b> : null} {me.handle ? "· " : ""}Save your account (Me → Save my account) to keep it and log in with it.
+            </small>
           ) : (
             <>
               <span className="ep-handle">

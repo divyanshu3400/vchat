@@ -87,10 +87,22 @@ class GuestSignupView(APIView):
                 {"code": "banned", "detail": "You can't start a new account right now: this browser or network is under a ban."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        user = User.create_guest(
-            nickname=serializer.validated_data["nickname"],
-            gender=serializer.validated_data.get("gender", ""),
-        )
+        # The name picked here is also the @username: unique, so nobody else can take it.
+        from . import profile
+
+        nickname = serializer.validated_data["nickname"]
+        handle = profile.normalise_handle(nickname)
+        problem = profile.handle_problem(None, handle)
+        if problem:
+            detail = "That name is taken. Try another." if "taken" in problem or "recently" in problem else problem.replace("username", "name")
+            return Response({"code": "name_taken", "field": "nickname", "detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            with transaction.atomic():
+                user = User.create_guest(nickname=nickname, gender=serializer.validated_data.get("gender", ""), handle=handle)
+        except IntegrityError:
+            return Response(
+                {"code": "name_taken", "field": "nickname", "detail": "That name is taken. Try another."}, status=status.HTTP_400_BAD_REQUEST
+            )
         return _start_session(user, request, status.HTTP_201_CREATED)
 
 
@@ -388,18 +400,20 @@ class AvatarView(APIView):
 
 
 class HandleCheckView(APIView):
-    """Is this @username free for me? {"handle", "available", "detail"} (detail says why not)."""
+    """Is this @username free (for me, or for someone signing up)? {"handle", "available", "detail"}."""
 
+    permission_classes = [AllowAny]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "people_search"
 
     def get(self, request):
         from . import profile
 
+        me = request.user if request.user.is_authenticated else None
         handle = profile.normalise_handle(request.query_params.get("handle"))
-        if handle == (request.user.handle or ""):
+        if me is not None and handle == (me.handle or ""):
             return Response({"handle": handle, "available": True, "detail": "That's your username."})
-        problem = profile.handle_problem(request.user, handle)
+        problem = profile.handle_problem(me, handle)
         return Response({"handle": handle, "available": problem is None, "detail": problem or ""})
 
 
@@ -433,7 +447,7 @@ class AccountSaveView(APIView):
             return Response({"code": "already_saved", "detail": "Your account is already saved."}, status=400)
         s = UsernamePasswordSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        handle = profile.normalise_handle(s.validated_data["username"])
+        handle = profile.normalise_handle(s.validated_data.get("username") or user.handle)
         problem = profile.handle_problem(user, handle)
         if problem:
             return Response({"code": "bad_username", "field": "username", "detail": problem}, status=400)

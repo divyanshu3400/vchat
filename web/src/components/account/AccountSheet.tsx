@@ -13,16 +13,19 @@ const HANDLE_RE = /^[a-z0-9][a-z0-9_.]{1,18}[a-z0-9_]$/;
  */
 export default function AccountSheet({
   reason,
+  handle,
   getAccess,
   onSaved,
   onClose,
 }: {
   reason?: string;
+  /** The @username picked at sign-up: filled in, can be changed here. */
+  handle?: string | null;
   getAccess: () => Promise<string>;
   onSaved: (user: ChatUser) => void;
   onClose: () => void;
 }) {
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(handle ?? "");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);

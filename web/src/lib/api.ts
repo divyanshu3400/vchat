@@ -174,7 +174,8 @@ export async function setAvatar(file: Blob | null, access: string): Promise<Chat
   return body as ChatUser;
 }
 
-export function checkHandle(handle: string, access: string) {
+/** Is this @username free? Works signed out too (the join form asks before sign-up). */
+export function checkHandle(handle: string, access?: string) {
   return request<{ handle: string; available: boolean; detail: string }>(`/api/auth/handle/check/?handle=${encodeURIComponent(handle)}`, { access });
 }
 

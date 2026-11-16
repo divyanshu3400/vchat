@@ -146,8 +146,10 @@ def erase(user: User) -> None:
         user.username = f"deleted_{user.pk}"
         user.email = ""
         user.nickname = GONE_NAME
+        # The username stays held for a while, so nobody can take it to pose as this person.
+        user.previous_handle = user.handle or ""
+        user.handle_changed_at = now
         user.handle = None
-        user.previous_handle = ""
         if user.avatar:
             user.avatar.storage.delete(user.avatar.name)
             user.avatar = ""

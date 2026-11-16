@@ -84,3 +84,25 @@ def test_email_already_used_is_refused(alice, settings):
     guest = User.create_guest(nickname="g2")
     assert auth_client(guest).post("/api/auth/email/start/", {"email": "x@example.com"}, format="json").status_code == 400
     assert not EmailCode.objects.exists()
+
+
+@pytest.mark.django_db
+def test_signup_name_is_a_unique_username():
+    first = APIClient().post("/api/auth/guest/", {"nickname": "Anonym_p", "age_confirmed": True}, format="json")
+    assert first.status_code == 201 and first.data["user"]["nickname"] == "Anonym_p"
+    assert User.objects.get(pk=first.data["user"]["id"]).handle == "anonym_p"
+    again = APIClient().post("/api/auth/guest/", {"nickname": "ANONYM_P", "age_confirmed": True}, format="json")
+    assert again.status_code == 400 and again.data["detail"] == "That name is taken. Try another."
+    check = APIClient().get("/api/auth/handle/check/", {"handle": "anonym_p"}).data
+    assert check["available"] is False
+    dotted = APIClient().post("/api/auth/guest/", {"nickname": ".dotty", "age_confirmed": True}, format="json")
+    assert dotted.status_code == 400
+
+
+@pytest.mark.django_db
+def test_save_keeps_the_signup_username():
+    res = APIClient().post("/api/auth/guest/", {"nickname": "keepme", "age_confirmed": True}, format="json")
+    guest = User.objects.get(pk=res.data["user"]["id"])
+    saved = auth_client(guest).post("/api/auth/account/save/", {"password": PASSWORD}, format="json")
+    assert saved.status_code == 200 and saved.data["user"]["handle"] == "keepme"
+    assert login("keepme").status_code == 200

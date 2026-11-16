@@ -82,10 +82,11 @@ class User(AbstractUser):
         return self.plus_until is not None and self.plus_until > timezone.now()
 
     @classmethod
-    def create_guest(cls, *, nickname: str, gender: str = "") -> "User":
+    def create_guest(cls, *, nickname: str, gender: str = "", handle: str | None = None) -> "User":
         user = cls(
             username=f"g_{secrets.token_hex(8)}",
             nickname=nickname,
+            handle=handle,
             gender=gender,
             is_guest=True,
             age_confirmed_at=timezone.now(),

@@ -62,16 +62,16 @@ def normalise_handle(value) -> str:
     return str(value or "").strip().lstrip("@").lower()
 
 
-def handle_problem(user: User, handle: str) -> str | None:
-    """Why `user` can't take `handle` right now, or None if they can."""
+def handle_problem(user: User | None, handle: str) -> str | None:
+    """Why `user` (None: someone signing up) can't take `handle` right now, or None if they can."""
     if not HANDLE_RE.match(handle) or ".." in handle:
         return "3 to 20 letters, numbers, _ or . (not at the start or end)."
     if handle.strip("._") in RESERVED_HANDLES or handle.startswith(("vchat", "admin")):
         return "That username is reserved."
-    if User.objects.filter(handle=handle).exclude(pk=user.pk).exists():
+    others = User.objects.exclude(pk=user.pk) if user is not None and user.pk else User.objects.all()
+    if others.filter(handle=handle).exists():
         return "That username is taken."
-    held = User.objects.filter(previous_handle=handle, handle_changed_at__gt=timezone.now() - HANDLE_HOLD).exclude(pk=user.pk)
-    if held.exists():
+    if others.filter(previous_handle=handle, handle_changed_at__gt=timezone.now() - HANDLE_HOLD).exists():
         return "That username was in use recently. Try another."
     return None
 

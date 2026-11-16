@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { ApiError, fetchPremiumStatus, guestSignup, refreshSession, type ChatUser } from "@/lib/api";
+import { ApiError, fetchPremiumStatus, guestSignup, refreshSession, type ChatUser, checkHandle } from "@/lib/api";
 import { setPlus } from "@/lib/plus";
 import { findRoom } from "@/lib/rooms";
 
@@ -56,11 +56,41 @@ export default function JoinForm() {
     };
   }, []);
 
+  // The name is also the @username: unique. Ask whether it's free while typing.
+  const wantedName = nickname.trim().toLowerCase();
+  const nameFormatOk = /^[a-z0-9][a-z0-9_.]{1,16}[a-z0-9_]$/.test(wantedName) && !wantedName.includes("..");
+  const [nameCheck, setNameCheck] = useState<{ value: string; ok: boolean; note: string } | null>(null);
+  useEffect(() => {
+    if (!nameFormatOk) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await checkHandle(wantedName);
+        if (!cancelled) setNameCheck({ value: wantedName, ok: res.available, note: res.available ? "" : res.detail.replace("username", "name") });
+      } catch {
+        if (!cancelled) setNameCheck(null);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [wantedName, nameFormatOk]);
+  const nameTaken = nameCheck?.value === wantedName && !nameCheck.ok;
+  const nameHint = !wantedName
+    ? ""
+    : !nameFormatOk
+      ? "3 to 18 letters, numbers, _ or . (not at the start or end)."
+      : nameTaken
+        ? nameCheck?.note || "That name is taken. Try another."
+        : "";
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     const name = nickname.trim();
     if (!name) return setError("Pick a nickname first.");
+    if (nameHint) return setError(nameHint);
     if (!ageOk) return setError("Confirm you're 18 or older to join.");
     setBusy(true);
     try {
@@ -103,6 +133,7 @@ export default function JoinForm() {
           maxLength={18}
           autoComplete="off"
           aria-label="Nickname"
+          aria-invalid={!!nameHint}
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
         />
@@ -137,7 +168,7 @@ export default function JoinForm() {
         {busy ? "Joining…" : "Start chatting"} <span aria-hidden="true">→</span>
       </button>
       <p className="form-msg" role="status">
-        {error}
+        {error || nameHint}
       </p>
       <p className="fine">No email or phone number needed. Letters, numbers, dots and underscores only.</p>
       <p className="fine">

@@ -618,6 +618,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       {accountAsk && (
         <AccountSheet
           reason={accountAsk.reason}
+          handle={me?.handle}
           getAccess={getAccess}
           onClose={() => setAccountAsk(null)}
           onSaved={(user) => {

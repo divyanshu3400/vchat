@@ -49,7 +49,7 @@ def test_a_ban_blocks_the_api_refresh_and_a_new_guest_from_the_same_browser():
 
     moderation.unban(user)
     assert browser.post("/api/auth/refresh/").status_code == 200
-    assert browser.post("/api/auth/guest/", GUEST, format="json").status_code == 201
+    assert browser.post("/api/auth/guest/", {**GUEST, "nickname": "comeback2"}, format="json").status_code == 201  # names are unique now
 
 
 @pytest.mark.django_db
