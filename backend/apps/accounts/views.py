@@ -94,8 +94,12 @@ class GuestSignupView(APIView):
         handle = profile.normalise_handle(nickname)
         problem = profile.handle_problem(None, handle)
         if problem:
-            detail = "That name is taken. Try another." if "taken" in problem or "recently" in problem else problem.replace("username", "name")
-            return Response({"code": "name_taken", "field": "nickname", "detail": detail}, status=status.HTTP_400_BAD_REQUEST)
+            taken = "taken" in problem or "recently" in problem
+            detail = f"@{handle} is already taken. Pick another name." if taken else problem.replace("username", "name")
+            return Response(
+                {"code": "name_taken", "field": "nickname", "detail": detail, "suggestions": profile.suggest_handles(None, handle) if taken else []},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             with transaction.atomic():
                 user = User.create_guest(nickname=nickname, gender=serializer.validated_data.get("gender", ""), handle=handle)
@@ -414,7 +418,17 @@ class HandleCheckView(APIView):
         if me is not None and handle == (me.handle or ""):
             return Response({"handle": handle, "available": True, "detail": "That's your username."})
         problem = profile.handle_problem(me, handle)
-        return Response({"handle": handle, "available": problem is None, "detail": problem or ""})
+        taken = problem is not None and ("taken" in problem or "recently" in problem)
+        return Response(
+            {
+                "handle": handle,
+                "available": problem is None,
+                "detail": problem or "",
+                # Why it isn't free: "taken" (someone has it) or "invalid" (format, reserved).
+                "reason": "" if problem is None else "taken" if taken else "invalid",
+                "suggestions": profile.suggest_handles(me, handle) if taken else [],
+            }
+        )
 
 
 def avatar_file(request, token):

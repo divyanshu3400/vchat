@@ -92,9 +92,14 @@ def test_signup_name_is_a_unique_username():
     assert first.status_code == 201 and first.data["user"]["nickname"] == "Anonym_p"
     assert User.objects.get(pk=first.data["user"]["id"]).handle == "anonym_p"
     again = APIClient().post("/api/auth/guest/", {"nickname": "ANONYM_P", "age_confirmed": True}, format="json")
-    assert again.status_code == 400 and again.data["detail"] == "That name is taken. Try another."
+    assert again.status_code == 400 and again.data["detail"] == "@anonym_p is already taken. Pick another name."
+    assert len(again.data["suggestions"]) == 3 and "anonym_p" not in again.data["suggestions"]
     check = APIClient().get("/api/auth/handle/check/", {"handle": "anonym_p"}).data
-    assert check["available"] is False
+    assert check["available"] is False and check["reason"] == "taken" and check["suggestions"][0] == "anonym_p_2"
+    # Every suggestion is really free.
+    for name in check["suggestions"]:
+        assert APIClient().get("/api/auth/handle/check/", {"handle": name}).data["available"] is True
+    assert APIClient().get("/api/auth/handle/check/", {"handle": "admin"}).data["reason"] == "invalid"
     dotted = APIClient().post("/api/auth/guest/", {"nickname": ".dotty", "age_confirmed": True}, format="json")
     assert dotted.status_code == 400
 

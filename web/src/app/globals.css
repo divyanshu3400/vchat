@@ -310,3 +310,18 @@ p { margin: 0; }
 .account-field .account-handle input { padding-left: 30px; }
 .account-field small { font-size: 12.5px; font-weight: 600; }
 .account-ok { color: var(--brand); font-size: 12.5px; font-weight: 700; }
+
+/* Name / @username status under a field: checking, available, taken (+ free names to tap) */
+.handle-status { font-size: 13px; font-weight: 600; color: var(--muted); margin: 0; line-height: 1.45; }
+div.handle-status { display: grid; gap: 8px; }
+.handle-status p { margin: 0; }
+.handle-status.ok { color: var(--brand); }
+.handle-status.bad { color: var(--danger, #d9435f); }
+.handle-status.checking { display: flex; align-items: center; gap: 8px; }
+.hs-spin { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--brand); animation: hs-spin 0.7s linear infinite; }
+@keyframes hs-spin { to { transform: rotate(360deg); } }
+.handle-suggest { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-weight: 700; }
+.handle-chip { appearance: none; border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); background: color-mix(in srgb, var(--brand) 8%, var(--surface)); color: var(--brand); font: inherit; font-size: 13px; font-weight: 700; padding: 5px 10px; border-radius: 999px; cursor: pointer; }
+.handle-chip:hover { background: color-mix(in srgb, var(--brand) 16%, var(--surface)); }
+.join-status { display: grid; gap: 4px; min-height: 18px; }
+.join .input[aria-invalid="true"] { border-color: var(--danger, #d9435f); }

@@ -176,7 +176,7 @@ export async function setAvatar(file: Blob | null, access: string): Promise<Chat
 
 /** Is this @username free? Works signed out too (the join form asks before sign-up). */
 export function checkHandle(handle: string, access?: string) {
-  return request<{ handle: string; available: boolean; detail: string }>(`/api/auth/handle/check/?handle=${encodeURIComponent(handle)}`, { access });
+  return request<{ handle: string; available: boolean; detail: string; reason?: "" | "taken" | "invalid"; suggestions?: string[] }>(`/api/auth/handle/check/?handle=${encodeURIComponent(handle)}`, { access });
 }
 
 /** Deactivate (log in to come back) or delete (saved: after 15 days; guests: now). Signs out. */

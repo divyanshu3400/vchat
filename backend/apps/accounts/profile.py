@@ -76,6 +76,26 @@ def handle_problem(user: User | None, handle: str) -> str | None:
     return None
 
 
+def suggest_handles(user: User | None, wanted: str, count: int = 3) -> list[str]:
+    """A few free usernames close to `wanted` (for "that name is taken")."""
+    import secrets
+
+    base = re.sub(r"[^a-z0-9_.]", "", normalise_handle(wanted)).strip("._").replace("..", ".")[:15] or "user"
+    if len(base) < 3:
+        base = f"{base}_x"
+    candidates = [f"{base}_{n}" for n in range(2, 5)]
+    candidates += [f"{base}{secrets.randbelow(900) + 100}" for _ in range(4)]
+    candidates += [f"the.{base}", f"{base}.in", f"real.{base}", f"{base}_x"]
+    found: list[str] = []
+    for c in candidates:
+        c = c[:20].strip("._")
+        if c not in found and handle_problem(user, c) is None:
+            found.append(c)
+        if len(found) == count:
+            break
+    return found
+
+
 def next_handle_change(user: User):
     """When the handle can change again (None: now)."""
     if not user.handle or not user.handle_changed_at:

@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ApiError, checkHandle, setAvatar, updateMe, type ChatUser } from "@/lib/api";
+import { HandleStatus, useHandleCheck } from "@/components/HandleStatus";
+import { ApiError, setAvatar, updateMe, type ChatUser } from "@/lib/api";
 import { useChat } from "../ChatProvider";
 import { Avatar, Icon } from "../bits";
 
 const NAME_RE = /^[A-Za-z0-9_.]{3,18}$/;
-const HANDLE_RE = /^[a-z0-9][a-z0-9_.]{1,18}[a-z0-9_]$/;
 
-type HandleState = { value: string; ok: boolean; note: string };
 
 function errorText(e: unknown, fallback: string) {
   return e instanceof ApiError ? e.message : fallback;
@@ -23,7 +22,6 @@ export default function EditProfileSheet({ me, onClose }: { me: ChatUser; onClos
   const { getAccess, replaceMe } = useChat();
   const [name, setName] = useState(me.nickname);
   const [handle, setHandle] = useState(me.handle ?? "");
-  const [check, setCheck] = useState<HandleState | null>(null);
   const [error, setError] = useState("");
   const [photoNote, setPhotoNote] = useState("");
   const [busy, setBusy] = useState(false);
@@ -36,8 +34,8 @@ export default function EditProfileSheet({ me, onClose }: { me: ChatUser; onClos
   const handleChanged = h !== (me.handle ?? "");
   const nameChanged = name.trim() !== me.nickname;
   const nameOk = NAME_RE.test(name.trim());
-  const handleFormatOk = !h || HANDLE_RE.test(h);
-  const handleOk = !handleChanged || (handleFormatOk && check?.value === h && check.ok);
+  const status = useHandleCheck(handle, { access: getAccess, mine: me.handle });
+  const handleOk = !handleChanged || status.kind === "free";
 
   useEffect(() => {
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -45,37 +43,9 @@ export default function EditProfileSheet({ me, onClose }: { me: ChatUser; onClos
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
 
-  // Is the username free? Asked 400 ms after typing stops.
-  useEffect(() => {
-    if (!handleChanged || !h || !HANDLE_RE.test(h)) return;
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      try {
-        const res = await checkHandle(h, await getAccess());
-        if (!cancelled) setCheck({ value: h, ok: res.available, note: res.available ? "Available" : res.detail });
-      } catch {
-        if (!cancelled) setCheck({ value: h, ok: false, note: "Couldn't check right now." });
-      }
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [h, handleChanged, getAccess]);
-
-  const handleNote = !handleChanged
-    ? lockedUntil
-      ? `You can change it again on ${lockedUntil.toLocaleDateString(undefined, { day: "numeric", month: "short" })}.`
-      : me.handle
-        ? "People can find you by it."
-        : "Pick one so friends can find you."
-    : !h
-      ? "A username can be changed, not removed."
-      : !handleFormatOk
-        ? "3 to 20 letters, numbers, _ or . (not at the start or end)."
-        : check?.value === h
-          ? check.note
-          : "Checking…";
+  const lockedNote = lockedUntil
+    ? `You can change it again on ${lockedUntil.toLocaleDateString(undefined, { day: "numeric", month: "short" })}.`
+    : "People can find you by it. You log in with it.";
 
   async function pickPhoto(file: File) {
     if (!file.type.startsWith("image/")) return setPhotoNote("Pick a photo.");
@@ -194,10 +164,14 @@ export default function EditProfileSheet({ me, onClose }: { me: ChatUser; onClos
                   aria-invalid={handleChanged && !handleOk}
                 />
               </span>
-              <small className={!handleChanged || handleOk ? (handleChanged && handleOk ? "ep-ok" : "muted-text") : check?.value === h || !handleFormatOk || !h ? "ep-error" : "muted-text"}>
-                {handleNote}
-                {handleChanged && handleOk ? " · You can change it again after 14 days." : ""}
-              </small>
+{handleChanged ? (
+                <>
+                  <HandleStatus state={status} onPick={(pick) => setHandle(pick)} />
+                  {handleOk && <small className="muted-text">After saving, you can change it again in 14 days.</small>}
+                </>
+              ) : (
+                <small className="muted-text">{lockedNote}</small>
+              )}
             </>
           )}
         </label>

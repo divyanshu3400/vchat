@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
-import { ApiError, checkHandle, errorCode, saveAccount, type ChatUser } from "@/lib/api";
-
-const HANDLE_RE = /^[a-z0-9][a-z0-9_.]{1,18}[a-z0-9_]$/;
+import { FormEvent, useState } from "react";
+import { HandleStatus, toHandle, useHandleCheck } from "@/components/HandleStatus";
+import { ApiError, errorCode, saveAccount, type ChatUser } from "@/lib/api";
 
 /**
  * Save a guest account with a @username and a password. No email needed: it stays the same
@@ -30,41 +29,15 @@ export default function AccountSheet({
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [check, setCheck] = useState<{ value: string; ok: boolean; note: string } | null>(null);
-  const h = username.trim().replace(/^@/, "").toLowerCase();
-  const formatOk = HANDLE_RE.test(h) && !h.includes("..");
-
-  // Is the username free? Asked 400 ms after typing stops.
-  useEffect(() => {
-    if (!formatOk) return;
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      try {
-        const res = await checkHandle(h, await getAccess());
-        if (!cancelled) setCheck({ value: h, ok: res.available, note: res.available ? "Available" : res.detail });
-      } catch {
-        if (!cancelled) setCheck(null);
-      }
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [h, formatOk, getAccess]);
-
-  const hint = !h
-    ? "People can find you by it. You log in with it."
-    : !formatOk
-      ? "3 to 20 letters, numbers, _ or . (not at the start or end)."
-      : check?.value === h
-        ? check.note
-        : "Checking…";
-  const hintClass = !h ? "fine" : !formatOk || (check?.value === h && !check.ok) ? "account-error" : check?.value === h ? "account-ok" : "fine";
+  const h = toHandle(username);
+  const status = useHandleCheck(username, { access: getAccess, mine: handle });
+  const blocked = status.kind === "invalid" || status.kind === "taken";
 
   async function save(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (!formatOk) return setError("Pick a username: 3 to 20 letters, numbers, _ or .");
+    if (!h) return setError("Pick a username.");
+    if (blocked) return;
     if (password.length < 8) return setError("Pick a password of at least 8 characters.");
     setBusy(true);
     try {
@@ -107,7 +80,14 @@ export default function AccountSheet({
                 placeholder="yourname"
               />
             </span>
-            <small className={hintClass}>{hint}</small>
+            <HandleStatus
+              state={status}
+              hint="You log in with it, and friends can find you by it."
+              onPick={(pick) => {
+                setUsername(pick);
+                setError("");
+              }}
+            />
           </label>
           <label className="account-field">
             <span>Password</span>
@@ -130,7 +110,7 @@ export default function AccountSheet({
               {error}
             </p>
           )}
-          <button className="cta wide" type="submit" disabled={busy || (check?.value === h && !check.ok)}>
+          <button className="cta wide" type="submit" disabled={busy || blocked}>
             {busy ? "Saving…" : "Save my account"}
           </button>
           <p className="fine">

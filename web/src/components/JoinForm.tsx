@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { ApiError, fetchPremiumStatus, guestSignup, refreshSession, type ChatUser, checkHandle } from "@/lib/api";
+import { ApiError, fetchPremiumStatus, guestSignup, refreshSession, type ChatUser } from "@/lib/api";
+import { HandleStatus, useHandleCheck } from "./HandleStatus";
 import { setPlus } from "@/lib/plus";
 import { findRoom } from "@/lib/rooms";
 
@@ -56,47 +57,23 @@ export default function JoinForm() {
     };
   }, []);
 
-  // The name is also the @username: unique. Ask whether it's free while typing.
-  const wantedName = nickname.trim().toLowerCase();
-  const nameFormatOk = /^[a-z0-9][a-z0-9_.]{1,16}[a-z0-9_]$/.test(wantedName) && !wantedName.includes("..");
-  const [nameCheck, setNameCheck] = useState<{ value: string; ok: boolean; note: string } | null>(null);
-  useEffect(() => {
-    if (!nameFormatOk) return;
-    let cancelled = false;
-    const t = setTimeout(async () => {
-      try {
-        const res = await checkHandle(wantedName);
-        if (!cancelled) setNameCheck({ value: wantedName, ok: res.available, note: res.available ? "" : res.detail.replace("username", "name") });
-      } catch {
-        if (!cancelled) setNameCheck(null);
-      }
-    }, 400);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [wantedName, nameFormatOk]);
-  const nameTaken = nameCheck?.value === wantedName && !nameCheck.ok;
-  const nameHint = !wantedName
-    ? ""
-    : !nameFormatOk
-      ? "3 to 18 letters, numbers, _ or . (not at the start or end)."
-      : nameTaken
-        ? nameCheck?.note || "That name is taken. Try another."
-        : "";
+  // The name is also the @username: unique. Checked while typing; taken names get free ones to tap.
+  const name = useHandleCheck(nickname, { max: 18 });
+  const blocked = name.kind === "invalid" || name.kind === "taken";
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    const name = nickname.trim();
-    if (!name) return setError("Pick a nickname first.");
-    if (nameHint) return setError(nameHint);
-    if (!ageOk) return setError("Confirm you're 18 or older to join.");
+    const wanted = nickname.trim();
+    if (!wanted) return setError("Pick a name first.");
+    if (blocked) return document.getElementById("nickname")?.focus();
+    if (!ageOk) return setError("Tick the box to confirm you're 18 or older.");
     setBusy(true);
     try {
-      await guestSignup({ nickname: name, gender, age_confirmed: true });
+      await guestSignup({ nickname: wanted, gender, age_confirmed: true });
       router.push(destination);
     } catch (err) {
+      // Taken a moment ago by someone else: the check below shows it (with free names) on the next look.
       setError(err instanceof ApiError ? err.message : "Couldn't reach vChat. Check your connection and try again.");
       setBusy(false);
     }
@@ -113,7 +90,7 @@ export default function JoinForm() {
         </button>
         <p className="fine">
           {existing.is_guest === false ? (
-            <>Signed in as {existing.email}.</>
+            <>Signed in as {existing.handle ? `@${existing.handle}` : existing.email}.</>
           ) : (
             <>You&apos;re a guest on this browser. Save your account in Me to keep it everywhere.</>
           )}
@@ -129,14 +106,32 @@ export default function JoinForm() {
           id="nickname"
           className="input"
           type="text"
-          placeholder="Pick a nickname"
+          placeholder="Pick a name, e.g. night_owl"
           maxLength={18}
           autoComplete="off"
-          aria-label="Nickname"
-          aria-invalid={!!nameHint}
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-label="Your name"
+          aria-describedby="nickname-status"
+          aria-invalid={blocked}
           value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
+          onChange={(e) => {
+            setNickname(e.target.value.replace(/\s/g, "_"));
+            setError("");
+          }}
         />
+        <div id="nickname-status" className="join-status">
+          <HandleStatus
+            state={name}
+            hint="This is also your @username. Nobody else can take it."
+            loginLink
+            onPick={(h) => {
+              setNickname(h);
+              setError("");
+              document.getElementById("nickname")?.focus();
+            }}
+          />
+        </div>
         <fieldset className="gender" aria-label="I am">
           {GENDERS.map(([value, label, icon]) => (
             <label key={value}>
@@ -164,11 +159,11 @@ export default function JoinForm() {
         <input id="age" type="checkbox" checked={ageOk} onChange={(e) => setAgeOk(e.target.checked)} />
         I&apos;m 18 or older and I accept the chat rules
       </label>
-      <button className="cta" type="submit" disabled={busy}>
+      <button className="cta" type="submit" disabled={busy || blocked}>
         {busy ? "Joining…" : "Start chatting"} <span aria-hidden="true">→</span>
       </button>
       <p className="form-msg" role="status">
-        {error || nameHint}
+        {error}
       </p>
       <p className="fine">No email or phone number needed. Letters, numbers, dots and underscores only.</p>
       <p className="fine">
