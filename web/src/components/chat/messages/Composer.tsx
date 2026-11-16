@@ -7,6 +7,7 @@ import { readDraft, writeDraft } from "./drafts";
 import MediaPanel, { type PanelTab } from "./MediaPanel";
 import { gifText } from "@/lib/gifs";
 import type { Msg } from "./MessageList";
+import { playSound } from "@/lib/sounds";
 
 const MAX_ROWS_PX = 132;
 const HOLD_MS = 350;
@@ -135,6 +136,7 @@ export default function Composer({
     // With the emoji panel open, it stays open instead.
     if (!panel) boxRef.current?.focus({ preventScroll: true });
     if (await onSend(text)) {
+      if (!editing) playSound("send");
       if (editing) setDraft(readDraft(draftKey));
       else typeText("");
     }
@@ -401,7 +403,7 @@ export default function Composer({
           onEmoji={insertEmoji}
           onGif={async (g) => {
             setExpanded(false);
-            await onSend(gifText(g));
+            if (await onSend(gifText(g))) playSound("send");
           }}
         />
       )}

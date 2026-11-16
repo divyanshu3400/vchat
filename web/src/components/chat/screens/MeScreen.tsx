@@ -11,6 +11,7 @@ import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
 import { cleanWordsOn, setCleanWords } from "../messages/richText";
 import AppSettings from "../nudges/AppSettings";
+import SoundSettings from "../nudges/SoundSettings";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
@@ -158,6 +159,8 @@ export default function MeScreen() {
         )}
 
         <AppSettings />
+
+        <SoundSettings />
 
         <section className="settings" aria-label="Settings">
           <div className="setting">

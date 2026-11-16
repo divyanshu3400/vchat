@@ -17,6 +17,7 @@ import { Icon } from "./bits";
 import StrangerProvider, { useStranger } from "./stranger/StrangerProvider";
 import MessageBanner from "./nudges/MessageBanner";
 import Nudges from "./nudges/Nudges";
+import SoundEffects from "./nudges/SoundEffects";
 
 /** Screens reached from the tab bar. Everything else under /chat is a conversation. */
 const TAB_SCREENS = new Set(["/chat", "/chat/rooms", "/chat/stranger", "/chat/inbox", "/chat/me"]);
@@ -245,6 +246,7 @@ function Frame({ children }: { children: React.ReactNode }) {
       </div>
       <Nudges enabled={!inConversation} />
       <MessageBanner />
+      <SoundEffects />
     </>
   );
 }

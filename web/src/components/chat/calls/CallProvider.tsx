@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { fetchIceServers, type CallKind, type ChatUser, type UserEvent } from "@/lib/api";
 import { useChat } from "../ChatProvider";
 import { useStranger } from "../stranger/StrangerProvider";
+import { startRingtone } from "@/lib/sounds";
 
 /**
  * Voice and video calls over WebRTC. The server only relays the setup ("signaling") between
@@ -62,39 +63,6 @@ function mediaError(e: unknown, kind: CallKind) {
   if (name === "NotAllowedError") return `Allow the ${kind === "video" ? "camera and microphone" : "microphone"} to make calls.`;
   if (name === "NotFoundError") return `No ${kind === "video" ? "camera or microphone" : "microphone"} found.`;
   return "Couldn't start the call on this device.";
-}
-
-/** A short two-tone ring through Web Audio (no file to load); silent if the browser refuses. */
-function startRing(): () => void {
-  try {
-    const ctx = new AudioContext();
-    let stopped = false;
-    const beep = () => {
-      if (stopped) return;
-      for (const [freq, at] of [[880, 0], [660, 0.25]] as const) {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.frequency.value = freq;
-        gain.gain.setValueAtTime(0.0001, ctx.currentTime + at);
-        gain.gain.exponentialRampToValueAtTime(0.08, ctx.currentTime + at + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.22);
-        osc.connect(gain).connect(ctx.destination);
-        osc.start(ctx.currentTime + at);
-        osc.stop(ctx.currentTime + at + 0.24);
-      }
-      navigator.vibrate?.([300, 150, 300]);
-    };
-    beep();
-    const t = setInterval(beep, 2200);
-    return () => {
-      stopped = true;
-      clearInterval(t);
-      navigator.vibrate?.(0);
-      ctx.close().catch(() => undefined);
-    };
-  } catch {
-    return () => undefined;
-  }
 }
 
 export default function CallProvider({ children }: { children: React.ReactNode }) {
@@ -275,7 +243,7 @@ export default function CallProvider({ children }: { children: React.ReactNode }
             };
             callRef.current = next;
             setCall(next);
-            stopRing.current = startRing();
+            stopRing.current = startRingtone();
             return;
           }
           case "call.accepted": {

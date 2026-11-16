@@ -120,7 +120,7 @@ export default function AppSettings() {
       <label className="setting">
         <span>
           <b>Alerts inside vChat</b>
-          <small>A banner, a soft sound and a buzz when a friend writes while you&apos;re in another chat</small>
+          <small>A banner at the top when a friend writes while you&apos;re in another chat</small>
         </span>
         <input
           type="checkbox"
