@@ -9,6 +9,17 @@
 SHELL := bash
 .DEFAULT_GOAL := help
 
+# This file is for the laptop. On the app server (where deploy/.env exists) say what to use instead.
+ifneq ($(wildcard deploy/.env),)
+  $(info This is the laptop's Makefile. On the server use the one in deploy/:)
+  $(info )
+  $(info    cd ~/vchat/deploy && make           (lists the server commands))
+  $(info    cd ~/vchat/deploy && make deploy    (take the code the laptop sent, rebuild, migrate))
+  $(info )
+  $(info New code comes from the laptop: `make deploy` there tests, pushes and ships it.)
+  $(error stopped)
+endif
+
 HOST    ?= hashai@10.10.11.6
 KEY     ?= ~/.ssh/github_actions_key
 SITE    ?= https://vchat.ssmm.online

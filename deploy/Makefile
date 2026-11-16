@@ -14,7 +14,7 @@ LINES   ?= 200
 BACKUPS ?= $(HOME)/vchat-data/backups
 DC      := docker compose
 
-.PHONY: help status ps logs logs-f errors stats version env-keys disk restart up up-web up-api update shell dbshell migrate showmigrations createsuperuser purge-dry purge purge-log backup backups backup-log env-edit clean
+.PHONY: deploy help status ps logs logs-f errors stats version env-keys disk restart up up-web up-api update shell dbshell migrate showmigrations createsuperuser purge-dry purge purge-log backup backups backup-log env-edit clean
 help: ## Show this list
 	@echo "vChat server commands (make <name>), run in ~/vchat/deploy:"
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /|/' | awk -F'|' '{ printf "  \033[1m%-15s\033[0m %s\n", $$1, $$2 }'
@@ -76,6 +76,10 @@ up-api: ## Rebuild and restart only the backend (runs migrations)
 update: ## Apply the bundle uploaded to /tmp/vchat.bundle, then rebuild everything
 	cd .. && git pull -q origin master && git log --oneline -1
 	@$(MAKE) --no-print-directory up
+
+deploy: ## Same as update: take the code the laptop sent (make sync / make deploy there), rebuild, migrate
+	@echo "Code comes from the laptop (GitHub isn't reachable from here). Applying the last upload:"
+	@$(MAKE) --no-print-directory update
 
 
 # --- Django ---
