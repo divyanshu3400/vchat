@@ -17,6 +17,8 @@ from . import closing, email_auth, moderation
 from .email_auth import AccountError
 from .models import EmailCode, User
 from .serializers import (
+    LoginSerializer,
+    UsernamePasswordSerializer,
     EmailCodeSerializer,
     EmailOnlySerializer,
     EmailPasswordSerializer,
@@ -172,6 +174,21 @@ def _loginable(email: str):
     )
 
 
+def _loginable_by(login: str):
+    """A saved account by email (has an @ in the middle) or by @username."""
+    login = login.strip()
+    if "@" in login.lstrip("@"):
+        return _loginable(login.lower())
+    handle = login.lstrip("@").lower()
+    if not handle:
+        return None
+    return (
+        User.objects.filter(handle=handle, is_guest=False, deleted_at__isnull=True)
+        .filter(Q(is_active=True) | Q(deactivated_at__isnull=False))
+        .first()
+    )
+
+
 def _signed_out(payload: dict) -> Response:
     response = Response(payload)
     response.delete_cookie(settings.VCHAT["REFRESH_COOKIE"], path=COOKIE_PATH)
@@ -279,11 +296,11 @@ class LoginView(APIView):
     throttle_scope = "login"
 
     def post(self, request):
-        s = EmailPasswordSerializer(data=request.data)
+        s = LoginSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        user = _loginable(s.validated_data["email"])
+        user = _loginable_by(s.validated_data["login"])
         if user is None or not user.check_password(s.validated_data["password"]):
-            return Response({"code": "wrong_login", "detail": "Wrong email or password."}, status=400)
+            return Response({"code": "wrong_login", "detail": "Wrong username or password."}, status=400)
         if user.is_banned:
             return _start_session(user, request)  # the ban answer; a banned account stays as it is
         # Deactivated (or waiting to be deleted): logging in brings the account back.
@@ -399,3 +416,85 @@ def avatar_file(request, token):
     response["Cache-Control"] = "private, max-age=86400, immutable"
     response["X-Content-Type-Options"] = "nosniff"
     return response
+
+
+class AccountSaveView(APIView):
+    """A guest keeps the account with a @username and a password (no email needed).
+    Adding an email later lets them reset a forgotten password."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
+
+    def post(self, request):
+        from . import profile
+
+        user = request.user
+        if not user.is_guest:
+            return Response({"code": "already_saved", "detail": "Your account is already saved."}, status=400)
+        s = UsernamePasswordSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        handle = profile.normalise_handle(s.validated_data["username"])
+        problem = profile.handle_problem(user, handle)
+        if problem:
+            return Response({"code": "bad_username", "field": "username", "detail": problem}, status=400)
+        password = s.validated_data["password"]
+        weak = _password_problems(password, user)
+        if weak:
+            return Response({"code": "weak_password", "field": "password", "detail": weak}, status=400)
+        try:
+            with transaction.atomic():
+                updated = User.objects.filter(pk=user.pk, is_guest=True).update(
+                    handle=handle, password=make_password(password), is_guest=False
+                )
+        except IntegrityError:
+            return Response({"code": "bad_username", "field": "username", "detail": "That username is taken."}, status=400)
+        if not updated:
+            return Response({"code": "already_saved", "detail": "Your account is already saved."}, status=400)
+        user.refresh_from_db()
+        return Response({"user": MeSerializer(user).data})
+
+
+class EmailAddStartView(APIView):
+    """A saved account adds (or changes) its email: we send a code to prove the address."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "email_codes"
+
+    def post(self, request):
+        user = request.user
+        if user.is_guest:
+            return Response({"code": "guest", "detail": "Save your account first."}, status=400)
+        s = EmailOnlySerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        email = s.validated_data["email"]
+        try:
+            email_auth.require_enabled()
+            if email_auth.email_taken(email, exclude_user_id=user.id):
+                raise AccountError("email_taken", "That email is already used by another account.", 409)
+            email_auth.send_code(email, EmailCode.Purpose.VERIFY, user)
+        except AccountError as exc:
+            return _account_error(exc)
+        return Response({"sent_to": email}, status=status.HTTP_202_ACCEPTED)
+
+
+class EmailAddVerifyView(APIView):
+    """The right code puts the email on the account (for password resets). Password unchanged."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
+
+    def post(self, request):
+        s = EmailCodeSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        email = s.validated_data["email"]
+        try:
+            row = email_auth.check_code(email, EmailCode.Purpose.VERIFY, s.validated_data["code"])
+            if row.user_id != request.user.id or request.user.is_guest:
+                raise AccountError("wrong_code", "That code isn't right.")
+            User.objects.filter(pk=request.user.pk).update(email=email)
+        except AccountError as exc:
+            return _account_error(exc)
+        except IntegrityError:
+            return _account_error(AccountError("email_taken", "That email is already used by another account.", 409))
+        request.user.email = email
+        return Response({"user": MeSerializer(request.user).data})

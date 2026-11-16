@@ -76,6 +76,26 @@ class EmailCodeSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=12)
 
 
+class LoginSerializer(serializers.Serializer):
+    """`login` is a @username or an email. (Old apps send `email`; it is read the same way.)"""
+
+    login = serializers.CharField(max_length=254, required=False, trim_whitespace=True)
+    email = serializers.CharField(max_length=254, required=False, trim_whitespace=True)
+    password = serializers.CharField(max_length=128, trim_whitespace=False)
+
+    def validate(self, attrs):
+        value = (attrs.get("login") or attrs.get("email") or "").strip()
+        if not value:
+            raise serializers.ValidationError({"login": "Enter your username or email."})
+        attrs["login"] = value
+        return attrs
+
+
+class UsernamePasswordSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=25, trim_whitespace=True)
+    password = serializers.CharField(max_length=128, trim_whitespace=False)
+
+
 class EmailOnlySerializer(serializers.Serializer):
     email = EmailField(max_length=254)
 

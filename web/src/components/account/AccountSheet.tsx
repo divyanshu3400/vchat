@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { ApiError, errorCode, startAccount, verifyAccount, type ChatUser } from "@/lib/api";
+import { ApiError, checkHandle, errorCode, saveAccount, type ChatUser } from "@/lib/api";
 
-const RESEND_SECONDS = 60;
+const HANDLE_RE = /^[a-z0-9][a-z0-9_.]{1,18}[a-z0-9_]$/;
 
 /**
- * Save a guest account: email + password, then the 6-digit code from the email.
- * It stays the same account (nickname, friends, chats); afterwards it can log in anywhere.
+ * Save a guest account with a @username and a password. No email needed: it stays the same
+ * account (nickname, friends, chats) and can log in on any device. An email can be added later
+ * in Me, so a forgotten password can be reset.
  */
 export default function AccountSheet({
   reason,
@@ -21,51 +22,54 @@ export default function AccountSheet({
   onSaved: (user: ChatUser) => void;
   onClose: () => void;
 }) {
-  const [step, setStep] = useState<"form" | "code">("form");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
-  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [taken, setTaken] = useState(false);
-  const [wait, setWait] = useState(0);
+  const [check, setCheck] = useState<{ value: string; ok: boolean; note: string } | null>(null);
+  const h = username.trim().replace(/^@/, "").toLowerCase();
+  const formatOk = HANDLE_RE.test(h) && !h.includes("..");
 
+  // Is the username free? Asked 400 ms after typing stops.
   useEffect(() => {
-    if (wait <= 0) return;
-    const t = setTimeout(() => setWait((w) => w - 1), 1000);
-    return () => clearTimeout(t);
-  }, [wait]);
+    if (!formatOk) return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const res = await checkHandle(h, await getAccess());
+        if (!cancelled) setCheck({ value: h, ok: res.available, note: res.available ? "Available" : res.detail });
+      } catch {
+        if (!cancelled) setCheck(null);
+      }
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [h, formatOk, getAccess]);
 
-  async function send(e?: FormEvent) {
-    e?.preventDefault();
-    setError("");
-    setTaken(false);
-    if (!email.trim() || password.length < 8) return setError("Enter your email and a password of at least 8 characters.");
-    setBusy(true);
-    try {
-      const res = await startAccount(email.trim(), password, await getAccess());
-      setEmail(res.sent_to);
-      setStep("code");
-      setCode("");
-      setWait(RESEND_SECONDS);
-    } catch (err) {
-      setTaken(errorCode(err) === "email_taken");
-      setError(err instanceof ApiError ? err.message : "Couldn't reach vChat. Try again.");
-    }
-    setBusy(false);
-  }
+  const hint = !h
+    ? "People can find you by it. You log in with it."
+    : !formatOk
+      ? "3 to 20 letters, numbers, _ or . (not at the start or end)."
+      : check?.value === h
+        ? check.note
+        : "Checking…";
+  const hintClass = !h ? "fine" : !formatOk || (check?.value === h && !check.ok) ? "account-error" : check?.value === h ? "account-ok" : "fine";
 
-  async function verify(e: FormEvent) {
+  async function save(e: FormEvent) {
     e.preventDefault();
     setError("");
-    if (!/^\d{6}$/.test(code)) return setError("Enter the 6-digit code from the email.");
+    if (!formatOk) return setError("Pick a username: 3 to 20 letters, numbers, _ or .");
+    if (password.length < 8) return setError("Pick a password of at least 8 characters.");
     setBusy(true);
     try {
-      const res = await verifyAccount(email, code, await getAccess());
+      const res = await saveAccount(h, password, await getAccess());
       onSaved(res.user);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't reach vChat. Try again.");
+      if (errorCode(err) === "already_saved") onClose();
       setBusy(false);
     }
   }
@@ -79,91 +83,60 @@ export default function AccountSheet({
         <div className="account-badge" aria-hidden="true">
           🔒
         </div>
-        {step === "form" ? (
-          <form onSubmit={send} noValidate>
-            <h2>Save your account</h2>
-            <p className="account-why">
-              {reason ?? "Keep your nickname, friends and chats, and log in on any device."} Guests lose everything when the
-              browser forgets them.
-            </p>
-            <label className="account-field">
-              <span>Email</span>
+        <form onSubmit={save} noValidate>
+          <h2>Save your account</h2>
+          <p className="account-why">
+            {reason ?? "Keep your nickname, friends and chats, and log in on any device."} Guests lose everything when the
+            browser forgets them.
+          </p>
+          <label className="account-field">
+            <span>Username</span>
+            <span className="account-handle">
+              <i aria-hidden="true">@</i>
               <input
-                type="email"
-                inputMode="email"
-                autoComplete="email"
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
                 autoFocus
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                maxLength={21}
+                value={username}
+                onChange={(e) => setUsername(e.target.value.replace(/\s/g, "").toLowerCase())}
+                placeholder="yourname"
               />
-            </label>
-            <label className="account-field">
-              <span>Password</span>
-              <span className="account-pass">
-                <input
-                  type={show ? "text" : "password"}
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  minLength={8}
-                />
-                <button type="button" onClick={() => setShow((s) => !s)}>
-                  {show ? "Hide" : "Show"}
-                </button>
-              </span>
-            </label>
-            {error && (
-              <p className="account-error" role="alert">
-                {error}{" "}
-                {taken && (
-                  <Link href="/login" className="inline-link">
-                    Log in
-                  </Link>
-                )}
-              </p>
-            )}
-            <button className="cta wide" type="submit" disabled={busy}>
-              {busy ? "Sending…" : "Send me a code"}
-            </button>
-            <p className="fine">We only use your email to sign you in. Nobody in vChat can see it.</p>
-          </form>
-        ) : (
-          <form onSubmit={verify} noValidate>
-            <h2>Check your email</h2>
-            <p className="account-why">
-              We sent a 6-digit code to <b>{email}</b>. It works for 10 minutes. Not there? Look in spam.
-            </p>
-            <input
-              className="code-input"
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              autoFocus
-              maxLength={6}
-              value={code}
-              onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-              placeholder="••••••"
-              aria-label="6-digit code"
-            />
-            {error && (
-              <p className="account-error" role="alert">
-                {error}
-              </p>
-            )}
-            <button className="cta wide" type="submit" disabled={busy || code.length !== 6}>
-              {busy ? "Checking…" : "Save my account"}
-            </button>
-            <p className="account-links">
-              <button type="button" className="inline-link" disabled={wait > 0 || busy} onClick={() => send()}>
-                {wait > 0 ? `Send again in ${wait}s` : "Send the code again"}
+            </span>
+            <small className={hintClass}>{hint}</small>
+          </label>
+          <label className="account-field">
+            <span>Password</span>
+            <span className="account-pass">
+              <input
+                type={show ? "text" : "password"}
+                autoComplete="new-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                minLength={8}
+              />
+              <button type="button" onClick={() => setShow((s) => !s)}>
+                {show ? "Hide" : "Show"}
               </button>
-              <button type="button" className="inline-link" onClick={() => setStep("form")}>
-                Change email
-              </button>
+            </span>
+          </label>
+          {error && (
+            <p className="account-error" role="alert">
+              {error}
             </p>
-          </form>
-        )}
+          )}
+          <button className="cta wide" type="submit" disabled={busy || (check?.value === h && !check.ok)}>
+            {busy ? "Saving…" : "Save my account"}
+          </button>
+          <p className="fine">
+            No email needed. Add one later in Me so you can reset a forgotten password.{" "}
+            <Link href="/login" className="inline-link">
+              Already have an account?
+            </Link>
+          </p>
+        </form>
       </div>
     </div>
   );

@@ -13,6 +13,7 @@ import { cleanWordsOn, setCleanWords } from "../messages/richText";
 import AppSettings from "../nudges/AppSettings";
 import SoundSettings from "../nudges/SoundSettings";
 import EditProfileSheet from "./EditProfileSheet";
+import EmailSettings from "./EmailSettings";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
@@ -84,7 +85,7 @@ export default function MeScreen() {
           <section className="save-card" aria-labelledby="save-title">
             <h2 id="save-title">Don&apos;t lose {me.nickname}</h2>
             <p>
-              Right now this account lives only in this browser. Save it with your email and a password to keep your friends
+              Right now this account lives only in this browser. Save it with a username and a password to keep your friends
               and chats, make new friends, and log in on any device.
             </p>
             <button type="button" className="start-btn wide" onClick={() => askAccount()}>
@@ -97,9 +98,9 @@ export default function MeScreen() {
               <div className="setting">
                 <span>
                   <b>Signed in as</b>
-                  <small>{me.email}</small>
+                  <small>{me.handle ? `@${me.handle}` : me.email}</small>
                 </span>
-                <span className="tag">Verified</span>
+                <span className="tag">Saved</span>
               </div>
             </section>
           )
@@ -171,6 +172,8 @@ export default function MeScreen() {
         </section>
         )}
 
+        {me && !guest && <EmailSettings me={me} />}
+
         <AppSettings />
 
         <SoundSettings />
@@ -231,7 +234,7 @@ export default function MeScreen() {
                     keep them.
                   </>
                 ) : (
-                  <>Log out on this device? Log back in any time with {me?.email}.</>
+                  <>Log out on this device? Log back in any time with {me?.handle ? `@${me.handle}` : me?.email} and your password.</>
                 )}
               </span>
               <button type="button" className="pill-btn danger" onClick={leave} disabled={busy}>

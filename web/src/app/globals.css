@@ -293,3 +293,20 @@ p { margin: 0; }
 .invite-page-about { color: var(--muted); }
 .invite-page .cta { justify-content: center; width: 100%; margin-top: 8px; }
 .invite-page small { color: var(--muted); }
+
+/* Scrollbars: thin, milky mint, darker on hover and while dragged. */
+* { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--mint) 65%, transparent) transparent; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--mint) 60%, transparent); border-radius: 999px; border: 1px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--brand) 70%, var(--mint)); background-clip: padding-box; }
+::-webkit-scrollbar-thumb:active { background: var(--brand); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+@media (hover: hover) { *:hover { scrollbar-color: color-mix(in srgb, var(--brand) 55%, var(--mint)) transparent; } }
+
+/* Save account: @username field */
+.account-handle { position: relative; display: block; }
+.account-handle i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-style: normal; font-weight: 800; color: var(--muted); }
+.account-field .account-handle input { padding-left: 30px; }
+.account-field small { font-size: 12.5px; font-weight: 600; }
+.account-ok { color: var(--brand); font-size: 12.5px; font-weight: 700; }

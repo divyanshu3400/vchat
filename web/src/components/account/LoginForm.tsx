@@ -12,6 +12,8 @@ export default function LoginForm() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
+  // Username or email, for logging in.
+  const [who, setWho] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [show, setShow] = useState(false);
@@ -32,9 +34,9 @@ export default function LoginForm() {
 
   function onLogin(e: FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !password) return setError("Enter your email and password.");
+    if (!who.trim() || !password) return setError("Enter your username and password.");
     run(async () => {
-      const res = await login(email.trim(), password);
+      const res = await login(who.trim(), password);
       if (res.deletion_cancelled) {
         try {
           sessionStorage.setItem("vchat.deletionCancelled", "1");
@@ -107,14 +109,33 @@ export default function LoginForm() {
         <form onSubmit={onLogin} noValidate>
           <h1>Log in</h1>
           <p className="account-why">Your saved account: same nickname, friends and chats, on any device.</p>
-          {emailField}
+          <label className="account-field">
+            <span>Username or email</span>
+            <input
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoFocus
+              value={who}
+              onChange={(e) => setWho(e.target.value)}
+              placeholder="yourname"
+            />
+          </label>
           {passwordField("Password", "current-password")}
           {error && <p className="account-error" role="alert">{error}</p>}
           <button className="cta wide" type="submit" disabled={busy}>
             {busy ? "Logging in…" : "Log in"}
           </button>
           <p className="account-links">
-            <button type="button" className="inline-link" onClick={() => { setError(""); setMode("forgot"); }}>
+            <button
+              type="button"
+              className="inline-link"
+              onClick={() => {
+                setError("");
+                if (who.includes("@") && !who.startsWith("@")) setEmail(who.trim());
+                setMode("forgot");
+              }}
+            >
               Forgot password?
             </button>
             <Link className="inline-link" href="/#join">
@@ -126,7 +147,9 @@ export default function LoginForm() {
       {mode === "forgot" && (
         <form onSubmit={onForgot} noValidate>
           <h1>Reset your password</h1>
-          <p className="account-why">We&apos;ll email you a 6-digit code.</p>
+          <p className="account-why">
+            We&apos;ll email you a 6-digit code. This works if you added an email to your account (Me → Email).
+          </p>
           {emailField}
           {error && <p className="account-error" role="alert">{error}</p>}
           <button className="cta wide" type="submit" disabled={busy}>

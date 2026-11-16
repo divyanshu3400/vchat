@@ -187,8 +187,23 @@ export function closeAccount(kind: "deactivate" | "delete", body: { password?: s
   });
 }
 
-export function login(email: string, password: string) {
-  return request<Session & { deletion_cancelled?: boolean }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+/** Log in with a @username or an email. */
+export function login(who: string, password: string) {
+  return request<Session & { deletion_cancelled?: boolean }>("/api/auth/login", { method: "POST", body: JSON.stringify({ login: who, password }) });
+}
+
+/** Guest -> saved account with a @username and a password (no email needed). */
+export function saveAccount(username: string, password: string, access: string) {
+  return request<{ user: ChatUser }>("/api/auth/account/save", { method: "POST", access, body: JSON.stringify({ username, password }) });
+}
+
+/** Saved accounts: add or change the email (for password resets). Step 1 sends a code. */
+export function startEmail(email: string, access: string) {
+  return request<{ sent_to: string }>("/api/auth/email/start", { method: "POST", access, body: JSON.stringify({ email }) });
+}
+
+export function verifyEmail(email: string, code: string, access: string) {
+  return request<{ user: ChatUser }>("/api/auth/email/verify", { method: "POST", access, body: JSON.stringify({ email, code }) });
 }
 
 export function forgotPassword(email: string) {

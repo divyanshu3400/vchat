@@ -12,7 +12,7 @@ import MessageList, { JumpToLatest, type Msg } from "../messages/MessageList";
 import { useStickyScroll } from "../messages/useStickyScroll";
 import { WatchPanel, WatchStartSheet, useWatch } from "../watch/WatchTogether";
 import { useRoomPresence } from "@/lib/presence";
-import { REGION_ROOMS, findRoom } from "@/lib/rooms";
+import { findRoom } from "@/lib/rooms";
 import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Icon } from "../bits";
@@ -95,64 +95,20 @@ function Interstitial({ onDone }: { onDone: () => void }) {
 }
 
 function IdleView() {
-  const { region, setRegion, want, setWant, start, notice, endedBy, interests, toggleInterest } = useStranger();
-  const { premium } = useChat();
+  // "I want to talk to" (women/men only) and "From" (region) are hidden for now: with more men
+  // than women online, filters left people waiting. Everyone is matched with anyone, anywhere.
+  const { start, notice, endedBy, interests, toggleInterest } = useStranger();
   const presence = useRoomPresence();
-  const [unlockFor, setUnlockFor] = useState<string | null>(null);
-  const grant = premium?.grants.gender_filter;
-  const unlocked = !!premium?.plus || (grant?.uses_left ?? 0) > 0;
-
-  function pick(g: string) {
-    if (g === "any" || unlocked) setWant(g);
-    else setUnlockFor(g);
-  }
-
-  const option = (g: string, label: string) => (
-    <button
-      type="button"
-      className={`chip${want === g ? " on" : ""}${g !== "any" && !unlocked ? " locked" : ""}`}
-      aria-pressed={want === g}
-      onClick={() => pick(g)}
-    >
-      {g !== "any" && !unlocked && <Icon name="lock" size={13} />} {label}
-    </button>
-  );
 
   return (
     <div className="page-scroll center">
       <div className="st-start">
-        <span className="st-orb" aria-hidden="true">
-          <Icon name="shuffle" size={34} />
-        </span>
-        <h2>Talk to a stranger</h2>
-        <p className="muted-text">One-on-one and anonymous. Skip anytime, keep the good ones as friends.</p>
+        {/* eslint-disable-next-line @next/next/no-img-element -- small static brand mark */}
+        <img src="/brand/logo-mark.png" alt="vChat" className="st-logo" width={96} height={96} />
+        <h2>Meet someone new</h2>
+        <p className="muted-text">Chat one-on-one, anonymously. Skip anytime, keep the good ones as friends.</p>
         {endedBy === "connection" && <p className="chat-notice">Your connection dropped, so that chat ended.</p>}
 
-        <div className="st-field">
-          <span className="st-label">
-            I want to talk to
-            {premium?.free_for_all ? null : premium?.plus ? (
-              <span className="perk">Plus</span>
-            ) : grant && grant.uses_left > 0 ? (
-              <span className="perk">{grant.uses_left} filtered chats left</span>
-            ) : null}
-          </span>
-          <div className="chips">
-            {option("any", "Anyone")}
-            {option("F", "Women")}
-            {option("M", "Men")}
-          </div>
-        </div>
-        {unlockFor && (
-          <UnlockSheet
-            kind="gender_filter"
-            onClose={() => setUnlockFor(null)}
-            onUnlocked={() => {
-              setWant(unlockFor);
-              setUnlockFor(null);
-            }}
-          />
-        )}
         <div className="st-field">
           <span className="st-label">
             Your interests <small className="st-optional">optional · up to {MAX_INTERESTS}</small>
@@ -177,17 +133,6 @@ function IdleView() {
           </div>
           <small className="st-hint">People who like the same things are matched first.</small>
         </div>
-        <label className="st-field" htmlFor="st-region">
-          <span className="st-label">From</span>
-          <select id="st-region" className="st-select" value={region} onChange={(e) => setRegion(e.target.value)}>
-            <option value="any">Anywhere</option>
-            {REGION_ROOMS.map((r) => (
-              <option key={r.slug} value={r.slug}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </label>
         {notice && <p className="chat-notice">{notice}</p>}
         <button type="button" className="start-btn wide" onClick={start}>
           <Icon name="shuffle" size={22} /> Start
@@ -741,7 +686,7 @@ export function StrangerWindow({ win }: { win: WinControls }) {
         </span>
         <div className="win-title">
           <b>Random chat</b>
-          <small className={phase === "searching" ? "on" : ""}>{phase === "searching" ? "Looking for someone…" : "1-on-1 with a stranger"}</small>
+          <small className={phase === "searching" ? "on" : ""}>{phase === "searching" ? "Looking for someone…" : "1-on-1 with someone new"}</small>
         </div>
         <WinButtons win={win} />
       </header>
@@ -756,7 +701,7 @@ export default function StrangerScreen() {
 
   return (
     <div className="page-screen st-screen">
-      {phase === "idle" || phase === "searching" ? <ChatHeader title="Random chat" subtitle="1-on-1 with a stranger" /> : null}
+      {phase === "idle" || phase === "searching" ? <ChatHeader title="Random chat" subtitle="1-on-1 with someone new" /> : null}
       {phase === "idle" && <IdleView />}
       {phase === "searching" && <SearchingView />}
       {(phase === "chatting" || phase === "ended") && <ChatView />}
