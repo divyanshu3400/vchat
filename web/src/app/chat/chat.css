@@ -608,3 +608,10 @@ button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700
 .save-card { background: linear-gradient(160deg, var(--brand-soft), var(--surface)); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); border-radius: 20px; padding: 18px; display: grid; gap: 10px; }
 .save-card h2 { font-family: var(--display); font-size: 20px; }
 .save-card p { color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+/* media keeps a fixed frame in the chat; the whole thing opens on tap */
+.media-photo { max-height: 300px; }
+.media-video { max-height: 300px; object-fit: contain; }
+.win .media-photo { width: min(220px, 62vw); max-height: 240px; }
+.lightbox img { object-fit: contain; cursor: default; }
+.lightbox-close { background: rgba(0, 0, 0, 0.45); border-radius: 50%; }

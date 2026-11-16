@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import type { Attachment } from "@/lib/api";
 import { Icon } from "../bits";
 import AudioPlayer from "./AudioPlayer";
@@ -29,7 +30,8 @@ export default function MediaBubble({ attachment, blurUntilTap = false }: { atta
       <button
         type="button"
         className={`media-photo${revealed ? "" : " blurred"}`}
-        style={{ aspectRatio: String(Math.min(Math.max(ratio, 0.6), 1.8)) }}
+        // A fixed frame, like other chat apps: very tall or wide photos are cropped here, shown whole on tap.
+        style={{ aspectRatio: String(Math.min(Math.max(ratio, 0.75), 1.6)) }}
         onClick={() => (revealed ? setOpen(true) : setRevealed(true))}
         aria-label={revealed ? "Open photo" : "Show photo from stranger"}
       >
@@ -41,15 +43,31 @@ export default function MediaBubble({ attachment, blurUntilTap = false }: { atta
           </span>
         )}
       </button>
-      {open && (
-        <div className="lightbox" role="dialog" aria-label="Photo" onClick={() => setOpen(false)}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={attachment.url} alt="" />
-          <button type="button" className="icon-btn lightbox-close" aria-label="Close">
-            <Icon name="close" />
-          </button>
-        </div>
-      )}
+      {open && <Lightbox src={attachment.url} onClose={() => setOpen(false)} />}
     </>
+  );
+}
+
+/** The whole photo over everything (rendered on <body>, so no chat bubble can clip it). */
+function Lightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", esc);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", esc);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+  return createPortal(
+    <div className="lightbox" role="dialog" aria-label="Photo" onClick={onClose}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- signed private link, not a static asset */}
+      <img src={src} alt="" onClick={(e) => e.stopPropagation()} />
+      <button type="button" className="icon-btn lightbox-close" aria-label="Close" onClick={onClose}>
+        <Icon name="close" />
+      </button>
+    </div>,
+    document.body,
   );
 }
