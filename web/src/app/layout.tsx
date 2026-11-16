@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, JetBrains_Mono, Manrope } from "next/font/google";
+import ServiceWorker from "@/components/ServiceWorker";
 import "./globals.css";
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display", weight: ["400", "600", "800"] });
@@ -18,6 +19,10 @@ export const metadata: Metadata = {
     "Chat with strangers from around the world in free anonymous chat rooms. No sign-up, no email. Pick a nickname, join a room and make friends.",
   openGraph: { type: "website", siteName: "vChat" },
   twitter: { card: "summary_large_image" },
+  applicationName: "vChat",
+  // iPhone: "Add to Home Screen" opens full screen with our icon.
+  appleWebApp: { capable: true, title: "vChat", statusBarStyle: "default" },
+  icons: { apple: "/app-icon/apple" },
 };
 
 export const viewport: Viewport = {
@@ -34,13 +39,20 @@ export const viewport: Viewport = {
 // Applies a saved light/dark choice before first paint, so the page never flashes the wrong theme.
 const themeInit = `try{var t=localStorage.getItem('vchat-theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t)}catch(e){}`;
 
+// Chrome offers to install only once, early: keep that offer for our own "Install app" button.
+const installInit = `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__vchatInstall=e;window.dispatchEvent(new Event('vchat-installable'))});window.addEventListener('appinstalled',function(){window.__vchatInstall=null;try{localStorage.setItem('vchat.installed','1')}catch(e){}});`;
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+        <script dangerouslySetInnerHTML={{ __html: installInit }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <ServiceWorker />
+      </body>
     </html>
   );
 }

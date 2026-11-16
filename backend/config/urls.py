@@ -13,4 +13,5 @@ urlpatterns = [
     path("api/", include("apps.media.urls")),
     path("api/", include("apps.calls.urls")),
     path("api/", include("apps.support.urls")),
+    path("api/", include("apps.push.urls")),
 ]

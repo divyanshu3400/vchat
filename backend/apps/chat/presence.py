@@ -140,6 +140,25 @@ def ping_user(user_id: int, conn: str) -> None:
     backend().add(_user_key(user_id), conn)
 
 
+# --- is vChat on this person's screen? (no notifications then) ---------------------------
+
+
+def _visible_key(user_id: int) -> str:
+    return f"pr:vis:{user_id}"
+
+
+def set_visible(user_id: int, conn: str, visible: bool) -> None:
+    """A personal socket reports whether its tab is on screen (refreshed with the heartbeat)."""
+    if visible:
+        backend().add(_visible_key(user_id), conn)
+    else:
+        backend().remove(_visible_key(user_id), conn)
+
+
+def is_looking(user_id: int) -> bool:
+    return bool(backend().members([_visible_key(user_id)])[0])
+
+
 def disconnect_user(user_id: int, conn: str) -> bool:
     """Unregister a personal socket. True if that was the user's last one (they just went offline)."""
     backend().remove(SITE_KEY, f"{user_id}|{conn}")

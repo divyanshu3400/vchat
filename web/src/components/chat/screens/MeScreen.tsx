@@ -8,6 +8,7 @@ import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
 import { cleanWordsOn, setCleanWords } from "../messages/richText";
+import AppSettings from "../nudges/AppSettings";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
@@ -110,6 +111,8 @@ export default function MeScreen() {
             </p>
           )}
         </section>
+
+        <AppSettings />
 
         <section className="settings" aria-label="Settings">
           <div className="setting">

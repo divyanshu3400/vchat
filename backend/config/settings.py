@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "apps.calls",
     "apps.watch",
     "apps.support",
+    "apps.push",
 ]
 
 MIDDLEWARE = [
@@ -182,6 +183,12 @@ if EMAIL_HOST:
 elif DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 EMAIL_ENABLED = bool(EMAIL_HOST) or DEBUG or TESTING
+# Web Push (notifications when vChat is closed). Keys from `manage.py vapid_keys`; empty = off.
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT = os.environ.get("VAPID_SUBJECT", "mailto:support@techyugantar.in")
+# Tests send in the same thread; the server sends in the background.
+PUSH_SYNC = TESTING
 # Where contact-page messages go.
 SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@techyugantar.in")
 

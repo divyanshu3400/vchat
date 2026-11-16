@@ -12,6 +12,7 @@ from apps.chat import message_ops, presence
 from apps.media import services as media
 from apps.chat.models import Block
 from apps.chat.realtime import push_to_user
+from apps.push import events as push_events
 
 from .models import Conversation, DirectMessage, FriendRequest, Friendship, ordered_pair
 
@@ -140,6 +141,7 @@ def send_friend_request(sender: User, target: User) -> tuple[str, FriendRequest 
         event = {"type": "friend_request", "request": request_payload(req)}
         _on_commit_push(target.id, event)
         _on_commit_push(sender.id, event)  # sender's other tabs
+        transaction.on_commit(lambda: push_events.friend_request(target.id, sender.nickname))
     return "pending", req
 
 
@@ -158,6 +160,7 @@ def _accept(req: FriendRequest) -> None:
         req.to_user_id,
         {"type": "friend_added", "friend": brief(req.from_user), "online": req.from_user_id in online, "request_id": req.id},
     )
+    transaction.on_commit(lambda: push_events.request_accepted(req.from_user_id, req.to_user_id, req.to_user.nickname))
 
 
 def respond_to_request(req_id: int, user: User, action: str) -> None:

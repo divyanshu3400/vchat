@@ -8,3 +8,4 @@ uvicorn[standard]>=0.32,<1  # production ASGI server (HTTP + WebSockets, several
 dj-database-url>=2.3,<3
 psycopg[binary]>=3.2,<3.3
 Pillow>=11,<12  # checks and re-encodes uploaded photos (drops EXIF/location)
+pywebpush>=2.0,<3  # notifications when vChat is closed (Web Push, VAPID)

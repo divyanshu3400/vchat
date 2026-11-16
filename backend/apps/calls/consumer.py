@@ -26,6 +26,7 @@ from django.core.cache import cache
 
 from apps.chat import services as chat_services
 from apps.chat.realtime import user_group
+from apps.push import events as push_events
 from apps.social import services as social
 
 CALL_ID_RE = re.compile(r"^[0-9a-fA-F-]{8,64}$")
@@ -206,6 +207,11 @@ class CallMixin:
                 await self._to_channel(state["callee_ch"], payload)
             else:  # still ringing on every tab of the friend
                 await self._to_user(state["callee"], payload)
+                if not state["stranger"]:
+                    # Nobody answered: a "missed call" for when they look at their phone.
+                    await database_sync_to_async(push_events.missed_call)(
+                        state["callee"], self.user.id, self.user.nickname, state["kind"]
+                    )
         else:
             await self._to_channel(state["caller_ch"], payload)
 

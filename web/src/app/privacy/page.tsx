@@ -50,7 +50,18 @@ export default function PrivacyPage() {
           Your IP address and basic device information, in server logs and to fight spam and ban evasion (stored as a hash
           where possible).
         </li>
-        <li>Whether you are online, so friends see a green dot.</li>
+        <li>Whether you are online, so friends see a green dot, and whether vChat is on your screen (so we don&apos;t notify you while you&apos;re looking).</li>
+      </ul>
+      <h3>If you turn on notifications</h3>
+      <ul>
+        <li>
+          A notification address for your browser or installed app, from your browser&apos;s push service (Google, Apple or
+          Mozilla), and which notifications you chose. Turning notifications off, or blocking them, deletes it.
+        </li>
+        <li>
+          Notifications carry the sender&apos;s nickname and, unless you hide it, the start of the message. They pass through
+          that push service encrypted.
+        </li>
       </ul>
       <p>We don&apos;t ask for your real name, phone number, location, contacts or photos of you.</p>
 

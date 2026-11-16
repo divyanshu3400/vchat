@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { setPlus } from "@/lib/plus";
 import AccountSheet from "@/components/account/AccountSheet";
+import { markEngaged } from "@/lib/install";
+import { usePush } from "@/lib/push";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   answerFriendRequest,
@@ -58,6 +60,8 @@ type ChatContextValue = {
   setPremium: (status: PremiumStatus) => void;
   /** Open "Save your account" (email + password). `then` runs once it is saved. */
   askAccount: (reason?: string, then?: () => void) => void;
+  /** Notifications on this device (permission, subscription, settings). */
+  push: ReturnType<typeof usePush>;
 };
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -80,6 +84,17 @@ function jwtExpiry(token: string): number {
 const withoutRequest = (list: FriendRequest[], id: number) => list.filter((r) => r.id !== id);
 const withoutUser = (list: FriendRequest[], userId: number) =>
   list.filter((r) => r.from_user.id !== userId && r.to_user.id !== userId);
+
+/** A few messages sent to friends: a good moment to suggest the app (see lib/install). */
+function countSent() {
+  try {
+    const n = Number(localStorage.getItem("vchat.sent") || 0) + 1;
+    localStorage.setItem("vchat.sent", String(n));
+    if (n === 5) markEngaged();
+  } catch {
+    /* private mode */
+  }
+}
 
 export default function ChatProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -168,6 +183,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         setOutgoing((l) => withoutRequest(l, event.request_id));
         break;
       case "friend_added":
+        markEngaged(); // a good moment to suggest installing the app and notifications
         setFriends((l) => {
           const existing = l.find((f) => f.user.id === event.friend.id);
           if (existing) {
@@ -192,6 +208,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         const m = event.message;
         const mine = m.sender.id === self?.id;
         const partner = mine ? m.recipient_id : m.sender.id;
+        if (mine) countSent();
         if (!mine && !watched.current.has(partner)) {
           setUnread((u) => ({ ...u, [partner]: (u[partner] ?? 0) + 1 }));
         }
@@ -245,6 +262,8 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         if (event.type === "ready") {
           attempt = 0;
           setSocketLive(true);
+          // Is this tab on screen? People looking at vChat get no notifications.
+          ws.send(JSON.stringify({ type: "visible", visible: document.visibilityState === "visible" }));
           resync().catch(() => undefined);
           // Keeps this tab counted as online (the server forgets silent sockets after ~70 s).
           clearInterval(heartbeat);
@@ -432,6 +451,24 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     };
   }, []);
 
+  const push = usePush(getAccess, !!me);
+
+  // Tell the server when this tab goes on or off screen.
+  useEffect(() => {
+    const report = () => sendRaw({ type: "visible", visible: document.visibilityState === "visible" });
+    document.addEventListener("visibilitychange", report);
+    return () => document.removeEventListener("visibilitychange", report);
+  }, [sendRaw]);
+
+  // Unread friend messages: on the app icon (installed app) and in the tab title.
+  const unreadTotal = Object.values(unread).reduce((a, b) => a + b, 0);
+  useEffect(() => {
+    const nav = navigator as Navigator & { setAppBadge?: (n: number) => Promise<void>; clearAppBadge?: () => Promise<void> };
+    (unreadTotal ? nav.setAppBadge?.(unreadTotal) : nav.clearAppBadge?.())?.catch(() => undefined);
+    const base = document.title.replace(/^\(\d+\+?\) /, "");
+    document.title = unreadTotal ? `(${unreadTotal > 99 ? "99+" : unreadTotal}) ${base}` : base;
+  }, [unreadTotal]);
+
   const value = useMemo<ChatContextValue>(
     () => ({
       me,
@@ -454,8 +491,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       premium,
       setPremium,
       askAccount,
+      push,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount, push],
   );
 
   if (banned) {

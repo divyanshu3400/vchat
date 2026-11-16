@@ -120,6 +120,27 @@ export function resetPassword(email: string, code: string, password: string) {
   });
 }
 
+// --- notifications (Web Push) ----------------------------------------------------------
+
+export type PushPrefs = { messages: boolean; requests: boolean; calls: boolean; preview: boolean };
+export type PushInfo = { enabled: boolean; public_key: string; prefs: PushPrefs; devices: number };
+
+export function fetchPush(access: string) {
+  return request<PushInfo>("/api/push", { access });
+}
+
+export function savePushPrefs(prefs: Partial<PushPrefs>, access: string) {
+  return request<{ prefs: PushPrefs }>("/api/push", { method: "PATCH", access, body: JSON.stringify(prefs) });
+}
+
+export function pushSubscribe(sub: PushSubscriptionJSON, access: string) {
+  return request<null>("/api/push/subscribe", { method: "POST", access, body: JSON.stringify(sub) });
+}
+
+export function pushUnsubscribe(endpoint: string, access: string) {
+  return request<null>("/api/push/unsubscribe", { method: "POST", access, body: JSON.stringify({ endpoint }) });
+}
+
 /** The contact page. `website` is a hidden field only bots fill in. */
 export function sendContact(
   input: { topic: string; name: string; email: string; message: string; website: string },

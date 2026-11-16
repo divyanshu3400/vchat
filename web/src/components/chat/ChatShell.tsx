@@ -15,6 +15,7 @@ import ConversationList from "./ConversationList";
 import { DockProvider } from "./Dock";
 import { Icon } from "./bits";
 import StrangerProvider, { useStranger } from "./stranger/StrangerProvider";
+import Nudges from "./nudges/Nudges";
 
 /** Screens reached from the tab bar. Everything else under /chat is a conversation. */
 const TAB_SCREENS = new Set(["/chat", "/chat/rooms", "/chat/stranger", "/chat/inbox", "/chat/me"]);
@@ -207,6 +208,7 @@ function Frame({ children }: { children: React.ReactNode }) {
         {!inConversation && <AdSlot kind="anchor" className="phone-anchor" />}
         {!inConversation && <TabBar pathname={pathname} />}
       </div>
+      <Nudges enabled={!inConversation} />
     </>
   );
 }

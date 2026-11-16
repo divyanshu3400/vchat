@@ -49,6 +49,8 @@ const ICONS: Record<string, string> = {
   expand: "M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7",
   play: "M7 4.5v15l12-7.5z",
   pause: "M8 5v14M16 5v14",
+  bell: "M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0",
+  phoneapp: "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2",
   reply: "M10 8 4 13l6 5M4 13h11a5 5 0 0 1 5 5v1",
   smile: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01",
   copy: "M9 9h10v12H9zM5 15V3h10",

@@ -7,6 +7,7 @@ from apps.chat.realtime import user_group
 from apps.calls.consumer import CallMixin
 from apps.chat.ws_auth import AuthenticatedJsonConsumer
 from apps.stranger.consumer import StrangerMixin
+from apps.push import events as push_events
 from apps.watch.consumer import WatchMixin
 
 from . import services
@@ -31,6 +32,7 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
             await self._announce(online=True)
 
     async def on_leave(self):
+        await database_sync_to_async(presence.set_visible)(self.user.id, self.channel_name, False)
         await self.call_disconnect()
         await self.stranger_disconnect()
         await self.channel_layer.group_discard(user_group(self.user.id), self.channel_name)
@@ -40,6 +42,8 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
 
     async def on_ping(self):
         await database_sync_to_async(presence.ping_user)(self.user.id, self.channel_name)
+        if getattr(self, "_visible", False):
+            await database_sync_to_async(presence.set_visible)(self.user.id, self.channel_name, True)
         await self.stranger_heartbeat()
 
     async def _announce(self, online: bool):
@@ -60,6 +64,10 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
             return await self._dm_change(kind[3:], content)
         if kind == "dm.typing":
             return await self._dm_typing(content.get("to"))
+        if kind == "visible":
+            # {"type": "visible", "visible": bool}: is this tab on screen? Notifications skip people who are looking.
+            self._visible = content.get("visible") is True
+            return await database_sync_to_async(presence.set_visible)(self.user.id, self.channel_name, self._visible)
         if kind != "dm":
             return await self.error("unknown_type", "Unknown message type.")
         client_id = str(content.get("client_id", ""))[:64]
@@ -87,6 +95,10 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
         event = {"type": "user.event", "payload": {"type": "dm", "message": payload, "client_id": client_id}}
         for uid in {self.user.id, recipient_id}:
             await self.channel_layer.group_send(user_group(uid), event)
+        attachment = payload.get("attachment") or {}
+        await database_sync_to_async(push_events.dm_received)(
+            recipient_id, self.user.id, self.user.nickname, payload["content"], attachment.get("kind")
+        )
 
     async def _dm_typing(self, to):
         """{"type": "dm.typing", "to": <friend id>} -> the friend gets {"type": "dm.typing", "user_id"}."""
