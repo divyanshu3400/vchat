@@ -604,22 +604,6 @@ function ChatView({ win }: { win?: WinControls }) {
         )}
       </div>
       <JumpToLatest away={scroll.away} unseen={scroll.unseen} onClick={scroll.jump} />
-      {!ended && (rel === "none" || rel === "incoming") && (
-        <button
-          type="button"
-          className="fab-friend"
-          onClick={async () => {
-            const msg = await addFriend(partner);
-            // Sent or accepted shows as a card in the chat; only problems need a notice.
-            if (!/^(Friend request sent|You and .* are now friends)/.test(msg)) setNotice(msg);
-          }}
-          aria-label={rel === "incoming" ? "Accept their friend request" : "Send a friend request"}
-          title={rel === "incoming" ? "Accept friend request" : "Add friend"}
-        >
-          <Icon name="plus" size={16} />
-          <Icon name="me" size={18} />
-        </button>
-      )}
 
       {unlockPhotos && (
         <UnlockSheet
@@ -688,6 +672,21 @@ function ChatView({ win }: { win?: WinControls }) {
                   <Icon name="shield" size={17} />
                 </button>
                 <span className="strip-gap" />
+                {(rel === "none" || rel === "incoming") && (
+                  <button
+                    type="button"
+                    className="strip-btn friend-btn"
+                    onClick={async () => {
+                      const msg = await addFriend(partner);
+                      // Sent or accepted shows as a card in the chat; only problems need a notice.
+                      if (!/^(Friend request sent|You and .* are now friends)/.test(msg)) setNotice(msg);
+                    }}
+                    aria-label={rel === "incoming" ? "Accept their friend request" : "Send a friend request"}
+                    title={rel === "incoming" ? "Accept friend request" : "Add friend"}
+                  >
+                    <Icon name="plus" size={17} /> <span className="strip-label">{rel === "incoming" ? "Accept" : "Add"}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`strip-btn${photosUnlocked ? "" : " locked-media"}`}
