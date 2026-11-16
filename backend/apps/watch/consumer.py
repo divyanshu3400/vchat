@@ -99,9 +99,7 @@ class WatchMixin:
                 await self.channel_layer.group_send(user_group(uid), {"type": "user.event", "payload": payload})
         else:
             st = chat["stranger"]
-            await self.channel_layer.send(
-                st["partner_channel"], {"type": "stranger.deliver", "session": st["session"], "payload": payload}
-            )
+            await self._to_partner({"type": "stranger.deliver", "session": st["session"], "payload": payload})
             await self.send_json(payload)
 
     async def _w_start(self, chat, content):

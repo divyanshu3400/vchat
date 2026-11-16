@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
+from django.conf import settings
 from django.utils import timezone
 
 
@@ -65,6 +66,8 @@ class User(AbstractUser):
 
     @property
     def is_plus(self) -> bool:
+        if settings.VCHAT.get("FREE_FOR_ALL"):
+            return True  # launch phase: everything is free
         return self.plus_until is not None and self.plus_until > timezone.now()
 
     @classmethod

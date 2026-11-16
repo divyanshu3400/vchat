@@ -225,6 +225,9 @@ VCHAT = {
     "STRANGER_FIND_COOLDOWN": 1,
     # A dropped socket (phone network blip, app switch) can pick its random chat back up this long.
     "STRANGER_RESUME_SECONDS": 25,
+    # Launch phase: every Plus feature is free for everyone and nobody sees ads or prices.
+    # Set FREE_FOR_ALL=0 in .env when payments start.
+    "FREE_FOR_ALL": os.environ.get("FREE_FOR_ALL", "1") == "1",
     # Rewarded ads unlock features (e.g. gender filter). Off in production until an ad network is live.
     "REWARDED_ADS": env_bool("REWARDED_ADS", DEBUG),
     "REWARDS_PER_DAY": 6,

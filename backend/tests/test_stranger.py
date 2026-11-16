@@ -157,25 +157,40 @@ async def test_next_ends_chat_for_both_and_searches_again(no_cooldown):
     await b.disconnect()
 
 
-@pytest.fixture
-def quick_resume(settings):
-    settings.VCHAT = {**settings.VCHAT, "STRANGER_FIND_COOLDOWN": 0, "STRANGER_RESUME_SECONDS": 0.5}
-
-
 async def ended_at(session):
     return (await database_sync_to_async(StrangerSession.objects.get)(id=session)).ended_at
 
 
 @pytestmark_ws
-async def test_a_socket_that_never_comes_back_ends_the_chat(quick_resume):
+async def test_the_chat_waits_while_someone_is_away_even_both(no_cooldown):
     alice, bob, a, b, session = await matched_pair()
     await b.disconnect()
     assert (await a.receive_json_from()) == {"type": "stranger.away", "session": session}
-    assert await ended_at(session) is None  # still waiting for bob
-    assert (await a.receive_json_from(timeout=3)) == {"type": "stranger.ended", "by": "stranger", "session": session}
-    s = await database_sync_to_async(StrangerSession.objects.get)(id=session)
-    assert s.ended_at is not None and s.ended_by_id == bob.id
-    await a.disconnect()
+    # Bob is gone: alice can still write; it's saved for him.
+    await a.send_json_to({"type": "stranger.message", "content": "you there?", "client_id": "c1"})
+    assert (await a.receive_json_from())["message"]["content"] == "you there?"
+    assert await a.receive_nothing(0.5)  # no time limit: nothing ends the chat
+    await a.disconnect()  # now both are away
+    assert await ended_at(session) is None
+
+    # Later, bob opens the app again (no session id needed): the chat and its messages are back.
+    b2 = await me_socket(str(AccessToken.for_user(bob)))
+    await b2.send_json_to({"type": "stranger.resume"})
+    got = await b2.receive_json_from()
+    assert got["type"] == "stranger.resumed" and got["session"] == session
+    assert got["partner"] == {"id": alice.id, "nickname": "Anonymous", "gender": "", "region": "any"}
+    assert got["partner_away"] is True
+    assert [m["content"] for m in got["messages"]] == ["you there?"]
+
+    # Alice comes back too: both are live again.
+    a2 = await me_socket(str(AccessToken.for_user(alice)))
+    await a2.send_json_to({"type": "stranger.resume"})
+    assert (await a2.receive_json_from())["partner_away"] is False
+    assert (await b2.receive_json_from()) == {"type": "stranger.back", "session": session}
+    await b2.send_json_to({"type": "stranger.message", "content": "back!", "client_id": "c2"})
+    assert (await a2.receive_json_from())["message"]["content"] == "back!"
+    await a2.disconnect()
+    await b2.disconnect()
 
 
 @pytestmark_ws
@@ -186,7 +201,8 @@ async def test_a_dropped_socket_picks_the_chat_back_up(no_cooldown):
 
     b2 = await me_socket(str(AccessToken.for_user(bob)))
     await b2.send_json_to({"type": "stranger.resume", "session": session})
-    assert (await b2.receive_json_from()) == {"type": "stranger.resumed", "session": session}
+    resumed = await b2.receive_json_from()
+    assert resumed["type"] == "stranger.resumed" and resumed["session"] == session and resumed["partner_away"] is False
     assert (await a.receive_json_from()) == {"type": "stranger.back", "session": session}
 
     await a.send_json_to({"type": "stranger.message", "content": "welcome back", "client_id": "c1"})
@@ -218,24 +234,35 @@ async def test_a_new_socket_takes_over_from_one_that_hasnt_closed_yet(no_cooldow
 
 
 @pytestmark_ws
-async def test_resuming_too_late_or_someone_elses_chat(quick_resume):
+async def test_resume_only_finds_your_own_open_chat(no_cooldown):
     alice, bob, a, b, session = await matched_pair()
     _, eve_token = await make_user("eve")
     eve = await me_socket(eve_token)
     await eve.send_json_to({"type": "stranger.resume", "session": session})
-    assert (await eve.receive_json_from())["by"] == "connection"
-    await eve.send_json_to({"type": "stranger.resume", "session": "not-a-uuid"})
-    assert (await eve.receive_json_from())["by"] == "connection"
-    assert await ended_at(session) is None  # eve can't end other people's chats
+    assert (await eve.receive_json_from()) == {"type": "stranger.idle"}
+    assert await ended_at(session) is None  # eve can't touch other people's chats
 
-    await b.disconnect()
-    assert (await a.receive_json_from())["type"] == "stranger.away"
-    assert (await a.receive_json_from(timeout=3))["type"] == "stranger.ended"
+    # Ended by Leave: coming back finds nothing.
+    await a.send_json_to({"type": "stranger.leave"})
+    assert (await b.receive_json_from())["by"] == "stranger"
     b2 = await me_socket(str(AccessToken.for_user(bob)))
     await b2.send_json_to({"type": "stranger.resume", "session": session})
-    assert (await b2.receive_json_from()) == {"type": "stranger.ended", "by": "connection", "session": session}
-    for comm in (a, b2, eve):
+    assert (await b2.receive_json_from()) == {"type": "stranger.idle"}
+    for comm in (a, b, b2, eve):
         await comm.disconnect()
+
+
+@pytestmark_ws
+async def test_leave_works_for_a_chat_left_open_before_a_reload(no_cooldown):
+    alice, bob, a, b, session = await matched_pair()
+    await a.disconnect()  # reload: the new page hasn't resumed yet
+    assert (await b.receive_json_from())["type"] == "stranger.away"
+    a2 = await me_socket(str(AccessToken.for_user(alice)))
+    await a2.send_json_to({"type": "stranger.leave"})
+    assert (await b.receive_json_from())["by"] == "stranger"
+    assert await ended_at(session) is not None
+    await a2.disconnect()
+    await b.disconnect()
 
 
 @pytestmark_ws

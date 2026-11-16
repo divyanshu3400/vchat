@@ -131,7 +131,7 @@ function IdleView() {
         <div className="st-field">
           <span className="st-label">
             I want to talk to
-            {premium?.plus ? (
+            {premium?.free_for_all ? null : premium?.plus ? (
               <span className="perk">Plus</span>
             ) : grant && grant.uses_left > 0 ? (
               <span className="perk">{grant.uses_left} filtered chats left</span>
@@ -236,7 +236,7 @@ function ChatView({ win }: { win?: WinControls }) {
   const [contactWarning, setContactWarning] = useState<string | null>(null);
   const warnResolve = useRef<((sent: boolean) => void) | null>(null);
   const { start: startCall } = useCalls();
-  const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, act, typing, shuffleIce } = useStranger();
+  const { phase, partner, session, lines, partnerTyping, partnerAway, endedBy, notice, setNotice, next, leave, send, act, typing, shuffleIce } = useStranger();
   const [replying, setReplying] = useState<Msg | null>(null);
   const [editing, setEditing] = useState<Msg | null>(null);
   const [uploading, setUploading] = useState<number | null>(null);
@@ -445,7 +445,13 @@ function ChatView({ win }: { win?: WinControls }) {
           </>
   );
   // Random chat is anonymous: no name, gender or region, only how the chat is going.
-  const status = ended ? "Chat ended" : partnerTyping ? "typing…" : "Random chat · anonymous";
+  const status = ended
+    ? "Chat ended"
+    : partnerTyping
+      ? "typing…"
+      : partnerAway
+        ? "Away right now · your messages wait"
+        : "Random chat · anonymous";
 
   return (
     <div className={win ? `win st-win${win.minimized ? " min" : ""}` : "conversation st-chat"}>

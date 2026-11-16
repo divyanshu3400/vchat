@@ -45,6 +45,30 @@ def open_partner_id(session_id, user_id: int) -> int | None:
     return s.user_b_id if s.user_a_id == user_id else s.user_a_id
 
 
+def open_session_of(user_id: int) -> tuple[str, int] | None:
+    """This user's random chat that nobody has ended yet: (session id, the other person)."""
+    s = (
+        StrangerSession.objects.filter(Q(user_a_id=user_id) | Q(user_b_id=user_id), ended_at__isnull=True)
+        .order_by("-started_at")
+        .first()
+    )
+    if s is None:
+        return None
+    return str(s.id), (s.user_b_id if s.user_a_id == user_id else s.user_a_id)
+
+
+def history(session_id, limit: int = 200) -> list[dict]:
+    """The latest messages of a random chat, oldest first (to rebuild the chat after a reload)."""
+    select, prefetch = message_ops.related_fields(StrangerMessage)
+    rows = list(
+        StrangerMessage.objects.select_related(*select)
+        .prefetch_related(*prefetch)
+        .filter(session_id=session_id)
+        .order_by("-id")[:limit]
+    )
+    return [message_payload(m) for m in reversed(rows)]
+
+
 def end_session(session_id, ended_by_id: int | None) -> None:
     ended = StrangerSession.objects.filter(id=session_id, ended_at__isnull=True).update(
         ended_at=timezone.now(), ended_by_id=ended_by_id

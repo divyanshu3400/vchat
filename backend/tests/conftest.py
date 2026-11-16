@@ -10,6 +10,12 @@ from apps.stranger import matchmaker
 
 
 @pytest.fixture(autouse=True)
+def _paid_features_on(settings):
+    # Tests check the paid rules; the launch "everything free" switch has its own test.
+    settings.VCHAT = {**settings.VCHAT, "FREE_FOR_ALL": False}
+
+
+@pytest.fixture(autouse=True)
 def _clear_cache():
     # Rate-limit counters and presence live outside the DB; never let them leak between tests.
     cache.clear()

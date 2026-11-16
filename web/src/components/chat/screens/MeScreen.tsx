@@ -90,6 +90,25 @@ export default function MeScreen() {
           )
         )}
 
+        {premium?.free_for_all ? (
+          <section className="plus-card active" id="plus" aria-labelledby="plus-title">
+            <div className="plus-head">
+              <span className="plus-icon">
+                <Icon name="crown" size={24} />
+              </span>
+              <div>
+                <h2 id="plus-title">Everything is free</h2>
+                <p>vChat is new, so every feature is on for everyone: no ads, no payments.</p>
+              </div>
+            </div>
+            <ul className="plus-perks">
+              <li>Women-only or men-only matching</li>
+              <li>Photos with strangers</li>
+              <li>Voice and video calls with friends</li>
+              <li>GIFs, stickers and disappearing photos</li>
+            </ul>
+          </section>
+        ) : (
         <section className={`plus-card${premium?.plus ? " active" : ""}`} id="plus" aria-labelledby="plus-title">
           <div className="plus-head">
             <span className="plus-icon">
@@ -135,6 +154,7 @@ export default function MeScreen() {
             </p>
           )}
         </section>
+        )}
 
         <AppSettings />
 

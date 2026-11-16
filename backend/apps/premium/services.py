@@ -36,6 +36,8 @@ def _active(user: User, kind: str):
 
 def is_plus_now(user: User) -> bool:
     """Reads the database, not the (possibly hours-old) user object a socket holds."""
+    if settings.VCHAT.get("FREE_FOR_ALL"):
+        return True
     return User.objects.filter(pk=user.pk, plus_until__gt=timezone.now()).exists()
 
 
@@ -80,7 +82,9 @@ def status(user: User) -> dict:
         )
     return {
         "plus": user.is_plus,
-        "plus_until": user.plus_until.isoformat() if user.is_plus else None,
+        "plus_until": user.plus_until.isoformat() if user.is_plus and user.plus_until else None,
+        # Launch phase: all features free, no ads, no prices shown.
+        "free_for_all": bool(settings.VCHAT.get("FREE_FOR_ALL")),
         "grants": grants,
         "rewarded_ads": settings.VCHAT["REWARDED_ADS"],
     }

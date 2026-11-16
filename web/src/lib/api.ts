@@ -327,7 +327,7 @@ export type UserEvent =
   | { type: "stranger.idle" }
   | { type: "stranger.away"; session: string }
   | { type: "stranger.back"; session: string }
-  | { type: "stranger.resumed"; session: string }
+  | { type: "stranger.resumed"; session: string; partner: StrangerPartner; partner_away: boolean; messages: StrangerMessage[] }
   | { type: "call.ringing"; call_id: string }
   | { type: "call.incoming"; call_id: string; kind: CallKind; stranger: boolean; from: ChatUser }
   | { type: "call.accepted"; call_id: string }
@@ -377,6 +377,8 @@ export type PremiumStatus = {
   plus_until: string | null;
   grants: Record<RewardKind, { uses_left: number; expires_at: string } | null>;
   rewarded_ads: boolean;
+  /** Launch phase: every feature is free for everyone, no ads, no prices. */
+  free_for_all?: boolean;
 };
 
 export function fetchPremiumStatus(access: string) {

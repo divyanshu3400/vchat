@@ -122,7 +122,9 @@ class CallMixin:
                 return await self.error("no_chat", "You're not chatting with anyone right now.")
             if kind != "voice":
                 return await self.error("call_not_allowed", "Video calls are only for friends.")
-            callee, callee_channel = st["partner_id"], st["partner_channel"]
+            callee, callee_channel = st["partner_id"], st.get("partner_channel")
+            if not callee_channel:
+                return await self.error("call_unavailable", "They're away right now. Try again when they're back.")
         else:
             callee = content.get("to")
             if not isinstance(callee, int) or isinstance(callee, bool) or callee == self.user.id:

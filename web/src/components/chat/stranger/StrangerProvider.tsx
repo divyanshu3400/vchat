@@ -77,6 +77,8 @@ type StrangerValue = {
   session: string | null;
   lines: Line[];
   partnerTyping: boolean;
+  /** Their app is closed or offline: the chat waits for them (until someone ends it). */
+  partnerAway: boolean;
   waiting: number;
   endedBy: EndedBy | null;
   region: string;
@@ -117,6 +119,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   const [session, setSession] = useState<string | null>(null);
   const [lines, setLines] = useState<Line[]>([]);
   const [partnerTyping, setPartnerTyping] = useState(false);
+  const [partnerAway, setPartnerAway] = useState(false);
   const [waiting, setWaiting] = useState(0);
   const [endedBy, setEndedBy] = useState<EndedBy | null>(null);
   const [region, setRegion] = useState("any");
@@ -159,14 +162,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
     sessionRef.current = session;
   }, [phase, session]);
 
-  // Closing the tab ends the chat at once; a dropped connection gets a grace period on the server.
-  useEffect(() => {
-    const onPageHide = (e: PageTransitionEvent) => {
-      if (!e.persisted && phaseRef.current === "chatting") sendRaw({ type: "stranger.leave" });
-    };
-    window.addEventListener("pagehide", onPageHide);
-    return () => window.removeEventListener("pagehide", onPageHide);
-  }, [sendRaw]);
+  // Closing or reloading the page does NOT end a random chat (like y99): it stays open on the
+  // server until someone presses End / Next, and comes back when vChat opens again.
 
   useEffect(
     () =>
@@ -211,6 +208,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             partnerRef.current = event.partner;
             setPartner(event.partner);
             setSession(event.session);
+            setPartnerAway(false);
             setLines([cardLine({ kind: "ice", common: event.common ?? [], question: iceBreaker(event.common ?? []) }, false, (cardSeq.current += 1))]);
             setEndedBy(null);
             setPartnerTyping(false);
@@ -255,20 +253,38 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             setSession(null);
             break;
           case "ready":
-            // The personal socket reconnected: pick the chat back up, or get back in the queue.
-            if (phaseRef.current === "chatting" && sessionRef.current) {
-              sendRaw({ type: "stranger.resume", session: sessionRef.current });
-            } else if (phaseRef.current === "searching") {
-              findRef.current();
-            }
+            // Connected (first load, reload or reconnect): get back into the queue, or pick up an
+            // open random chat (the server knows if there is one).
+            if (phaseRef.current === "searching") findRef.current();
+            else if (phaseRef.current !== "ended") sendRaw({ type: "stranger.resume", session: sessionRef.current ?? undefined });
             break;
-          case "stranger.resumed":
+          case "stranger.resumed": {
+            const self = meRef.current?.id;
+            const same = sessionRef.current === event.session;
+            partnerRef.current = event.partner;
+            setPartner(event.partner);
+            setSession(event.session);
+            setPartnerAway(event.partner_away);
+            setEndedBy(null);
+            setNotice("");
+            // Same chat after a reconnect: keep the cards, add what came meanwhile. After a reload: rebuild it.
+            setLines((l) => {
+              const fresh = event.messages.map((m) => toLine(m, self));
+              if (!same) return fresh;
+              const known = new Map(l.filter((x) => !x.card).map((x) => [x.id, x]));
+              fresh.forEach((m) => known.set(m.id, m));
+              return [...l.filter((x) => x.card), ...[...known.values()].sort((a, b) => a.id - b.id)];
+            });
+            setPhase("chatting");
+            break;
+          }
           case "stranger.back":
+            setPartnerAway(false);
             setNotice("");
             break;
           case "stranger.away":
             setPartnerTyping(false);
-            setNotice("The stranger's connection dropped. Waiting a few seconds for them to come back…");
+            setPartnerAway(true);
             break;
           case "error":
             if (["rate_limited", "no_chat", "locked_photos", "invalid_attachment"].includes(event.code)) setNotice(event.detail);
@@ -371,6 +387,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       session,
       lines,
       partnerTyping,
+      partnerAway,
       waiting,
       endedBy,
       region,
@@ -393,7 +410,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       typing,
       finishInterstitial,
     }),
-    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, socketLive, interstitial, interests, toggleInterest, shuffleIce, start, next, cancel, leave, send, act, typing, finishInterstitial],
+    [phase, partner, session, lines, partnerTyping, partnerAway, waiting, endedBy, region, want, notice, socketLive, interstitial, interests, toggleInterest, shuffleIce, start, next, cancel, leave, send, act, typing, finishInterstitial],
   );
 
   return <StrangerContext.Provider value={value}>{children}</StrangerContext.Provider>;

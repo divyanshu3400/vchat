@@ -114,3 +114,13 @@ async def test_plus_members_filter_for_free(rewards_on):
     assert await database_sync_to_async(RewardGrant.objects.count)() == 0
     assert matchmaker.waiting_count() == 1
     await s.disconnect()
+
+
+@pytest.mark.django_db
+def test_launch_phase_everything_is_free(alice, settings):
+    from apps.premium import services as premium_services
+
+    settings.VCHAT = {**settings.VCHAT, "FREE_FOR_ALL": True}
+    assert alice.is_plus and premium_services.consume(alice, RewardGrant.Kind.RANDOM_PHOTOS)
+    status = auth_client(alice).get("/api/premium/status/").data
+    assert status["plus"] is True and status["free_for_all"] is True and status["plus_until"] is None
