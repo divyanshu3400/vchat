@@ -122,6 +122,7 @@ endif
 
 # --- production: look ---
 status: ## Production check: main pages and the API answer
+	@for i in $$(seq 45); do [ "$$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 $(SITE)/api/health/)" = 200 ] && break; sleep 2; done  # a fresh deploy needs a few seconds
 	@for p in "" chat chat/stranger chat/me api/health/; do printf "  %-16s %s\n" "/$$p" "$$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 $(SITE)/$$p)"; done
 	@echo "  /api/gifs/ without login -> $$(curl -s -o /dev/null -w '%{http_code}' $(SITE)/api/gifs/) (401 is right)"
 
