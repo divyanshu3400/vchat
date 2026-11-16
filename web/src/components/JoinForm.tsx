@@ -7,6 +7,13 @@ import { ApiError, fetchPremiumStatus, guestSignup, refreshSession, type ChatUse
 import { setPlus } from "@/lib/plus";
 import { findRoom } from "@/lib/rooms";
 
+// value, label, icon path (male ♂ / female ♀ symbols)
+const GENDERS: [string, string, string][] = [
+  ["M", "Male", "M10 20a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM14.5 9.5 20 4M15 4h5v5"],
+  ["F", "Female", "M12 14a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zM12 14v7M9 18h6"],
+  ["O", "Other", ""],
+];
+
 export default function JoinForm() {
   const router = useRouter();
   const [nickname, setNickname] = useState("");
@@ -95,11 +102,7 @@ export default function JoinForm() {
           onChange={(e) => setNickname(e.target.value)}
         />
         <fieldset className="gender" aria-label="I am">
-          {[
-            ["M", "M"],
-            ["F", "F"],
-            ["O", "Other"],
-          ].map(([value, label]) => (
+          {GENDERS.map(([value, label, icon]) => (
             <label key={value}>
               <input
                 type="radio"
@@ -109,7 +112,14 @@ export default function JoinForm() {
                 checked={gender === value}
                 onChange={() => setGender(value)}
               />
-              <span>{label}</span>
+              <span>
+                {icon && (
+                  <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d={icon} />
+                  </svg>
+                )}
+                {label}
+              </span>
             </label>
           ))}
         </fieldset>
