@@ -22,6 +22,7 @@ import { useStranger, type FriendCard, type IceCard } from "../stranger/Stranger
 import { useDock } from "../Dock";
 import Dropdown, { DropItem, DropSep } from "../Dropdown";
 import { looksLikeContact } from "../messages/richText";
+import FadeAway from "../FadeAway";
 
 
 /** How the other person in a random chat is shown: never their real name. */
@@ -229,6 +230,8 @@ function ChatView({ win }: { win?: WinControls }) {
   const rel = partner ? relation(partner.id) : "none";
   const scroll = useStickyScroll(listRef, lines.length, [partnerTyping, ended, uploading !== null]);
 
+  // Anyone wrote something (not just the system cards): the intro and opener can go.
+  const hasText = lines.some((l) => !l.card);
   const items = useMemo<Msg[]>(
     () =>
       lines.map((l) => ({
@@ -431,7 +434,10 @@ function ChatView({ win }: { win?: WinControls }) {
         />
       )}
       <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
-        <p className="sys-line">You&apos;re chatting with someone anonymous. Neither of you can see the other&apos;s name. Say hi!</p>
+        {/* The intro and the opener are for an empty chat: they fold away once anyone writes. */}
+        <FadeAway key={session ?? "none"} show={!hasText}>
+          <p className="sys-line">You&apos;re chatting with someone anonymous. Neither of you can see the other&apos;s name. Say hi!</p>
+        </FadeAway>
         {/* Strangers' photos and videos open only if you choose; their links ask first. When the chat
             ends, the messages are gone from the screen (friends keep them in their friend chat). */}
         {!ended && (
@@ -448,6 +454,7 @@ function ChatView({ win }: { win?: WinControls }) {
             const any = m.card as FriendCard | IceCard;
             if (any.kind === "ice") {
               return (
+                <FadeAway key={`${session}-${m.id}`} show={!hasText}>
                 <div className="ice-card">
                   {any.common.length > 0 ? (
                     <span className="ice-common">
@@ -468,6 +475,7 @@ function ChatView({ win }: { win?: WinControls }) {
                     </span>
                   )}
                 </div>
+                </FadeAway>
               );
             }
             const card = any;
@@ -497,11 +505,14 @@ function ChatView({ win }: { win?: WinControls }) {
               );
             if (card.kind === "friends")
               return (
-                <div className="friend-card done">
-                  <span className="friend-card-icon">🎉</span>
-                  <b>You&apos;re friends now</b>
-                  <small>You can see each other&apos;s names in Chats, and this chat is saved there.</small>
-                </div>
+                // Good news, said once: it leaves after 3 seconds.
+                <FadeAway after={3000}>
+                  <div className="friend-card done">
+                    <span className="friend-card-icon">🎉</span>
+                    <b>You&apos;re friends now</b>
+                    <small>You can see each other&apos;s names in Chats, and this chat is saved there.</small>
+                  </div>
+                </FadeAway>
               );
             return (
               <div className="friend-card muted">
