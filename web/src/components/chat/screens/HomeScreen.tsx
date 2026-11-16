@@ -15,6 +15,14 @@ import { useStranger } from "../stranger/StrangerProvider";
 const fmt = new Intl.NumberFormat("en-US");
 const noSubscribe = () => () => undefined;
 
+function deletionCancelled() {
+  try {
+    return sessionStorage.getItem("vchat.deletionCancelled") === "1";
+  } catch {
+    return false;
+  }
+}
+
 function greeting() {
   const h = new Date().getHours();
   return h < 5 ? "Up late" : h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
@@ -36,6 +44,9 @@ export default function HomeScreen() {
   const [q, setQ] = useState("");
   // The visitor's own clock, not the server's.
   const greet = useSyncExternalStore(noSubscribe, greeting, () => "Hi");
+  // Logged in during the 15 days after asking for deletion: the deletion was cancelled.
+  const comeBack = useSyncExternalStore(noSubscribe, deletionCancelled, () => false);
+  const [hideComeBack, setHideComeBack] = useState(false);
   const online = friends.filter((f) => f.online);
   const here = (slug: string) => presence?.rooms[slug] ?? 0;
   const query = q.trim().toLowerCase();
@@ -58,6 +69,30 @@ export default function HomeScreen() {
       />
       <div className="page-scroll">
         <div className="home-wrap">
+          {comeBack && !hideComeBack && (
+            <section className="home-banner welcome-back" role="status">
+              <Icon name="check" size={20} />
+              <p>
+                <b>Welcome back{me ? `, ${me.nickname}` : ""}!</b> Your account deletion was cancelled. Everything is just as you
+                left it.
+              </p>
+              <button
+                type="button"
+                className="pill-btn"
+                onClick={() => {
+                  try {
+                    sessionStorage.removeItem("vchat.deletionCancelled");
+                  } catch {
+                    /* nothing to clear */
+                  }
+                  setHideComeBack(true);
+                }}
+              >
+                OK
+              </button>
+            </section>
+          )}
+
           {me?.is_guest !== false && me && (
             <section className="home-banner" aria-label="Save your account">
               <Icon name="lock" size={20} />

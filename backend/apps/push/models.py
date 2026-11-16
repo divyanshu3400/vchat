@@ -31,8 +31,10 @@ class NotificationPrefs(models.Model):
     calls = models.BooleanField(default=True)
     # False: "New message from Asha" without the text.
     preview = models.BooleanField(default=True)
+    # Emails about the account itself (e.g. a deletion was scheduled). Off unless turned on.
+    email = models.BooleanField(default=False)
 
-    FIELDS = ("messages", "requests", "calls", "preview")
+    FIELDS = ("messages", "requests", "calls", "preview", "email")
 
     @classmethod
     def of(cls, user_id: int) -> "NotificationPrefs":

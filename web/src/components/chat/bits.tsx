@@ -9,6 +9,9 @@ function colourFor(name: string) {
   return AVATAR_COLOURS[h % AVATAR_COLOURS.length];
 }
 
+/** How a deactivated or deleted account is shown (the server sends this name). */
+export const GONE_NAME = "vChat user";
+
 export function Avatar({
   name,
   size = 40,
@@ -22,7 +25,8 @@ export function Avatar({
   return (
     <span
       className="avatar"
-      style={{ width: size, height: size, background: colourFor(name), fontSize: Math.round(size * 0.4) }}
+      // "vChat user" is a closed account: a plain grey circle.
+      style={{ width: size, height: size, background: name === GONE_NAME ? "var(--line)" : colourFor(name), fontSize: Math.round(size * 0.4) }}
       aria-hidden="true"
     >
       {name.replace(/[^a-z0-9]/gi, "")[0]?.toUpperCase() ?? "?"}
@@ -70,6 +74,10 @@ const ICONS: Record<string, string> = {
   shield: "M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6zM9 12l2 2 4-4",
   eye: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
   timer: "M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2.5 2M9 2h6",
+  ban: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM5.6 5.6l12.8 12.8",
+  userminus: "M10 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM3 21a7 7 0 0 1 14 0M16 11h6",
+  flag: "M5 21V4M5 4h11l-2 4 2 4H5",
+  exit: "M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10",
 };
 
 export function Icon({ name, size = 20 }: { name: keyof typeof ICONS | string; size?: number }) {

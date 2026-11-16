@@ -3,6 +3,8 @@ export type ChatUser = {
   nickname: string;
   gender: string;
   is_guest?: boolean;
+  /** Deactivated or deleted: shown as "vChat user", messages as "********". */
+  inactive?: boolean;
   /** Only ever present for yourself. */
   email?: string;
 };
@@ -105,8 +107,17 @@ export function verifyAccount(email: string, code: string, access: string) {
   });
 }
 
+/** Deactivate (log in to come back) or delete (saved: after 15 days; guests: now). Signs out. */
+export function closeAccount(kind: "deactivate" | "delete", body: { password?: string; confirm?: string }, access: string) {
+  return request<{ deactivated?: boolean; deleted?: boolean; delete_after?: string }>(`/api/auth/account/${kind}`, {
+    method: "POST",
+    access,
+    body: JSON.stringify(body),
+  });
+}
+
 export function login(email: string, password: string) {
-  return request<Session>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+  return request<Session & { deletion_cancelled?: boolean }>("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
 }
 
 export function forgotPassword(email: string) {
@@ -122,7 +133,7 @@ export function resetPassword(email: string, code: string, password: string) {
 
 // --- notifications (Web Push) ----------------------------------------------------------
 
-export type PushPrefs = { messages: boolean; requests: boolean; calls: boolean; preview: boolean };
+export type PushPrefs = { messages: boolean; requests: boolean; calls: boolean; preview: boolean; email: boolean };
 export type PushInfo = { enabled: boolean; public_key: string; prefs: PushPrefs; devices: number };
 
 export function fetchPush(access: string) {

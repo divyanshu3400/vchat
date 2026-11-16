@@ -8,6 +8,8 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts.closing import GONE_NAME, MASK, is_gone
+
 from .services import InvalidMessage, clean_content
 
 KIND_LABEL = {"image": "📷 Photo", "video": "🎬 Video", "audio": "🎤 Voice message"}
@@ -49,10 +51,12 @@ def reply_preview(message) -> dict | None:
     else:
         text = target.content[:REPLY_PREVIEW_CHARS] or KIND_LABEL.get(attachment.kind if attachment else "", "")
         kind = attachment.kind if attachment else None
+        if is_gone(target.sender):
+            text, kind = MASK, None
     return {
         "id": target.id,
         "sender_id": target.sender_id,
-        "nickname": target.sender.nickname,
+        "nickname": GONE_NAME if is_gone(target.sender) else target.sender.nickname,
         "text": text,
         "kind": kind,
         "deleted": target.deleted_at is not None,
@@ -78,7 +82,14 @@ def extras(message) -> dict:
 
 
 def visible_content(message) -> str:
-    return "" if message.deleted_at else message.content
+    """Deleted: nothing. From a deactivated or deleted account: "********" (the text is kept)."""
+    if message.deleted_at:
+        return ""
+    return MASK if is_gone(message.sender) else message.content
+
+
+def hides_attachment(message) -> bool:
+    return message.deleted_at is not None or is_gone(message.sender)
 
 
 # --- writing ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import F
+from django.db.models import F, Q
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from . import email_auth, moderation
+from . import closing, email_auth, moderation
 from .email_auth import AccountError
 from .models import EmailCode, User
 from .serializers import (
@@ -134,6 +134,59 @@ class MeView(APIView):
         return Response(MeSerializer(request.user).data)
 
 
+def _loginable(email: str):
+    """Active, or deactivated by its owner (log in to come back). Never erased or admin-disabled."""
+    return (
+        User.objects.filter(email__iexact=email, is_guest=False, deleted_at__isnull=True)
+        .filter(Q(is_active=True) | Q(deactivated_at__isnull=False))
+        .first()
+    )
+
+
+def _signed_out(payload: dict) -> Response:
+    response = Response(payload)
+    response.delete_cookie(settings.VCHAT["REFRESH_COOKIE"], path=COOKIE_PATH)
+    return response
+
+
+class DeactivateView(APIView):
+    """Saved accounts: password, then signed out everywhere. Logging in again brings it back."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
+
+    def post(self, request):
+        user = request.user
+        if user.is_guest:
+            return Response(
+                {"code": "guest", "detail": "Guest accounts can't be deactivated: you couldn't log back in. Save your account first, or delete it."},
+                status=400,
+            )
+        if not user.check_password(str(request.data.get("password", ""))):
+            return Response({"code": "wrong_password", "detail": "That password isn't right."}, status=400)
+        closing.deactivate(user)
+        return _signed_out({"deactivated": True})
+
+
+class DeleteAccountView(APIView):
+    """Saved accounts: deactivated now, deleted after 15 days unless they log in. Guests: deleted now."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "login"
+
+    def post(self, request):
+        user = request.user
+        if request.data.get("confirm") != "DELETE":
+            return Response({"code": "confirm", "detail": "Type DELETE to confirm."}, status=400)
+        if user.is_guest:
+            closing.erase(user)
+            return _signed_out({"deleted": True})
+        if not user.check_password(str(request.data.get("password", ""))):
+            return Response({"code": "wrong_password", "detail": "That password isn't right."}, status=400)
+        closing.deactivate(user, delete=True)
+        return _signed_out({"delete_after": user.delete_after.isoformat()})
+
+
 # --- email accounts ------------------------------------------------------------------
 
 
@@ -199,10 +252,17 @@ class LoginView(APIView):
     def post(self, request):
         s = EmailPasswordSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        user = User.objects.filter(email__iexact=s.validated_data["email"], is_guest=False, is_active=True).first()
+        user = _loginable(s.validated_data["email"])
         if user is None or not user.check_password(s.validated_data["password"]):
             return Response({"code": "wrong_login", "detail": "Wrong email or password."}, status=400)
-        return _start_session(user, request)
+        if user.is_banned:
+            return _start_session(user, request)  # the ban answer; a banned account stays as it is
+        # Deactivated (or waiting to be deleted): logging in brings the account back.
+        cancelled = closing.reactivate(user)
+        response = _start_session(user, request)
+        if cancelled:
+            response.data["deletion_cancelled"] = True
+        return response
 
 
 class ForgotPasswordView(APIView):
@@ -221,7 +281,7 @@ class ForgotPasswordView(APIView):
         except AccountError as exc:
             return _account_error(exc)
         email = s.validated_data["email"]
-        user = User.objects.filter(email__iexact=email, is_guest=False, is_active=True).first()
+        user = _loginable(email)
         if user is not None:
             try:
                 email_auth.send_code(email, EmailCode.Purpose.RESET, user)

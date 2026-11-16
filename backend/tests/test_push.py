@@ -89,7 +89,7 @@ async def test_settings_switch_off_or_hide_the_text(sent):
     await make_friends(alice, bob)
     await subscribe(bob)
     res = await database_sync_to_async(auth_client(bob).patch)("/api/push/", {"preview": False}, format="json")
-    assert res.data["prefs"] == {"messages": True, "requests": True, "calls": True, "preview": False}
+    assert res.data["prefs"] == {"messages": True, "requests": True, "calls": True, "preview": False, "email": False}
     a = await personal_socket(a_token)
     await a.send_json_to({"type": "dm", "to": bob.id, "content": "secret stuff", "client_id": "1"})
     await next_event(a)

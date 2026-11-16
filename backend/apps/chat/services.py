@@ -3,6 +3,8 @@
 from django.conf import settings
 from django.core.cache import cache
 
+from apps.accounts.closing import public_user
+
 from .models import Block, Message, Room
 
 
@@ -57,7 +59,7 @@ def message_payload(message: Message) -> dict:
     return {
         "id": message.id,
         "room": message.room.slug,
-        "sender": {"id": sender.id, "nickname": sender.nickname, "gender": sender.gender},
+        "sender": public_user(sender),
         "content": message_ops.visible_content(message),
         "content_type": message.content_type,
         "created_at": message.created_at.isoformat(),

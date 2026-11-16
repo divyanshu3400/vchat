@@ -7,6 +7,7 @@
   view-once / timed media .................. hidden copy for reports: 30 days, even if its message is gone
   reports, contact messages ................ 2 years
   email codes .............................. 2 days; expired ban marks ........ 30 days
+  accounts asked to be deleted ............. erased 15 days later, unless they logged in again
 """
 
 from datetime import timedelta
@@ -15,7 +16,8 @@ from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.accounts.models import BanMark, EmailCode
+from apps.accounts import closing
+from apps.accounts.models import BanMark, EmailCode, User
 from apps.chat.models import Message, Report
 from apps.media.models import Attachment
 from apps.social.models import Conversation, DirectMessage
@@ -88,6 +90,11 @@ class Command(BaseCommand):
                 a.file.delete(save=False)
                 Attachment.objects.filter(pk=a.pk).update(file="")
         self.report("disappearing media files", count)
+
+        if dry_run:
+            self.report("accounts", User.objects.filter(delete_after__lte=now, deleted_at__isnull=True).count())
+        else:
+            self.report("accounts", closing.erase_due(now))
 
         self.purge("email codes", EmailCode.objects.filter(created_at__lt=now - timedelta(days=2)))
         self.purge("expired ban marks", BanMark.objects.filter(until__lt=now - timedelta(days=30)))

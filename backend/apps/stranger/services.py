@@ -140,13 +140,12 @@ def load_message(session_id, message_id) -> StrangerMessage | None:
 
 
 def message_payload(message: StrangerMessage) -> dict:
-    deleted = message.deleted_at is not None
     return {
         "id": message.id,
         "session": str(message.session_id),
         "sender_id": message.sender_id,
         "content": message_ops.visible_content(message),
-        "attachment": None if deleted else media.payload(message.attachment),
+        "attachment": None if message_ops.hides_attachment(message) else media.payload(message.attachment),
         "created_at": message.created_at.isoformat(),
         **message_ops.extras(message),
     }

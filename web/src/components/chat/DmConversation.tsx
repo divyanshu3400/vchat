@@ -22,6 +22,7 @@ import { WatchPanel, WatchStartSheet, useWatch } from "./watch/WatchTogether";
 import { useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
 import { Avatar, Icon } from "./bits";
+import Dropdown, { DropItem, DropSep } from "./Dropdown";
 
 function merge(prev: DirectMessage[], incoming: DirectMessage[]) {
   const byId = new Map(prev.map((m) => [m.id, m]));
@@ -78,7 +79,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const [watchSheet, setWatchSheet] = useState(false);
   const watch = useWatch({ kind: "dm", with: userId });
   const rel = relation(userId);
-  const isFriend = rel === "friend";
+  // A deactivated or deleted account: the old chat stays readable (as "********"), nothing can be sent.
+  const gone = !!partner?.inactive;
+  const isFriend = rel === "friend" && !gone;
   const partnerOnline = friends.some((f) => f.user.id === userId && f.online);
   const { start: startCall } = useCalls();
   const isWindow = variant === "window";
@@ -261,7 +264,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   }
 
   const name = partner?.nickname ?? "…";
-  const status = !socketLive
+  const status = gone
+    ? "Account not active"
+    : !socketLive
     ? "Reconnecting…"
     : !isFriend
       ? "Not friends"
@@ -289,40 +294,42 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   }
 
   const menu = (
-    <div className="menu-wrap">
-      <button type="button" className="icon-btn" aria-label="More" aria-expanded={menuOpen} onClick={() => setMenuOpen((o) => !o)}>
-        <Icon name="more" />
-      </button>
-      {menuOpen && (
-        <div className="menu" role="menu">
-          {isFriend && (
-            <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); setWatchSheet(true); }}>
-              Watch YouTube together
-            </button>
-          )}
-          {isFriend && (
-            <div className="menu-group" role="group" aria-label="Delete messages after">
-              <span className="menu-label">Delete messages after</span>
-              <div className="menu-chips">
-                {AUTO_DELETE_DAYS.map((d) => (
-                  <button key={d} type="button" className={d === autoDelete ? "on" : ""} aria-pressed={d === autoDelete} onClick={() => chooseAutoDelete(d)}>
-                    {AUTO_DELETE_SHORT[d]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {isFriend && (
-            <button type="button" role="menuitem" onClick={() => setConfirming("unfriend")}>
-              Remove friend
-            </button>
-          )}
-          <button type="button" role="menuitem" className="danger" onClick={() => setConfirming("block")}>
-            Block
-          </button>
+    <Dropdown open={menuOpen} onToggle={() => setMenuOpen((o) => !o)} onClose={() => setMenuOpen(false)} label="More">
+      {isFriend && (
+        <DropItem icon="play" tone="red" hint="Play a video for both of you" onClick={() => { setMenuOpen(false); setWatchSheet(true); }}>
+          Watch YouTube together
+        </DropItem>
+      )}
+      {isFriend && (
+        <div className="dd-group" role="group" aria-label="Delete messages after">
+          <span className="dd-group-head">
+            <span className="dd-ic tone-amber" aria-hidden="true">
+              <Icon name="timer" size={18} />
+            </span>
+            <span className="dd-text">
+              <b>Disappearing messages</b>
+              <small>Delete messages after</small>
+            </span>
+          </span>
+          <span className="dd-seg">
+            {AUTO_DELETE_DAYS.map((d) => (
+              <button key={d} type="button" className={d === autoDelete ? "on" : ""} aria-pressed={d === autoDelete} onClick={() => chooseAutoDelete(d)}>
+                {AUTO_DELETE_SHORT[d]}
+              </button>
+            ))}
+          </span>
         </div>
       )}
-    </div>
+      <DropSep />
+      {isFriend && (
+        <DropItem icon="userminus" tone="muted" onClick={() => { setMenuOpen(false); setConfirming("unfriend"); }}>
+          Remove friend
+        </DropItem>
+      )}
+      <DropItem icon="ban" tone="danger" onClick={() => { setMenuOpen(false); setConfirming("block"); }}>
+        Block
+      </DropItem>
+    </Dropdown>
   );
 
   const callButtons = isFriend && partner && (
@@ -337,7 +344,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   );
 
   const header = isWindow ? (
-    <header className="win-head" onClick={(e) => !(e.target as HTMLElement).closest("button") && onToggleMin?.()}>
+    <header className="win-head" onClick={(e) => !(e.target as HTMLElement).closest("button, .dd") && onToggleMin?.()}>
       <Avatar name={name} size={34} online={isFriend ? partnerOnline : undefined} />
       <div className="win-title">
         <b>{name}</b>
@@ -512,7 +519,8 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                 {notice}
               </p>
             )}
-            {!isFriend && partner && (
+            {gone && <p className="chat-notice">This account isn&apos;t active. You can&apos;t message or call it.</p>}
+            {!gone && !isFriend && partner && (
               <p className="chat-notice">
                 You can only message friends.{" "}
                 {rel === "requested" ? (

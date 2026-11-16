@@ -10,6 +10,8 @@ urlpatterns = [
     path("account/start/", views.AccountStartView.as_view(), name="account-start"),
     path("account/verify/", views.AccountVerifyView.as_view(), name="account-verify"),
     path("login/", views.LoginView.as_view(), name="login"),
+    path("account/deactivate/", views.DeactivateView.as_view(), name="account-deactivate"),
+    path("account/delete/", views.DeleteAccountView.as_view(), name="account-delete"),
     path("password/forgot/", views.ForgotPasswordView.as_view(), name="password-forgot"),
     path("password/reset/", views.ResetPasswordView.as_view(), name="password-reset"),
 ]

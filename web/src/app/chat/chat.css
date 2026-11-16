@@ -873,3 +873,49 @@ button.head-who:active { background: var(--surface-2); }
 /* --- voice: play twice ------------------------------------------------------------------ */
 .twice-btn { appearance: none; flex: none; height: 30px; min-width: 38px; padding: 0 8px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; color: var(--muted); background: transparent; border: 1px dashed var(--line); }
 .twice-btn.on { color: var(--on-brand); background: var(--brand); border: 1px solid var(--brand); }
+
+/* --- chat "⋯" menu: icons, colour, animated open and close ------------------------------- */
+.icon-btn.pressed { background: var(--brand-soft); color: var(--brand); }
+.dd { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: min(288px, calc(100vw - 24px)); display: grid; gap: 2px; padding: 8px; border-radius: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 22px 50px -18px rgba(6, 30, 18, 0.38), 0 4px 12px -6px rgba(6, 30, 18, 0.18); transform-origin: top right; opacity: 0; visibility: hidden; transform: translateY(-6px) scale(0.92); transition: opacity 0.16s ease, transform 0.2s cubic-bezier(0.2, 0.9, 0.3, 1.2), visibility 0s linear 0.2s; text-align: left; }
+.dd.open { opacity: 1; visibility: visible; transform: none; transition: opacity 0.16s ease, transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2), visibility 0s; }
+.dd-item { appearance: none; border: 0; background: transparent; color: var(--fg); font: inherit; display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px; border-radius: 14px; cursor: pointer; text-align: left; transition: background 0.12s; }
+.dd-item:hover, .dd-item:focus-visible { background: var(--surface-2); outline: none; }
+.dd-item:active { transform: scale(0.98); }
+.dd-ic { width: 36px; height: 36px; flex: none; border-radius: 12px; display: grid; place-items: center; }
+.dd-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.dd-text b { font-size: 14.5px; font-weight: 700; }
+.dd-text small { font-size: 12px; color: var(--muted); }
+.tone-brand .dd-ic, .dd-ic.tone-brand { background: var(--brand-soft); color: var(--brand); }
+.tone-red .dd-ic, .dd-ic.tone-red { background: color-mix(in srgb, #e62117 12%, var(--surface)); color: #e62117; }
+.tone-amber .dd-ic, .dd-ic.tone-amber { background: color-mix(in srgb, var(--amber) 15%, var(--surface)); color: var(--amber); }
+.tone-blue .dd-ic, .dd-ic.tone-blue { background: color-mix(in srgb, #2f7de1 13%, var(--surface)); color: #2f7de1; }
+.tone-muted .dd-ic, .dd-ic.tone-muted { background: var(--surface-2); color: var(--muted); }
+.tone-danger .dd-ic, .dd-ic.tone-danger { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); }
+.dd-item.tone-danger b { color: var(--danger); }
+.dd-sep { height: 1px; margin: 4px 8px; background: var(--line); }
+.dd-group { display: grid; gap: 8px; padding: 8px; }
+.dd-group-head { display: flex; align-items: center; gap: 12px; }
+.dd-seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface-2); }
+.dd-seg button { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 800; padding: 7px 0; border-radius: 9px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.dd-seg button.on { background: var(--surface); color: var(--brand); box-shadow: 0 1px 3px rgba(6, 30, 18, 0.15); }
+.dd-back { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px 8px; cursor: pointer; text-transform: uppercase; }
+.dd-back svg { transform: none; }
+@media (prefers-reduced-motion: reduce) { .dd, .dd.open { transition: none; } }
+
+/* --- closing your account ------------------------------------------------------------------ */
+.account-close .danger-row b { color: var(--danger); }
+.account-close .danger-row svg { color: var(--danger); }
+.account-close button.setting { appearance: none; width: 100%; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.close-sheet { gap: 14px; }
+.close-icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; background: var(--surface-2); color: var(--fg); }
+.close-icon.danger { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); }
+.close-points { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45; color: var(--fg); }
+.close-points li::marker { color: var(--muted); }
+.close-sheet .field { width: 100%; min-width: 0; background: var(--bg); border: 1px solid var(--line); color: var(--fg); font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 14px; outline: none; }
+.close-sheet .field:focus { border-color: var(--brand); }
+.close-type { display: grid; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 700; }
+.close-type b { color: var(--danger); letter-spacing: 0.06em; }
+.close-error { margin: 0; color: var(--danger); font-size: 13px; font-weight: 700; }
+.close-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.pill-btn.danger:disabled { opacity: 0.45; cursor: not-allowed; }
+.welcome-back { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); }

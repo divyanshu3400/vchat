@@ -34,7 +34,14 @@ export default function LoginForm() {
     e.preventDefault();
     if (!email.trim() || !password) return setError("Enter your email and password.");
     run(async () => {
-      await login(email.trim(), password);
+      const res = await login(email.trim(), password);
+      if (res.deletion_cancelled) {
+        try {
+          sessionStorage.setItem("vchat.deletionCancelled", "1");
+        } catch {
+          /* private mode: no banner */
+        }
+      }
       router.push("/chat");
     });
   }

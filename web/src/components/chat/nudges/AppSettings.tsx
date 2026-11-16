@@ -9,7 +9,7 @@ import { inAppAlertsOn, setInAppAlerts } from "./MessageBanner";
 
 /** Me screen: install the app, and everything about notifications on this device. */
 export default function AppSettings() {
-  const { push } = useChat();
+  const { push, me } = useChat();
   const { info, canPrompt, prompt } = useInstall();
   const [guide, setGuide] = useState(false);
   const [alerts, setAlerts] = useState(() => (typeof window === "undefined" ? true : inAppAlertsOn()));
@@ -105,6 +105,16 @@ export default function AppSettings() {
             </p>
           )}
         </>
+      )}
+
+      {me?.email && prefs && (
+        <label className="setting">
+          <span>
+            <b>Email notifications</b>
+            <small>Emails to {me.email} about your account, like a scheduled deletion</small>
+          </span>
+          <input type="checkbox" className="switch" checked={prefs.email} onChange={(e) => push.setPrefs({ email: e.target.checked })} />
+        </label>
       )}
 
       <label className="setting">

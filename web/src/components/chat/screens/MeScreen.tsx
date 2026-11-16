@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
+import CloseAccountSheet from "@/components/account/CloseAccountSheet";
 import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
@@ -14,7 +15,8 @@ const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
 export default function MeScreen() {
   const router = useRouter();
-  const { me, friends, premium, askAccount } = useChat();
+  const { me, friends, premium, askAccount, getAccess } = useChat();
+  const [closing, setClosing] = useState<"deactivate" | "delete" | null>(null);
   const guest = me?.is_guest !== false;
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -173,6 +175,41 @@ export default function MeScreen() {
             </div>
           )}
         </section>
+
+        {me && (
+          <section className="settings account-close" aria-labelledby="close-title-h">
+            <h2 id="close-title-h" className="settings-title">
+              Close your account
+            </h2>
+            {!guest && (
+              <button type="button" className="setting link" onClick={() => setClosing("deactivate")}>
+                <span>
+                  <b>Deactivate account</b>
+                  <small>Take a break. Log in again any time to come back.</small>
+                </span>
+                <Icon name="lock" size={18} />
+              </button>
+            )}
+            <button type="button" className="setting link danger-row" onClick={() => setClosing("delete")}>
+              <span>
+                <b>Delete account</b>
+                <small>{guest ? "Deleted right away. Guest accounts can't be recovered." : "Deleted after 15 days. Log in before then to cancel."}</small>
+              </span>
+              <Icon name="trash" size={18} />
+            </button>
+          </section>
+        )}
+        {closing && me && (
+          <CloseAccountSheet
+            kind={closing}
+            guest={guest}
+            nickname={me.nickname}
+            getAccess={getAccess}
+            onClose={() => setClosing(null)}
+            // Signed out by the server: start over on the front page.
+            onDone={() => window.location.replace("/")}
+          />
+        )}
       </div>
     </div>
   );

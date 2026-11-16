@@ -38,6 +38,11 @@ class AuthenticatedJsonConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(moderation.account_group(self.user.id), self.channel_name)
             await self.on_leave()
 
+    async def account_closed(self, event):
+        """The account was deactivated or deleted: this device is signed out."""
+        await self.error("account_closed", "This account was closed.")
+        await self.close(code=CLOSE_UNAUTHORIZED)
+
     async def account_banned(self, event):
         user = await database_sync_to_async(User.objects.get)(pk=self.user.pk)
         await self.send_json({"type": "error", **moderation.ban_payload(user), "client_id": ""})

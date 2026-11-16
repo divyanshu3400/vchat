@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
@@ -95,7 +96,8 @@ class ConversationListView(APIView):
 
 class DmMessagesView(APIView):
     def get(self, request, user_id):
-        partner = get_object_or_404(User, id=user_id, is_active=True)
+        # A closed account's old chat stays readable (shown as "vChat user" / "********").
+        partner = get_object_or_404(User.objects.filter(Q(is_active=True) | Q(deactivated_at__isnull=False)), id=user_id)
         if partner.id == request.user.id or services.is_blocked_between(request.user.id, partner.id):
             return Response(status=status.HTTP_404_NOT_FOUND)
         limit = min(_int_param(request.query_params.get("limit", 50), "limit"), settings.VCHAT["HISTORY_PAGE_MAX"])

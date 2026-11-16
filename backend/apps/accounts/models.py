@@ -35,6 +35,14 @@ class User(AbstractUser):
     device_hash = models.CharField(max_length=64, blank=True, db_index=True)
     last_ip_hash = models.CharField(max_length=64, blank=True)
 
+    # --- closing the account (apps/accounts/closing.py) ---
+    # Set while deactivated (is_active is False then): others see "vChat user" and "********".
+    deactivated_at = models.DateTimeField(null=True, blank=True)
+    # Deletion asked for: erased after this moment unless the person logs in before it.
+    delete_after = models.DateTimeField(null=True, blank=True, db_index=True)
+    # Erased: no email, password or name any more. The row stays so old messages keep their place.
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         constraints = [
             # One account per email, whatever the capitals. Guests have no email.

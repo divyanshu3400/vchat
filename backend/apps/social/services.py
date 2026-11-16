@@ -9,6 +9,7 @@ from django.utils import timezone
 
 from django.core.exceptions import ValidationError
 
+from apps.accounts import closing
 from apps.accounts.models import User
 from apps.chat import message_ops, presence
 from apps.media import services as media
@@ -29,7 +30,8 @@ class SocialError(Exception):
 
 
 def brief(user: User) -> dict:
-    return {"id": user.id, "nickname": user.nickname, "gender": user.gender}
+    # A deactivated or deleted account shows as "vChat user".
+    return closing.public_user(user)
 
 
 def request_payload(req: FriendRequest) -> dict:
@@ -42,14 +44,13 @@ def request_payload(req: FriendRequest) -> dict:
 
 
 def dm_payload(message: DirectMessage, recipient_id: int) -> dict:
-    deleted = message.deleted_at is not None
     return {
         "id": message.id,
         "sender": brief(message.sender),
         "recipient_id": recipient_id,
         "content": message_ops.visible_content(message),
-        # fresh signed link each time; none once deleted
-        "attachment": None if deleted else media.payload(message.attachment),
+        # fresh signed link each time; none once deleted (or from a closed account)
+        "attachment": None if message_ops.hides_attachment(message) else media.payload(message.attachment),
         "created_at": message.created_at.isoformat(),
         **message_ops.extras(message),
     }
@@ -215,7 +216,8 @@ def friend_ids(user_id: int) -> list[int]:
 def friends_of(user: User) -> list[dict]:
     rows = Friendship.objects.filter(Q(user_a=user) | Q(user_b=user)).select_related("user_a", "user_b")
     others = [(f.user_b if f.user_a_id == user.id else f.user_a, f.created_at) for f in rows]
-    others = [(u, since) for u, since in others if u.is_active]
+    # Deactivated friends stay listed (as "vChat user"); accounts disabled by an admin don't.
+    others = [(u, since) for u, since in others if u.is_active or closing.is_gone(u)]
     online = presence.online_among(u.id for u, _ in others)
     friends = [{"user": brief(u), "since": since.isoformat(), "online": u.id in online} for u, since in others]
     return sorted(friends, key=lambda f: f["user"]["nickname"].lower())
@@ -258,6 +260,8 @@ def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None, repl
         raise SocialError("invalid", "Pick someone to message.")
     if not are_friends(sender.id, recipient_id):
         raise SocialError("not_friends", "You can only message friends. Send a friend request first.")
+    if not User.objects.filter(id=recipient_id, is_active=True).exists():
+        raise SocialError("inactive", "This account isn't active.")
     x, y = ordered_pair(sender.id, recipient_id)
     with transaction.atomic():
         attachment = None
@@ -374,10 +378,15 @@ def conversations_of(user: User, limit: int = 100) -> list[dict]:
         )
         .order_by("-last_message_at")[:limit]
     )
+    def preview(c, partner) -> str:
+        if c.last_sender_id == partner.id and closing.is_gone(partner):
+            return closing.MASK
+        return c.last_content or ATTACHMENT_PREVIEW.get(c.last_kind or "", "")
+
     return [
         {
             "user": brief(c.user_b if c.user_a_id == user.id else c.user_a),
-            "last_message": c.last_content or ATTACHMENT_PREVIEW.get(c.last_kind or "", ""),
+            "last_message": preview(c, c.user_b if c.user_a_id == user.id else c.user_a),
             "last_from_me": c.last_sender_id == user.id,
             "last_message_at": c.last_message_at.isoformat(),
             "unread": c.unread,

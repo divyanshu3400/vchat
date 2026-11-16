@@ -19,6 +19,7 @@ import { Avatar, Icon } from "../bits";
 import UnlockSheet from "../premium/UnlockSheet";
 import { useStranger, type FriendCard } from "../stranger/StrangerProvider";
 import { useDock } from "../Dock";
+import Dropdown, { DropItem, DropSep } from "../Dropdown";
 import { looksLikeContact } from "../messages/richText";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
@@ -40,7 +41,7 @@ function WinButtons({ win }: { win: WinControls }) {
 }
 
 const toggleOnHeader = (win: WinControls) => (e: React.MouseEvent) => {
-  if (!(e.target as HTMLElement).closest("button, .menu, a")) win.onToggleMin();
+  if (!(e.target as HTMLElement).closest("button, .menu, .dd, a")) win.onToggleMin();
 };
 const REPORT_REASONS: [ReportReason, string][] = [
   ["sexual", "Sexual content"],
@@ -373,40 +374,40 @@ function ChatView({ win }: { win?: WinControls }) {
             )}
             {rel === "requested" && <span className="tag">Request sent</span>}
             {rel === "friend" && <span className="tag">Friends</span>}
-            <div className="menu-wrap">
-              <button type="button" className="icon-btn" aria-label="Report or block" aria-expanded={menu !== null} onClick={() => setMenu(menu ? null : "main")}>
-                <Icon name="more" />
-              </button>
-              {menu === "main" && (
-                <div className="menu" role="menu">
-                  {!ended && (
-                    <button type="button" role="menuitem" onClick={() => { setMenu(null); setWatchSheet(true); }}>
-                      Watch YouTube together
-                    </button>
-                  )}
-                  <button type="button" role="menuitem" onClick={() => setMenu("report")}>
-                    Report…
+            <Dropdown open={menu !== null} onToggle={() => setMenu(menu ? null : "main")} onClose={() => setMenu(null)} label="Report or block">
+              {menu === "report" ? (
+                <>
+                  <button type="button" className="dd-back" onClick={() => setMenu("main")}>
+                    <Icon name="back" size={16} /> Report for…
                   </button>
-                  <button type="button" role="menuitem" className="danger" onClick={block}>
-                    Block
-                  </button>
-                  {!ended && (
-                    <button type="button" role="menuitem" onClick={() => { setMenu(null); leave(); }}>
-                      Leave chat
-                    </button>
-                  )}
-                </div>
-              )}
-              {menu === "report" && (
-                <div className="menu" role="menu" aria-label="Report for">
                   {REPORT_REASONS.map(([reason, label]) => (
-                    <button key={reason} type="button" role="menuitem" onClick={() => report(reason)}>
+                    <DropItem key={reason} icon="flag" tone="amber" onClick={() => report(reason)}>
                       {label}
-                    </button>
+                    </DropItem>
                   ))}
-                </div>
+                </>
+              ) : (
+                <>
+                  {!ended && (
+                    <DropItem icon="play" tone="red" hint="Play a video for both of you" onClick={() => { setMenu(null); setWatchSheet(true); }}>
+                      Watch YouTube together
+                    </DropItem>
+                  )}
+                  <DropItem icon="flag" tone="amber" hint="Tell us what happened" onClick={() => setMenu("report")}>
+                    Report
+                  </DropItem>
+                  <DropSep />
+                  {!ended && (
+                    <DropItem icon="exit" tone="muted" onClick={() => { setMenu(null); leave(); }}>
+                      Leave chat
+                    </DropItem>
+                  )}
+                  <DropItem icon="ban" tone="danger" onClick={block}>
+                    Block
+                  </DropItem>
+                </>
               )}
-            </div>
+            </Dropdown>
           </>
   );
   const status = ended ? "Chat ended" : `Stranger · ${sub}`;
