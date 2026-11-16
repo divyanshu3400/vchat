@@ -134,12 +134,22 @@ class MeView(APIView):
         return Response(MeSerializer(request.user).data)
 
     def patch(self, request):
-        """Privacy settings: {"show_last_seen": bool}."""
-        value = request.data.get("show_last_seen")
-        if isinstance(value, bool):
-            User.objects.filter(pk=request.user.pk).update(show_last_seen=value)
-            request.user.show_last_seen = value
-        return Response(MeSerializer(request.user).data)
+        """Privacy settings: {"show_last_seen" | "show_online" | "read_receipts": bool}."""
+        from apps.social.services import online_visibility_changed
+
+        user = request.user
+        changes = {f: request.data[f] for f in PRIVACY_FIELDS if isinstance(request.data.get(f), bool)}
+        if changes:
+            online_changed = "show_online" in changes and changes["show_online"] != user.show_online
+            User.objects.filter(pk=user.pk).update(**changes)
+            for field, value in changes.items():
+                setattr(user, field, value)
+            if online_changed:
+                online_visibility_changed(user)
+        return Response(MeSerializer(user).data)
+
+
+PRIVACY_FIELDS = ("show_last_seen", "show_online", "read_receipts")
 
 
 def _loginable(email: str):

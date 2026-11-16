@@ -8,7 +8,6 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.accounts.models import User
-from apps.chat import presence
 
 from . import services
 from .services import SocialError
@@ -43,7 +42,7 @@ class FriendsOnlineView(APIView):
     """Ids of friends online right now. Clients poll this as a backstop for missed presence events."""
 
     def get(self, request):
-        return Response({"online": sorted(presence.online_among(services.friend_ids(request.user.id)))})
+        return Response({"online": sorted(services.visible_online(request.user, services.friend_ids(request.user.id)))})
 
 
 class FriendDetailView(APIView):

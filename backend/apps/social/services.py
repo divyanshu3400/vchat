@@ -10,6 +10,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 from apps.accounts import closing
+from apps.gifs.services import label as gif_label
 from apps.accounts.models import User
 from apps.chat import message_ops, presence
 from apps.media import services as media
@@ -218,7 +219,7 @@ def friends_of(user: User) -> list[dict]:
     others = [(f.user_b if f.user_a_id == user.id else f.user_a, f.created_at) for f in rows]
     # Deactivated friends stay listed (as "vChat user"); accounts disabled by an admin don't.
     others = [(u, since) for u, since in others if u.is_active or closing.is_gone(u)]
-    online = presence.online_among(u.id for u, _ in others)
+    online = visible_online(user, [u.id for u, _ in others])
     friends = [
         {"user": brief(u), "since": since.isoformat(), "online": u.id in online, "last_seen": last_seen_for(user, u, u.id in online)}
         for u, since in others
@@ -319,20 +320,56 @@ def last_seen_for(viewer: User, other: User, online: bool) -> str | None:
 
 
 def presence_events(user_id: int, online: bool) -> list[tuple[int, dict]]:
-    """For each friend: the presence event to send. Going offline records the moment (last seen)."""
+    """For each friend: the presence event to send. Going offline records the moment (last seen).
+    Coming online is told only when you show "online" and they show theirs too."""
     now = timezone.now()
     if not online:
         User.objects.filter(pk=user_id).update(last_seen_at=now)
-    shows = User.objects.filter(pk=user_id, show_last_seen=True).exists()
+    me = User.objects.filter(pk=user_id).values("show_last_seen", "show_online").first() or {}
+    if online and not me.get("show_online", True):
+        return []
     ids = friend_ids(user_id)
-    allow = set(User.objects.filter(id__in=ids, show_last_seen=True).values_list("id", flat=True)) if shows else set()
+    flags = {u["id"]: u for u in User.objects.filter(id__in=ids).values("id", "show_last_seen", "show_online")}
     out = []
     for fid in ids:
+        theirs = flags.get(fid, {})
+        if online and not theirs.get("show_online", True):
+            continue
         payload = {"type": "presence", "user_id": user_id, "online": online}
-        if not online and fid in allow:
+        if not online and me.get("show_last_seen", True) and theirs.get("show_last_seen", True):
             payload["last_seen"] = now.isoformat()
         out.append((fid, payload))
     return out
+
+
+def visible_online(viewer: User, ids) -> set[int]:
+    """Friends shown as online to `viewer`: nobody when either side hides "online"."""
+    if not viewer.show_online:
+        return set()
+    online = presence.online_among(ids)
+    if not online:
+        return set()
+    return set(User.objects.filter(id__in=online, show_online=True).values_list("id", flat=True))
+
+
+def online_visibility_changed(user: User) -> None:
+    """Turned "online" off or on while connected: friends see it at once; your own list reloads."""
+    from apps.chat.realtime import push_to_user
+
+    connected = user.id in presence.online_among([user.id])
+    if connected:
+        if user.show_online:
+            for fid, payload in presence_events(user.id, online=True):
+                push_to_user(fid, payload)
+        else:
+            for fid in friend_ids(user.id):
+                push_to_user(fid, {"type": "presence", "user_id": user.id, "online": False})
+    push_to_user(user.id, {"type": "conversations.changed"})
+
+
+def receipts_between(a_id: int, b_id: int) -> bool:
+    """"Seen" ticks only when both people keep read receipts on."""
+    return not User.objects.filter(id__in=[a_id, b_id], read_receipts=False).exists()
 
 
 def touch_last_seen(user_id: int) -> None:
@@ -425,14 +462,14 @@ def _advance_read(conversation: Conversation, user_id: int, last_id: int) -> boo
 def mark_read(user: User, partner_id: int, last_id: int) -> None:
     """Also tells the partner, for the "seen" ticks under their messages."""
     conversation = _conversation(user.id, partner_id)
-    if conversation and _advance_read(conversation, user.id, last_id):
+    if conversation and _advance_read(conversation, user.id, last_id) and receipts_between(user.id, partner_id):
         _on_commit_push(partner_id, {"type": "dm.read", "user_id": user.id, "last_id": last_id})
 
 
 def partner_read_id(user: User, partner_id: int) -> int:
     """The newest message of this chat the partner has seen."""
     conversation = _conversation(user.id, partner_id)
-    if conversation is None:
+    if conversation is None or not receipts_between(user.id, partner_id):
         return 0
     return conversation.b_last_read_id if conversation.user_a_id == user.id else conversation.a_last_read_id
 
@@ -474,7 +511,7 @@ def conversations_of(user: User, limit: int = 100) -> list[dict]:
     def preview(c, partner) -> str:
         if c.last_sender_id == partner.id and closing.is_gone(partner):
             return closing.MASK
-        return c.last_content or ATTACHMENT_PREVIEW.get(c.last_kind or "", "")
+        return gif_label(c.last_content or "") or ATTACHMENT_PREVIEW.get(c.last_kind or "", "")
 
     out = [
         {

@@ -14,20 +14,29 @@ import AppSettings from "../nudges/AppSettings";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
+type PrivacyKey = "show_online" | "show_last_seen" | "read_receipts";
+// Give and take, like WhatsApp: hide yours and you don't see other people's either.
+const PRIVACY: [PrivacyKey, string, string][] = [
+  ["show_online", "Show when I'm online", "Off: friends always see you as offline, and you won't see who's online."],
+  ["show_last_seen", "Show my last seen", "Friends see when you were last online. Turn it off and you won't see theirs either."],
+  ["read_receipts", "Read receipts", "Off: friends don't see when you've read their messages, and you won't see theirs."],
+];
+
 export default function MeScreen() {
   const router = useRouter();
   const { me, friends, premium, askAccount, getAccess } = useChat();
   const [closing, setClosing] = useState<"deactivate" | "delete" | null>(null);
-  const [lastSeenOn, setLastSeenOn] = useState<boolean | null>(null);
-  const showLastSeen = lastSeenOn ?? me?.show_last_seen !== false;
+  // Privacy switches: what you changed here, else what the server says (all on by default).
+  const [privacy, setPrivacy] = useState<Partial<Record<PrivacyKey, boolean>>>({});
+  const isOn = (key: PrivacyKey) => privacy[key] ?? me?.[key] !== false;
 
-  async function toggleLastSeen(on: boolean) {
-    setLastSeenOn(on);
+  async function setPrivacyKey(key: PrivacyKey, on: boolean) {
+    setPrivacy((p) => ({ ...p, [key]: on }));
     try {
-      const updated = await updateMe({ show_last_seen: on }, await getAccess());
-      setLastSeenOn(updated.show_last_seen !== false);
+      const updated = await updateMe({ [key]: on }, await getAccess());
+      setPrivacy((p) => ({ ...p, [key]: updated[key] !== false }));
     } catch {
-      setLastSeenOn(!on);
+      setPrivacy((p) => ({ ...p, [key]: !on }));
     }
   }
   const guest = me?.is_guest !== false;
@@ -137,13 +146,15 @@ export default function MeScreen() {
             </span>
             <ThemeToggle />
           </div>
-          <label className="setting">
-            <span>
-              <b>Show my last seen</b>
-              <small>Friends see when you were last online. Turn it off and you won&apos;t see theirs either.</small>
-            </span>
-            <input type="checkbox" className="switch" checked={showLastSeen} onChange={(e) => toggleLastSeen(e.target.checked)} />
-          </label>
+          {PRIVACY.map(([key, label, hint]) => (
+            <label className="setting" key={key}>
+              <span>
+                <b>{label}</b>
+                <small>{hint}</small>
+              </span>
+              <input type="checkbox" className="switch" checked={isOn(key)} onChange={(e) => setPrivacyKey(key, e.target.checked)} />
+            </label>
+          ))}
           <label className="setting">
             <span>
               <b>Hide swear words</b>

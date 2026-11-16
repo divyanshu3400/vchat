@@ -5,6 +5,8 @@ import { Icon } from "../bits";
 import { MAX_VOICE_SECONDS, useRecorder } from "../media/useRecorder";
 import { readDraft, writeDraft } from "./drafts";
 import EmojiPicker from "./EmojiPicker";
+import GifPicker from "./GifPicker";
+import { gifText } from "@/lib/gifs";
 import type { Msg } from "./MessageList";
 
 const MAX_ROWS_PX = 132;
@@ -59,6 +61,7 @@ export default function Composer({
 }: Props) {
   const [draft, setDraft] = useState("");
   const [picker, setPicker] = useState(false);
+  const [gifs, setGifs] = useState(false);
   const [holding, setHolding] = useState<null | { x: number; t: number; slide: number }>(null);
   const [lockedRec, setLockedRec] = useState(false);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -225,6 +228,17 @@ export default function Composer({
           <EmojiPicker onPick={insertEmoji} onClose={() => setPicker(false)} />
         </div>
       )}
+      {gifs && (
+        <div className="picker-dock gif-dock">
+          <GifPicker
+            onClose={() => setGifs(false)}
+            onPick={async (g) => {
+              setGifs(false);
+              await onSend(gifText(g));
+            }}
+          />
+        </div>
+      )}
       {recording ? (
         <div className={`recorder2${holding ? " holding" : ""}`} role="group" aria-label="Recording a voice message">
           {voice.error ? (
@@ -304,10 +318,29 @@ export default function Composer({
               aria-label="Emoji"
               aria-expanded={picker}
               disabled={disabled}
-              onClick={() => setPicker((p) => !p)}
+              onClick={() => {
+                setGifs(false);
+                setPicker((p) => !p);
+              }}
             >
               <Icon name="smile" />
             </button>
+            {!editing && (
+              <button
+                type="button"
+                className="gif-toggle"
+                onPointerDown={(e) => e.preventDefault()}
+                aria-label="GIFs and stickers"
+                aria-expanded={gifs}
+                disabled={disabled}
+                onClick={() => {
+                  setPicker(false);
+                  setGifs((g) => !g);
+                }}
+              >
+                GIF
+              </button>
+            )}
             <textarea
               ref={boxRef}
               id={id}

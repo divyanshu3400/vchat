@@ -66,9 +66,8 @@ p { margin: 0; }
   background: radial-gradient(520px 380px at 78% 30%, var(--glow-a), transparent 70%), radial-gradient(420px 300px at 18% 12%, var(--glow-b), transparent 70%); filter: blur(10px); }
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; position: relative; }
 .logo { text-decoration: none; font-family: var(--display); font-weight: 800; font-size: 27px; letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px; }
-.logo svg { width: 30px; height: 30px; }
-.logo svg path { stroke: var(--brand); stroke-width: 2.6; fill: none; stroke-linecap: round; }
-.logo i { font-style: normal; color: var(--brand); }
+.logo img { width: 42px; height: auto; display: block; }
+.logo i { font-style: normal; background: linear-gradient(135deg, #7b3fe4, #3d6cf0); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .nav ul { display: flex; gap: 26px; list-style: none; margin: 0; padding: 0; font-weight: 500; color: var(--muted); }
 .nav ul a { text-decoration: none; }
 .nav ul a:hover { color: var(--fg); }

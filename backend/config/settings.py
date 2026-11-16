@@ -155,6 +155,7 @@ REST_FRAMEWORK = {
         "rewards": "20/hour",
         "uploads": "60/hour",
         "media_open": "200/hour",
+        "gifs": "300/hour",
     },
 }
 
@@ -263,3 +264,7 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": os.environ.get("LOG_LEVEL", "INFO")},
 }
+
+# GIFs and stickers (apps/gifs). The key stays on the server; without it the GIF picker is off.
+GIPHY_API_KEY = os.environ.get("GIPHY_API_KEY", "")
+GIF_RATING = "pg-13"

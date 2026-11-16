@@ -21,6 +21,14 @@ def clean_content(raw) -> str:
     limit = settings.VCHAT["MESSAGE_MAX_LENGTH"]
     if len(text) > limit:
         raise InvalidMessage(f"Message is longer than {limit} characters.")
+    from apps.gifs import services as gifs
+
+    if gifs.is_gif(text):
+        # "gif:<id>:<w>x<h>": only real GIPHY GIFs with an allowed rating.
+        if not gifs.verify(gifs.GIF_RE.match(text).group(1)):
+            raise InvalidMessage("That GIF isn't available.")
+        return text
+
     from .automod import has_slur
 
     if has_slur(text):

@@ -5,6 +5,8 @@ export type ChatUser = {
   is_guest?: boolean;
   /** Yours only: do friends see when you were last online (and you theirs)? */
   show_last_seen?: boolean;
+  show_online?: boolean;
+  read_receipts?: boolean;
   /** Deactivated or deleted: shown as "vChat user", messages as "********". */
   inactive?: boolean;
   /** Only ever present for yourself. */
@@ -109,12 +111,20 @@ export function verifyAccount(email: string, code: string, access: string) {
   });
 }
 
+export type GifItem = { id: string; w: number; h: number; title: string };
+
+/** GIFs or stickers from GIPHY through our server: trending without a query. */
+export function fetchGifs(kind: "gifs" | "stickers", q: string, offset: number, access: string) {
+  const qs = new URLSearchParams({ kind, q, offset: String(offset) });
+  return request<{ items: GifItem[]; next: number | null }>(`/api/gifs?${qs}`, { access });
+}
+
 /** Mute ("8h" | "1w" | "always" | "off") and/or pin one chat, for you only. */
 export function setChatPrefs(userId: number, body: { mute?: string; pin?: boolean }, access: string) {
   return request<ChatPrefs>(`/api/dms/${userId}/prefs`, { method: "POST", access, body: JSON.stringify(body) });
 }
 
-export function updateMe(body: { show_last_seen?: boolean }, access: string) {
+export function updateMe(body: { show_last_seen?: boolean; show_online?: boolean; read_receipts?: boolean }, access: string) {
   return request<ChatUser>("/api/auth/me", { method: "PATCH", access, body: JSON.stringify(body) });
 }
 

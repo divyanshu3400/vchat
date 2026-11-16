@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, memo, useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
+import { gifFull, gifLabel, gifSmall, parseGif, type GifRef } from "@/lib/gifs";
 import type { Attachment, ReplyPreview } from "@/lib/api";
 import MediaBubble from "../media/MediaBubble";
 import { Icon } from "../bits";
@@ -107,6 +109,29 @@ function burst(from: Element, mood: Mood) {
   setTimeout(() => layer.remove(), 2600);
 }
 
+// --- a GIF or sticker -------------------------------------------------------------------------
+
+function GifBubble({ gif }: { gif: GifRef }) {
+  const [big, setBig] = useState(false);
+  return (
+    <>
+      <button type="button" className="gif-msg" style={{ aspectRatio: `${gif.w} / ${gif.h}` }} onClick={() => setBig(true)} aria-label="GIF. Tap to enlarge.">
+        {/* eslint-disable-next-line @next/next/no-img-element -- GIPHY's CDN */}
+        <img src={gifSmall(gif.id)} alt="GIF" loading="lazy" referrerPolicy="no-referrer" draggable={false} />
+        <span className="gif-badge" aria-hidden="true">GIF</span>
+      </button>
+      {big &&
+        createPortal(
+          <div className="lightbox" role="dialog" aria-label="GIF" onClick={() => setBig(false)}>
+            {/* eslint-disable-next-line @next/next/no-img-element -- GIPHY's CDN */}
+            <img src={gifFull(gif.id)} alt="GIF" referrerPolicy="no-referrer" />
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
 // --- one bubble ---------------------------------------------------------------------------------
 
 type BubbleProps = {
@@ -135,8 +160,9 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
   const mine = m.mine;
   // Deleted, or not sent yet: nothing to react to, reply to or open a menu on.
   const frozen = m.deleted || !!m.pending;
-  const jumbo = !m.deleted && !m.attachment && !m.replyTo && isJumboEmoji(m.content);
-  const yt = !m.deleted && m.content ? firstYoutube(m.content) : null;
+  const gif = !m.deleted ? parseGif(m.content) : null;
+  const jumbo = !gif && !m.deleted && !m.attachment && !m.replyTo && isJumboEmoji(m.content);
+  const yt = !gif && !m.deleted && m.content ? firstYoutube(m.content) : null;
   const mentioned = !mine && !!meNick && mentions(m.content, meNick);
   const mineEmoji = myReaction(m, meId);
   const reactions = Object.entries(m.reactions).sort((a, b) => b[1].length - a[1].length);
@@ -248,14 +274,14 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           <Icon name="reply" size={16} />
         </span>
         <div
-          className={`bubble${jumbo ? " jumbo" : ""}${m.attachment && !m.deleted ? " has-media" : ""}${m.deleted ? " deleted" : ""}${
+          className={`bubble${jumbo ? " jumbo" : ""}${(m.attachment || gif) && !m.deleted ? " has-media" : ""}${m.deleted ? " deleted" : ""}${
             m.attachment?.kind === "audio" ? " voice" : ""
           }`}
         >
           {m.replyTo && (
             <button type="button" className="quote" onClick={() => jumpTo(m.replyTo!.id)}>
               <b>{m.replyTo.sender_id === meId ? "You" : m.replyTo.nickname}</b>
-              <span>{m.replyTo.deleted ? "Deleted message" : m.replyTo.text || "Message"}</span>
+              <span>{m.replyTo.deleted ? "Deleted message" : gifLabel(m.replyTo.text) || "Message"}</span>
             </button>
           )}
           {m.deleted ? (
@@ -265,7 +291,8 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           ) : (
             <>
               {m.attachment && <MediaBubble attachment={m.attachment} ask={!mine} />}
-              {m.content && (
+              {gif && <GifBubble gif={gif} />}
+              {m.content && !gif && (
                 <span className="txt">{renderRich(m.content, { me: meNick, clean, onLink: stranger && !mine ? onLink : undefined })}</span>
               )}
               {yt && (

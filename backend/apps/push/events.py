@@ -10,7 +10,9 @@ def dm_received(recipient_id: int, sender_id: int, nickname: str, content: str, 
 
     if is_muted(recipient_id, sender_id):
         return  # muted chat: no notification
-    text = content.strip() or KIND_PREVIEW.get(attachment_kind or "", "New message")
+    from apps.gifs.services import label as gif_label
+
+    text = gif_label(content.strip()) or KIND_PREVIEW.get(attachment_kind or "", "New message")
     if len(text) > 120:
         text = text[:117] + "…"
     sender.notify(

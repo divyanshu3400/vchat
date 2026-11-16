@@ -10,6 +10,7 @@ import { useRoomPresence } from "@/lib/presence";
 import { ALL_ROOMS } from "@/lib/rooms";
 import { useChat } from "./ChatProvider";
 import { RANDOM_WINDOW, useDock } from "./Dock";
+import { gifLabel } from "@/lib/gifs";
 import { useStranger } from "./stranger/StrangerProvider";
 import { Avatar, Icon, timeAgo } from "./bits";
 
@@ -85,7 +86,7 @@ export default function ConversationList() {
   const randomPreview =
     stranger.phase === "chatting"
       ? lastLine
-        ? `${lastLine.mine ? "You: " : ""}${lastLine.content || (lastLine.attachment ? "📎 Attachment" : "")}`
+        ? `${lastLine.mine ? "You: " : ""}${gifLabel(lastLine.content) || (lastLine.attachment ? "📎 Attachment" : "")}`
         : "Chatting anonymously"
       : stranger.phase === "searching"
         ? "Looking for someone…"

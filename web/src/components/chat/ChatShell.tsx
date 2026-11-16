@@ -141,7 +141,8 @@ function Rail({ pathname }: { pathname: string }) {
   return (
     <nav className="rail" aria-label="Main">
       <Link href="/" className="rail-logo" aria-label="vChat home page">
-        v<i>c</i>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
+        <img src="/brand/logo-mark.png" alt="" width={44} height={36} />
       </Link>
       {NAV.filter((n) => !("phoneOnly" in n)).map((n) => (
         <Link

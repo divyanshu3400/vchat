@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.closing import GONE_NAME, MASK, is_gone
+from apps.gifs.services import label as gif_label
 
 from .services import InvalidMessage, clean_content
 
@@ -49,7 +50,7 @@ def reply_preview(message) -> dict | None:
     if target.deleted_at:
         text, kind = "", None
     else:
-        text = target.content[:REPLY_PREVIEW_CHARS] or KIND_LABEL.get(attachment.kind if attachment else "", "")
+        text = gif_label(target.content)[:REPLY_PREVIEW_CHARS] or KIND_LABEL.get(attachment.kind if attachment else "", "")
         kind = attachment.kind if attachment else None
         if is_gone(target.sender):
             text, kind = MASK, None

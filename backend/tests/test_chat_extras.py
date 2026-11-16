@@ -118,3 +118,43 @@ def test_random_chat_replies_hide_the_name(alice, bob):
     reply = StrangerMessage.objects.create(session=session, sender=bob, content="hey", reply_to=first)
     payload = st.message_payload(reply)
     assert payload["reply_to"]["nickname"] == "Anonymous" and payload["reply_to"]["text"] == "hi"
+
+
+@pytest.mark.django_db
+def test_hiding_online_works_both_ways(alice, bob):
+    from apps.chat import presence
+
+    befriend(alice, bob)
+    presence.connect_user(bob.id, "chan-bob")
+    assert [f["online"] for f in social.friends_of(alice)] == [True]
+
+    # Bob hides his "online": alice sees him offline, and no "came online" event goes out.
+    auth_client(bob).patch("/api/auth/me/", {"show_online": False}, format="json")
+    alice.refresh_from_db()
+    assert [f["online"] for f in social.friends_of(alice)] == [False]
+    assert auth_client(alice).get("/api/friends/online/").data["online"] == []
+    assert social.presence_events(bob.id, online=True) == []
+
+    # Alice hides hers instead: she doesn't see bob online either.
+    auth_client(bob).patch("/api/auth/me/", {"show_online": True}, format="json")
+    User.objects.filter(pk=alice.pk).update(show_online=False)
+    alice.refresh_from_db()
+    assert [f["online"] for f in social.friends_of(alice)] == [False]
+    assert dict(social.presence_events(bob.id, online=True)) == {}
+
+
+@pytest.mark.django_db
+def test_read_receipts_off_hides_seen_both_ways(alice, bob):
+    befriend(alice, bob)
+    msg = social.send_dm(alice, bob.id, "hi")
+    social.mark_read(bob, alice.id, msg["id"])
+    assert social.partner_read_id(alice, bob.id) == msg["id"]
+
+    auth_client(bob).patch("/api/auth/me/", {"read_receipts": False}, format="json")
+    assert social.partner_read_id(alice, bob.id) == 0
+    assert social.partner_read_id(bob, alice.id) == 0
+    with mock.patch("apps.social.services._on_commit_push") as push:
+        msg2 = social.send_dm(alice, bob.id, "again")
+        push.reset_mock()
+        social.mark_read(bob, alice.id, msg2["id"])
+        push.assert_not_called()

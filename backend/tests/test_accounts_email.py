@@ -40,7 +40,7 @@ def test_guest_saves_account_and_keeps_the_same_user():
     assert client.post("/api/auth/account/verify/", {"email": "milky@example.com", "code": "000000"}, format="json").data["code"] == "wrong_code"
     res = client.post("/api/auth/account/verify/", {"email": "milky@example.com", "code": code}, format="json")
     assert res.status_code == 200
-    assert res.data["user"] == {"id": guest.id, "nickname": "milky", "gender": "F", "is_guest": False, "email": "milky@example.com", "show_last_seen": True}
+    assert res.data["user"] == {"id": guest.id, "nickname": "milky", "gender": "F", "is_guest": False, "email": "milky@example.com", "show_last_seen": True, "show_online": True, "read_receipts": True}
     guest.refresh_from_db()
     assert guest.check_password(PASSWORD) and not guest.is_guest
 

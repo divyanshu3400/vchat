@@ -7,6 +7,7 @@ import { markEngaged } from "@/lib/install";
 import { usePush } from "@/lib/push";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { noteOpened } from "./media/viewCounts";
+import { gifLabel } from "@/lib/gifs";
 import {
   answerFriendRequest,
   ApiError,
@@ -260,7 +261,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
           if (!partnerUser) return list; // appears on the next resync
           const summary: ConversationSummary = {
             user: partnerUser,
-            last_message: m.content,
+            last_message: gifLabel(m.content),
             last_from_me: mine,
             last_message_at: m.created_at,
             unread: 0,

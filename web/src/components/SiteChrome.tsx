@@ -6,11 +6,10 @@ import ThemeToggle from "./ThemeToggle";
 export function Logo() {
   return (
     <Link className="logo" href="/" aria-label="vChat home">
-      <svg viewBox="0 0 32 32" aria-hidden="true">
-        <path d="M3 16c3-8 6-8 9 0s6 8 9 0 6-8 8-2" />
-      </svg>
+      {/* eslint-disable-next-line @next/next/no-img-element -- a small static logo */}
+      <img src="/brand/logo-mark.png" alt="" width={42} height={34} />
       <span>
-        <i>v</i>chat
+        <i>V</i>Chat
       </span>
     </Link>
   );

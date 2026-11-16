@@ -40,6 +40,10 @@ class User(AbstractUser):
     # people allow it: hiding yours hides everyone's from you, like WhatsApp.
     last_seen_at = models.DateTimeField(null=True, blank=True)
     show_last_seen = models.BooleanField(default=True)
+    # Same give-and-take rules: hide your "online" and you see nobody online; turn off read
+    # receipts and you see nobody's "Seen" either.
+    show_online = models.BooleanField(default=True)
+    read_receipts = models.BooleanField(default=True)
 
     # --- closing the account (apps/accounts/closing.py) ---
     # Set while deactivated (is_active is False then): others see "vChat user" and "********".

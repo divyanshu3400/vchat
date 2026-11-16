@@ -22,7 +22,11 @@ export const metadata: Metadata = {
   applicationName: "vChat",
   // iPhone: "Add to Home Screen" opens full screen with our icon.
   appleWebApp: { capable: true, title: "vChat", statusBarStyle: "default" },
-  icons: { apple: "/app-icon/apple" },
+  icons: {
+    // app/favicon.ico is added by Next itself; this is the sharper one for big screens.
+    icon: [{ url: "/brand/favicon-64.png", type: "image/png", sizes: "64x64" }],
+    apple: "/app-icon/apple",
+  },
 };
 
 export const viewport: Viewport = {

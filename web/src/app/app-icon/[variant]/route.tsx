@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { ImageResponse } from "next/og";
 
 // The home-screen icon in every size the phone asks for: /app-icon/192, /app-icon/512,
@@ -16,8 +18,17 @@ export function generateStaticParams() {
   return Object.keys(VARIANTS).map((variant) => ({ variant }));
 }
 
+// The vChat logo (public/brand), on white. The notification badge stays a one-colour shape.
+const FILES: Record<string, string> = { "192": "icon-192.png", "512": "icon-512.png", maskable: "icon-maskable.png", apple: "apple-180.png" };
+
 export async function GET(_req: Request, { params }: { params: Promise<{ variant: string }> }) {
-  const v = VARIANTS[(await params).variant];
+  const variant = (await params).variant;
+  const file = FILES[variant];
+  if (file) {
+    const bytes = await readFile(path.join(process.cwd(), "public", "brand", file));
+    return new Response(new Uint8Array(bytes), { headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=86400" } });
+  }
+  const v = VARIANTS[variant];
   if (!v) return new Response("Not found", { status: 404 });
   const inner = Math.round(v.size * (1 - 2 * v.pad));
   return new ImageResponse(

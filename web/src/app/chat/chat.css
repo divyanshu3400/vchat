@@ -62,8 +62,8 @@
 
 /* ---------- rail (tablet +) ---------- */
 .rail { grid-area: rail; flex-direction: column; align-items: center; gap: 4px; padding: 14px 0; background: var(--fg); color: var(--bg); }
-.rail-logo { font-family: var(--display); font-weight: 800; font-size: 24px; color: var(--bg); text-decoration: none; margin-bottom: 14px; }
-.rail-logo i { font-style: normal; color: #5be3a6; }
+.rail-logo { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: #fff; text-decoration: none; margin-bottom: 14px; box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.4); }
+.rail-logo img { width: 40px; height: auto; display: block; }
 .rail-item { width: 60px; padding: 9px 0; border-radius: 14px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; font-weight: 700; text-decoration: none; color: color-mix(in srgb, var(--bg) 62%, transparent); }
 .rail-item:hover { color: var(--bg); }
 .rail-item.on { background: color-mix(in srgb, var(--bg) 14%, transparent); color: var(--bg); }
@@ -954,3 +954,53 @@ button.head-who:active { background: var(--surface-2); }
 
 /* random chat: the other person is always anonymous */
 .anon-avatar { background: linear-gradient(135deg, #2c3e36, #4a5f55); color: #e9f3ee; }
+
+/* --- calls: minimise, the bar on top, the floating video ------------------------------------ */
+.call-corner { position: absolute; top: max(14px, env(safe-area-inset-top, 0px)); left: max(14px, env(safe-area-inset-left, 0px)); z-index: 3; display: flex; gap: 8px; }
+.call-min { appearance: none; border: 0; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; color: #fff; background: rgba(255, 255, 255, 0.16); backdrop-filter: blur(8px); }
+.call-min:hover { background: rgba(255, 255, 255, 0.26); }
+html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); height: calc(var(--app-h, 100dvh) - 44px - env(safe-area-inset-top, 0px)); }
+.call-bar { position: fixed; inset: 0 0 auto 0; z-index: 84; height: calc(44px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 8px 0 4px; display: flex; align-items: center; gap: 6px; color: #fff; background: linear-gradient(90deg, #0e8a5a, #16a46c); box-shadow: 0 4px 14px -6px rgba(0, 0, 0, 0.35); animation: call-bar-in 0.22s ease both; }
+@keyframes call-bar-in { from { transform: translateY(-100%); } }
+.call-bar-main { appearance: none; border: 0; background: transparent; color: inherit; font: inherit; flex: 1; min-width: 0; height: 100%; display: flex; align-items: center; gap: 8px; padding: 0 8px; cursor: pointer; text-align: left; }
+.call-bar-main b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.call-bar-time { font-family: var(--mono); font-size: 13px; opacity: 0.92; white-space: nowrap; }
+.call-bar-main small { margin-left: auto; font-size: 12px; opacity: 0.8; white-space: nowrap; }
+.call-bar-dot { width: 8px; height: 8px; border-radius: 50%; background: #b8ffd9; flex: none; animation: pulse 1.6s infinite; }
+.call-bar-btn { appearance: none; border: 0; width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; cursor: pointer; color: #fff; background: rgba(255, 255, 255, 0.18); }
+.call-bar-btn.on { background: #fff; color: #0e8a5a; }
+.call-bar-btn.end { background: #e5484d; }
+@media (max-width: 420px) { .call-bar-main small { display: none; } }
+.call-pip { position: fixed; z-index: 83; width: min(34vw, 168px); aspect-ratio: 3 / 4; border-radius: 16px; overflow: hidden; background: #0b2a1d; box-shadow: 0 16px 36px -12px rgba(0, 0, 0, 0.6); border: 2px solid rgba(255, 255, 255, 0.85); touch-action: none; cursor: grab; transition: top 0.25s ease, left 0.25s ease, right 0.25s ease, bottom 0.25s ease; }
+.call-pip:active { cursor: grabbing; }
+.call-pip.at-tl { top: calc(56px + env(safe-area-inset-top, 0px)); left: 12px; }
+.call-pip.at-tr { top: calc(56px + env(safe-area-inset-top, 0px)); right: 12px; }
+.call-pip.at-bl { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); left: 12px; }
+.call-pip.at-br { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); right: 12px; }
+@media (min-width: 1024px) { .call-pip { width: 220px; } .call-pip.at-bl, .call-pip.at-br { bottom: 24px; } }
+.call-pip-video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.call-pip-self { position: absolute; right: 6px; bottom: 6px; width: 32%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.7); transform: scaleX(-1); pointer-events: none; }
+.call-pip-wait { position: absolute; inset: 0; display: grid; place-items: center; }
+.call-pip-out { position: absolute; top: 6px; right: 6px; appearance: none; border: 0; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: rgba(0, 0, 0, 0.45); cursor: pointer; }
+
+/* --- GIFs and stickers ------------------------------------------------------------------- */
+.gif-toggle { appearance: none; flex: none; height: 26px; padding: 0 7px; border-radius: 7px; border: 1.5px solid var(--muted); background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 900; letter-spacing: 0.04em; cursor: pointer; align-self: center; }
+.gif-toggle[aria-expanded="true"] { border-color: var(--brand); color: var(--brand); }
+.gif-dock { left: 8px; right: 8px; }
+.gif-picker { width: min(380px, 100%); height: min(380px, 52vh); display: grid; grid-template-rows: auto auto 1fr auto; gap: 6px; padding: 8px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+.gif-head { display: flex; gap: 6px; align-items: center; }
+.gif-search { flex: 1; display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 38px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); color: var(--muted); }
+.gif-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--fg); font: inherit; font-size: 16px; }
+.gif-tabs { display: flex; gap: 4px; }
+.gif-tabs button { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 800; padding: 5px 12px; border-radius: 999px; cursor: pointer; }
+.gif-tabs button.on { background: var(--brand-soft); color: var(--brand); }
+.gif-grid { overflow-y: auto; columns: 2 120px; column-gap: 6px; overscroll-behavior: contain; }
+.gif-grid.stickers { columns: 3 90px; }
+.gif-cell { appearance: none; display: block; width: 100%; margin: 0 0 6px; padding: 0; border: 0; border-radius: 10px; overflow: hidden; background: var(--surface-2); cursor: pointer; break-inside: avoid; }
+.gif-grid.stickers .gif-cell { background: transparent; }
+.gif-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gif-note { column-span: all; text-align: center; color: var(--muted); font-size: 13px; padding: 18px 8px; }
+.gif-credit { margin: 0; text-align: right; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
+.gif-msg { appearance: none; position: relative; display: block; width: min(220px, 60vw); max-height: 320px; padding: 0; border: 0; border-radius: 14px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; }
+.gif-msg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.gif-badge { position: absolute; left: 6px; bottom: 6px; font-size: 10px; font-weight: 900; letter-spacing: 0.06em; color: #fff; background: rgba(0, 0, 0, 0.45); padding: 2px 5px; border-radius: 5px; }

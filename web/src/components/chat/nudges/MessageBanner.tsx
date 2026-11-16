@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { gifLabel } from "@/lib/gifs";
 import { useChat } from "../ChatProvider";
 import { useDock } from "../Dock";
 import { useStranger } from "../stranger/StrangerProvider";
@@ -78,7 +79,7 @@ export default function MessageBanner() {
         if (!me || m.sender.id === me.id || isWatching(m.sender.id) || mutedRef.current.has(m.sender.id)) return;
         if (phaseRef.current === "chatting" || document.visibilityState !== "visible" || !inAppAlertsOn()) return;
         const kind = m.attachment?.kind;
-        const text = m.content || (kind === "image" ? "📷 Photo" : kind === "video" ? "🎬 Video" : kind === "audio" ? "🎤 Voice message" : "");
+        const text = gifLabel(m.content) || (kind === "image" ? "📷 Photo" : kind === "video" ? "🎬 Video" : kind === "audio" ? "🎤 Voice message" : "");
         setShown({ id: m.sender.id, nickname: m.sender.nickname, text, key: m.id });
         tick();
         navigator.vibrate?.(30);
