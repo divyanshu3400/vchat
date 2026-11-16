@@ -22,3 +22,7 @@ node_modules/
 Thumbs.db
 .vscode/
 .idea/
+
+# Deploy leftovers (make deploy removes them)
+.deploy.bundle
+.ship.sh

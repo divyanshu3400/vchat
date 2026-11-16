@@ -76,3 +76,17 @@ Default rooms are defined twice and must stay in sync:
 5. Google sign-in to save a guest profile across devices
 6. Voice notes, voice rooms, then 1:1 calls (WebRTC)
 7. A real nickname/link/word filter and auto-mute after repeated reports
+
+## Everyday commands
+
+From Git Bash in this folder: `make` lists everything. The usual ones:
+
+```bash
+make check        # tests, lint, type check
+make deploy       # checks, push, ship backend + web + migrations, verify
+make deploy-web   # website only
+make status       # is production up?
+make logs SERVICE=web LINES=300
+```
+
+Server steps run inside WSL (where the deploy SSH key is); the Makefile does that by itself.
