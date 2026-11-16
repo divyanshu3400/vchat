@@ -106,3 +106,15 @@ def test_most_shared_interests_first_but_nobody_waits_for_them(settings):
     # No interests in common with anyone: the longest waiting, as before.
     other = entry(8, ["anime"])
     assert matchmaker.find_or_wait(other, set()).user_id == 1
+
+
+@pytest.mark.django_db
+def test_random_chat_replies_hide_the_name(alice, bob):
+    from apps.stranger import services as st
+    from apps.stranger.models import StrangerMessage, StrangerSession
+
+    session = StrangerSession.objects.create(user_a=alice, user_b=bob)
+    first = StrangerMessage.objects.create(session=session, sender=alice, content="hi")
+    reply = StrangerMessage.objects.create(session=session, sender=bob, content="hey", reply_to=first)
+    payload = st.message_payload(reply)
+    assert payload["reply_to"]["nickname"] == "Anonymous" and payload["reply_to"]["text"] == "hi"

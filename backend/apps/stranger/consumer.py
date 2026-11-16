@@ -7,7 +7,7 @@ other's channel; nothing is broadcast.
 client -> {"type": "stranger.find", "region": "any" | "<region slug>", "want": "any" | "F" | "M"}
           ("want" other than "any" needs Plus or a rewarded-ad grant: else error "locked_filter")
 server -> {"type": "stranger.waiting", "waiting": <people in the queue>}
-server -> {"type": "stranger.matched", "session": "<uuid>", "partner": {id, nickname, gender, region}, "common": [interests]}
+server -> {"type": "stranger.matched", "session": "<uuid>", "partner": {id, nickname: "Anonymous", gender: "", region: "any"}, "common": [interests]}
           (stranger.find may carry "interests": up to 5 of matchmaker.INTERESTS; most shared first)
 client -> {"type": "stranger.message", "content": "...", "client_id": "..."}
 server -> {"type": "stranger.message", "message": {id, session, sender_id, content, created_at}, "client_id": "..."}
@@ -149,7 +149,7 @@ class StrangerMixin:
                 "type": "stranger.paired",
                 "session": sid,
                 "partner_channel": self.channel_name,
-                "partner": services.partner_brief(self.user, region),
+                "partner": services.partner_brief(self.user.id),
                 "common": me.shared(partner),
             },
         )
@@ -157,7 +157,7 @@ class StrangerMixin:
             {
                 "type": "stranger.matched",
                 "session": sid,
-                "partner": {"id": partner.user_id, "nickname": partner.nickname, "gender": partner.gender, "region": partner.region},
+                "partner": services.partner_brief(partner.user_id),
                 # Interests you both picked: the app opens with an ice-breaker about them.
                 "common": me.shared(partner),
             }

@@ -86,7 +86,7 @@ export default function ConversationList() {
     stranger.phase === "chatting"
       ? lastLine
         ? `${lastLine.mine ? "You: " : ""}${lastLine.content || (lastLine.attachment ? "📎 Attachment" : "")}`
-        : `Chatting with ${stranger.partner?.nickname ?? "a stranger"}`
+        : "Chatting anonymously"
       : stranger.phase === "searching"
         ? "Looking for someone…"
         : "Talk to someone new, one-on-one";

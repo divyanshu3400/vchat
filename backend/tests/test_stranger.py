@@ -116,8 +116,9 @@ async def matched_pair():
     got_b, got_a = await b.receive_json_from(), await a.receive_json_from()
     assert got_b["type"] == got_a["type"] == "stranger.matched"
     assert got_b["session"] == got_a["session"]
-    assert got_b["partner"] == {"id": alice.id, "nickname": "alice", "gender": "F", "region": "europe"}
-    assert got_a["partner"] == {"id": bob.id, "nickname": "bob", "gender": "M", "region": "any"}
+    # Anonymous: no name, gender or region, only the id (for adding a friend, blocking, reporting).
+    assert got_b["partner"] == {"id": alice.id, "nickname": "Anonymous", "gender": "", "region": "any"}
+    assert got_a["partner"] == {"id": bob.id, "nickname": "Anonymous", "gender": "", "region": "any"}
     return alice, bob, a, b, got_a["session"]
 
 

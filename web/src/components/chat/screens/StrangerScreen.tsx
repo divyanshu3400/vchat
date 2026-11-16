@@ -15,7 +15,7 @@ import { useRoomPresence } from "@/lib/presence";
 import { REGION_ROOMS, findRoom } from "@/lib/rooms";
 import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
-import { Avatar, Icon } from "../bits";
+import { Icon } from "../bits";
 import UnlockSheet from "../premium/UnlockSheet";
 import { INTERESTS, MAX_INTERESTS, interestLabel } from "@/lib/interests";
 import { useStranger, type FriendCard, type IceCard } from "../stranger/StrangerProvider";
@@ -23,7 +23,17 @@ import { useDock } from "../Dock";
 import Dropdown, { DropItem, DropSep } from "../Dropdown";
 import { looksLikeContact } from "../messages/richText";
 
-const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
+
+/** How the other person in a random chat is shown: never their real name. */
+const ANON = "Anonymous";
+
+function AnonAvatar({ size }: { size: number }) {
+  return (
+    <span className="avatar anon-avatar" style={{ width: size, height: size }} aria-hidden="true">
+      <Icon name="incognito" size={Math.round(size * 0.55)} />
+    </span>
+  );
+}
 
 /** Laptop: random chat in a floating window next to friends' windows. */
 export type WinControls = { minimized: boolean; onToggleMin: () => void; onClose: () => void };
@@ -374,7 +384,7 @@ function ChatView({ win }: { win?: WinControls }) {
     setMenu(null);
     try {
       await blockUser(partner.id, await getAccess());
-      setNotice(`You blocked ${partner.nickname}. You'll never be matched again.`);
+      setNotice("You blocked them. You'll never be matched again.");
     } catch {
       setNotice("Couldn't block. Try again.");
     }
@@ -382,7 +392,6 @@ function ChatView({ win }: { win?: WinControls }) {
   }
 
   if (!partner) return null;
-  const sub = [GENDER[partner.gender], regionName(partner.region)].filter(Boolean).join(" · ");
 
   const headActions = (
           <>
@@ -435,15 +444,16 @@ function ChatView({ win }: { win?: WinControls }) {
             </Dropdown>
           </>
   );
-  const status = ended ? "Chat ended" : `Stranger · ${sub}`;
+  // Random chat is anonymous: no name, gender or region, only how the chat is going.
+  const status = ended ? "Chat ended" : partnerTyping ? "typing…" : "Random chat · anonymous";
 
   return (
     <div className={win ? `win st-win${win.minimized ? " min" : ""}` : "conversation st-chat"}>
       {win ? (
         <header className="win-head" onClick={toggleOnHeader(win)}>
-          <Avatar name={partner.nickname} size={34} />
+          <AnonAvatar size={34} />
           <div className="win-title">
-            <b>{partner.nickname}</b>
+            <b>{ANON}</b>
             <small className={ended ? "" : "on"}>{status}</small>
           </div>
           {!win.minimized && headActions}
@@ -451,8 +461,8 @@ function ChatView({ win }: { win?: WinControls }) {
         </header>
       ) : (
         <ChatHeader
-          title={partner.nickname}
-          avatar={<Avatar name={partner.nickname} size={36} />}
+          title={ANON}
+          avatar={<AnonAvatar size={36} />}
           subtitle={<span className={ended ? "" : "on"}>{status}</span>}
           actions={headActions}
         />
@@ -470,7 +480,7 @@ function ChatView({ win }: { win?: WinControls }) {
         />
       )}
       <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
-        <p className="sys-line">You&apos;re chatting with a stranger{partner.region !== "any" ? ` from ${regionName(partner.region)}` : ""}. Say hi!</p>
+        <p className="sys-line">You&apos;re chatting with someone anonymous. Neither of you can see the other&apos;s name. Say hi!</p>
         {/* Strangers' photos and videos open only if you choose; their links ask first. When the chat
             ends, the messages are gone from the screen (friends keep them in their friend chat). */}
         {!ended && (
@@ -510,12 +520,11 @@ function ChatView({ win }: { win?: WinControls }) {
               );
             }
             const card = any;
-            const who = partner.nickname;
             if (card.kind === "sent")
               return (
                 <div className="friend-card">
                   <span className="friend-card-icon">🤝</span>
-                  <b>You sent {who} a friend request</b>
+                  <b>You sent a friend request</b>
                   <small>Waiting for them to accept.</small>
                 </div>
               );
@@ -523,8 +532,8 @@ function ChatView({ win }: { win?: WinControls }) {
               return (
                 <div className="friend-card incoming">
                   <span className="friend-card-icon">🤝</span>
-                  <b>{who} wants to be friends</b>
-                  <small>Friends keep chatting after this chat ends, with photos and calls.</small>
+                  <b>They want to be friends</b>
+                  <small>Friends see each other&apos;s names and keep chatting after this chat ends, with photos and calls.</small>
                   <span className="friend-card-actions">
                     <button type="button" className="pill-btn primary" onClick={() => card.requestId && answerRequest(card.requestId, "accept").catch(() => setNotice("That request isn't waiting any more."))}>
                       Accept
@@ -539,8 +548,8 @@ function ChatView({ win }: { win?: WinControls }) {
               return (
                 <div className="friend-card done">
                   <span className="friend-card-icon">🎉</span>
-                  <b>You and {who} are friends now</b>
-                  <small>This chat will be saved in Chats.</small>
+                  <b>You&apos;re friends now</b>
+                  <small>You can see each other&apos;s names in Chats, and this chat is saved there.</small>
                 </div>
               );
             return (
@@ -598,7 +607,7 @@ function ChatView({ win }: { win?: WinControls }) {
             // Sent or accepted shows as a card in the chat; only problems need a notice.
             if (!/^(Friend request sent|You and .* are now friends)/.test(msg)) setNotice(msg);
           }}
-          aria-label={rel === "incoming" ? `Accept ${partner.nickname}'s friend request` : `Send ${partner.nickname} a friend request`}
+          aria-label={rel === "incoming" ? "Accept their friend request" : "Send a friend request"}
           title={rel === "incoming" ? "Accept friend request" : "Add friend"}
         >
           <Icon name="plus" size={16} />

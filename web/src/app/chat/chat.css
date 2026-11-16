@@ -951,3 +951,6 @@ button.head-who:active { background: var(--surface-2); }
 .ice-q { font-size: 15px; line-height: 1.4; color: var(--fg); }
 .ice-actions { display: flex; gap: 8px; }
 .ice-actions .pill-btn { height: 32px; font-size: 13px; }
+
+/* random chat: the other person is always anonymous */
+.anon-avatar { background: linear-gradient(135deg, #2c3e36, #4a5f55); color: #e9f3ee; }

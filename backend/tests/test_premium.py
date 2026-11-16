@@ -99,7 +99,7 @@ async def test_filter_needs_plus_or_reward_and_spends_one_use(rewards_on):
 
     await w.send_json_to({"type": "stranger.find"})
     assert (await w.receive_json_from())["type"] == "stranger.matched"
-    assert (await m.receive_json_from())["partner"]["gender"] == "F"
+    assert (await m.receive_json_from())["partner"]["id"] == woman.id  # the filter worked (gender itself isn't shown)
     await m.disconnect()
     await w.disconnect()
 

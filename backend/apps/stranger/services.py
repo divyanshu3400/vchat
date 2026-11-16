@@ -21,9 +21,13 @@ class PhotoLocked(Exception):
         self.detail = detail
 
 
-def partner_brief(user: User, region: str) -> dict:
-    """What a stranger learns about you: nickname, gender and the region you picked. Nothing else."""
-    return {"id": user.id, "nickname": user.nickname, "gender": user.gender, "region": region}
+ANON_NAME = "Anonymous"
+
+
+def partner_brief(user_id: int) -> dict:
+    """What a stranger learns about you: nothing. Random chat is anonymous: no name, gender or
+    region. The id is only there to add a friend, block or report; becoming friends reveals the name."""
+    return {"id": user_id, "nickname": ANON_NAME, "gender": "", "region": "any"}
 
 
 def start_session(waiting_user_id: int, finder_id: int) -> StrangerSession:
@@ -147,8 +151,15 @@ def message_payload(message: StrangerMessage) -> dict:
         "content": message_ops.visible_content(message),
         "attachment": None if message_ops.hides_attachment(message) else media.payload(message.attachment),
         "created_at": message.created_at.isoformat(),
-        **message_ops.extras(message),
+        **_anonymous_reply(message_ops.extras(message)),
     }
+
+
+def _anonymous_reply(extras: dict) -> dict:
+    """A reply quotes the message, never the name behind it."""
+    if extras.get("reply_to"):
+        extras["reply_to"] = {**extras["reply_to"], "nickname": ANON_NAME}
+    return extras
 
 
 def change_message(session_id, user: User, kind: str, message_id, value=None) -> dict:

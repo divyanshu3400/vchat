@@ -28,6 +28,7 @@ from apps.chat import services as chat_services
 from apps.chat.realtime import user_group
 from apps.push import events as push_events
 from apps.social import services as social
+from apps.stranger import services as stranger_services
 
 CALL_ID_RE = re.compile(r"^[0-9a-fA-F-]{8,64}$")
 RING_SECONDS = 60
@@ -157,7 +158,8 @@ class CallMixin:
             "call_id": call_id,
             "kind": kind,
             "stranger": state["stranger"],
-            "from": social.brief(self.user),
+            # Random chat stays anonymous on calls too.
+            "from": stranger_services.partner_brief(self.user.id) if state["stranger"] else social.brief(self.user),
         }
         if callee_channel:
             await self._to_channel(callee_channel, incoming)
