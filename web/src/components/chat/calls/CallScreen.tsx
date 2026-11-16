@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Avatar, Icon } from "../bits";
 import { useCalls } from "./CallProvider";
+import { useMicGlow, VoiceRing } from "./VoiceRing";
 
 function Timer({ since }: { since: number }) {
   const [now, setNow] = useState(() => Date.now());
@@ -92,6 +93,9 @@ export default function CallScreen() {
   // Phones show the call on the lock screen and in notifications, with hang up / mute.
   const peerName = call ? (call.stranger ? "Anonymous" : call.peer.nickname) : "";
   const active = call?.phase === "active";
+  // Your own voice lights the mute button (voice calls, full screen, not muted).
+  const micBtn = useRef<HTMLButtonElement>(null);
+  useMicGlow(localStream, !!call && call.kind !== "video" && active && !muted && !mini, micBtn);
   useEffect(() => {
     const ms = typeof navigator !== "undefined" ? navigator.mediaSession : undefined;
     if (!ms || !active) return;
@@ -254,7 +258,11 @@ export default function CallScreen() {
       )}
 
       <div className="call-top">
-        {(!video || !inCall || !remoteStream) && <Avatar name={peerName} size={104} />}
+        {!video ? (
+          <VoiceRing name={peerName} stream={remoteStream} talking={call.phase === "active" && !mini} />
+        ) : (
+          (!inCall || !remoteStream) && <Avatar name={peerName} size={104} />
+        )}
         <h2>{peerName}</h2>
         <p className="call-status">{call.phase === "active" && call.startedAt ? <Timer since={call.startedAt} /> : status}</p>
         {call.stranger && call.phase !== "ended" && <p className="call-hint">Voice only. Your name, number and video stay private.</p>}
@@ -273,7 +281,7 @@ export default function CallScreen() {
         ) : call.phase === "ended" ? null : (
           <>
             {inCall && (
-              <button type="button" className={`call-btn soft${muted ? " on" : ""}`} onClick={toggleMute} aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"}>
+              <button ref={micBtn} type="button" className={`call-btn soft mic-btn${muted ? " on" : ""}`} onClick={toggleMute} aria-pressed={muted} aria-label={muted ? "Unmute" : "Mute"}>
                 <Icon name={muted ? "micoff" : "mic"} size={24} />
               </button>
             )}
