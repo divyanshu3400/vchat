@@ -1033,3 +1033,21 @@ html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); 
 .conversation:has(.media-panel) .jump-latest, .win:has(.media-panel) .jump-latest, .conversation:has(.media-panel) .fab-friend { display: none; }
 .media-panel { grid-template-columns: minmax(0, 1fr); overflow: hidden; }
 .mp-body, .mp-search-row { min-width: 0; }
+
+/* --- people search and message requests ---------------------------------------------------- */
+.conv-person { appearance: none; width: 100%; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.conv-requests { appearance: none; width: 100%; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.requests-orb { background: var(--brand-soft); color: var(--brand); }
+.conv-request { padding-left: 28px; background: color-mix(in srgb, var(--brand) 4%, transparent); }
+.list-more { margin: 6px 16px 14px; }
+.person-sheet { gap: 14px; }
+.person-head { display: flex; align-items: center; gap: 14px; }
+.person-head h2 { font-size: 21px; margin: 0; }
+.person-actions { display: grid; gap: 8px; }
+.person-actions .sheet-opt:disabled { opacity: 0.6; cursor: default; }
+.person-small { display: flex; gap: 8px; justify-content: flex-end; }
+.pill-btn.danger-text { color: var(--danger); }
+.person-note { margin: 0; font-size: 13px; color: var(--muted); }
+.request-bar { display: grid; gap: 8px; padding: 10px 12px; margin: 0 10px 8px; border-radius: 14px; background: var(--brand-soft); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); }
+.request-bar p { margin: 0; font-size: 13.5px; }
+.request-bar span { display: flex; gap: 8px; flex-wrap: wrap; }

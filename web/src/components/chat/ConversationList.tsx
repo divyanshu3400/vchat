@@ -10,6 +10,7 @@ import { useRoomPresence } from "@/lib/presence";
 import { ALL_ROOMS } from "@/lib/rooms";
 import { useChat } from "./ChatProvider";
 import { RANDOM_WINDOW, useDock } from "./Dock";
+import PeopleSearch from "./PeopleSearch";
 import { gifLabel } from "@/lib/gifs";
 import { useStranger } from "./stranger/StrangerProvider";
 import { Avatar, Icon, timeAgo } from "./bits";
@@ -32,6 +33,8 @@ type PersonRow = {
   /** Position among pinned chats, or -1. */
   pin: number;
   muted: boolean;
+  /** My message request, still waiting for them. */
+  outgoing?: boolean;
 };
 
 function FriendRequests() {
@@ -94,6 +97,8 @@ export default function ConversationList() {
   const presence = useRoomPresence();
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
+  const [showRequests, setShowRequests] = useState(false);
+  const requests = conversations.filter((c) => c.request === "incoming");
   const searchId = useId(); // the list is mounted twice on some screens (pane + Chats tab)
   const q = query.trim().toLowerCase();
 
@@ -101,6 +106,7 @@ export default function ConversationList() {
   const people = useMemo<PersonRow[]>(() => {
     const rows = new Map<number, PersonRow>();
     for (const c of conversations) {
+      if (c.request === "incoming") continue; // shown under "Message requests"
       const f = friends.find((x) => x.user.id === c.user.id);
       rows.set(c.user.id, {
         user: c.user,
@@ -111,6 +117,7 @@ export default function ConversationList() {
         unread: unread[c.user.id] ?? 0,
         pin: c.pinned ? conversations.filter((x) => x.pinned).indexOf(c) : -1,
         muted: !!c.muted,
+        outgoing: c.request === "outgoing",
       });
     }
     for (const f of friends) {
@@ -162,7 +169,7 @@ export default function ConversationList() {
         <span className="conv-mid">
           <span className="conv-name">
             {p.user.nickname}
-            {!p.friend && <span className="tag">Not friends</span>}
+            {!p.friend && <span className="tag">{p.outgoing ? "Request sent" : "Not friends"}</span>}
             {p.muted && (
               <span className="conv-flag" title="Muted" aria-label="Muted">
                 <Icon name="belloff" size={13} />
@@ -201,7 +208,7 @@ export default function ConversationList() {
           <input
             id={searchId}
             type="search"
-            placeholder="Search friends and rooms"
+            placeholder="Search chats, rooms and people"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             autoComplete="off"
@@ -265,6 +272,44 @@ export default function ConversationList() {
           </Link>
         )}
         {tab !== "rooms" && <FriendRequests />}
+        {tab === "all" && !q && requests.length > 0 && (
+          <>
+            <button type="button" className="conv conv-requests" aria-expanded={showRequests} onClick={() => setShowRequests((v) => !v)}>
+              <span className="random-orb requests-orb" aria-hidden="true">
+                <Icon name="chat" size={20} />
+              </span>
+              <span className="conv-mid">
+                <span className="conv-name">Message requests</span>
+                <span className="conv-preview">People who aren&apos;t your friends yet</span>
+              </span>
+              <span className="conv-meta">
+                <span className="badge">{requests.length}</span>
+              </span>
+            </button>
+            {showRequests &&
+              requests.map((c) => (
+                <a
+                  key={c.user.id}
+                  href={`/chat/dm/${c.user.id}`}
+                  className="conv conv-request"
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey) return;
+                    e.preventDefault();
+                    openChat(c.user.id);
+                  }}
+                >
+                  <Avatar name={c.user.nickname} size={40} />
+                  <span className="conv-mid">
+                    <span className="conv-name">{c.user.nickname}</span>
+                    <span className="conv-preview">{c.last_message}</span>
+                  </span>
+                  <span className="conv-meta">
+                    <time dateTime={c.last_message_at}>{timeAgo(c.last_message_at)}</time>
+                  </span>
+                </a>
+              ))}
+          </>
+        )}
 
         {tab !== "rooms" && (
           <>
@@ -283,6 +328,7 @@ export default function ConversationList() {
                 {ADS_ON && !isDesktop && (i + 1) % NATIVE_EVERY === 0 && <AdSlot kind="native" className="conv-native" />}
               </Fragment>
             ))}
+            {q.length >= 2 && <PeopleSearch query={query} skip={new Set(shownPeople.map((p) => p.user.id))} />}
           </>
         )}
 

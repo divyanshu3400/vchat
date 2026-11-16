@@ -71,6 +71,14 @@ class Conversation(models.Model):
     b_muted_until = models.DateTimeField(null=True, blank=True)
     a_pinned_at = models.DateTimeField(null=True, blank=True)
     b_pinned_at = models.DateTimeField(null=True, blank=True)
+    # A message request (someone wrote to a person who isn't their friend). Friends need none of this.
+    # Pending: requested_by set, accepted_at and declined_at empty. Declined requests stay hidden
+    # from the person who declined; the sender isn't told.
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    declined_at = models.DateTimeField(null=True, blank=True)
 
     AUTO_DELETE_CHOICES = (1, 7, 30, 365)
 

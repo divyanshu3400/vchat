@@ -115,8 +115,36 @@ class DmMessagesView(APIView):
                 "partner_read_id": services.partner_read_id(request.user, partner.id),
                 "auto_delete_days": services.auto_delete_days(request.user, partner.id),
                 "prefs": services.prefs_with(request.user, partner.id),
+                # friend | accepted | outgoing | incoming | declined | none (see services.chat_state)
+                "chat_state": services.chat_state(request.user.id, partner.id),
+                "request_messages_left": services.request_messages_left(request.user.id, partner.id),
             }
         )
+
+
+class PeopleSearchView(APIView):
+    """GET /api/people/?q=<name>&offset=<n>: people by name (2+ letters), for Chats search."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "people_search"
+
+    def get(self, request):
+        try:
+            offset = max(0, int(request.query_params.get("offset", 0)))
+        except ValueError:
+            offset = 0
+        return Response(services.search_people(request.user, request.query_params.get("q", ""), offset))
+
+
+class MessageRequestView(APIView):
+    """POST /api/dms/<id>/request/ {"action": "accept" | "delete"}: answer someone's message request."""
+
+    def post(self, request, user_id):
+        try:
+            result = services.answer_message_request(request.user, user_id, str(request.data.get("action", "")))
+        except SocialError as exc:
+            return Response({"code": exc.code, "detail": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"result": result, "chat_state": services.chat_state(request.user.id, user_id)})
 
 
 class DmPrefsView(APIView):

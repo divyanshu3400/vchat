@@ -376,6 +376,106 @@ def touch_last_seen(user_id: int) -> None:
     User.objects.filter(pk=user_id).update(last_seen_at=timezone.now())
 
 
+# --- people search and message requests -------------------------------------------
+
+REQUEST_MESSAGES = 3  # text messages before the other person accepts
+REQUESTS_PER_DAY = 20  # new people one account can write to in a day
+SEARCH_PAGE = 20
+
+
+def _active_people():
+    """Accounts others may find: saved, active, findable, not banned."""
+    now = timezone.now()
+    return User.objects.filter(is_active=True, is_guest=False, discoverable=True, deactivated_at__isnull=True).filter(
+        Q(banned_until__isnull=True) | Q(banned_until__lt=now)
+    )
+
+
+def search_people(viewer: User, query: str, offset: int = 0) -> dict:
+    """Names starting with the query first, then names containing it. Never yourself, blocked
+    people (either way), guests, banned or closed accounts, or people who turned search off."""
+    from apps.chat.services import blocked_user_ids
+
+    q = " ".join(str(query or "").split())[:30]
+    if len(q) < 2:
+        return {"results": [], "next": None}
+    hidden = blocked_user_ids(viewer.id) | {viewer.id}
+    base = _active_people().exclude(id__in=hidden).filter(nickname__icontains=q)
+    starts = base.annotate(rank=Case(When(nickname__istartswith=q, then=Value(0)), default=Value(1), output_field=IntegerField()))
+    page = list(starts.order_by("rank", "nickname", "id")[offset : offset + SEARCH_PAGE + 1])
+    more = len(page) > SEARCH_PAGE
+    page = page[:SEARCH_PAGE]
+    friends = set(friend_ids(viewer.id))
+    sent = set(FriendRequest.objects.filter(from_user=viewer, status=FriendRequest.Status.PENDING).values_list("to_user_id", flat=True))
+    got = set(FriendRequest.objects.filter(to_user=viewer, status=FriendRequest.Status.PENDING).values_list("from_user_id", flat=True))
+    results = []
+    for u in page:
+        mutual = len(friends & set(friend_ids(u.id))) if friends else 0
+        relation = "friend" if u.id in friends else "requested" if u.id in sent else "incoming" if u.id in got else "none"
+        results.append({
+            "user": brief(u),
+            "relation": relation,
+            "joined": u.date_joined.strftime("%b %Y"),
+            "mutual_friends": mutual,
+        })
+    return {"results": results, "next": offset + SEARCH_PAGE if more else None}
+
+
+def chat_state(user_id: int, partner_id: int, conversation: Conversation | None = None) -> str:
+    """What this user may do in the chat with partner:
+    friend | accepted (a request was accepted) | outgoing (my request, waiting) |
+    incoming (their request, waiting for me) | none (nothing yet)."""
+    if are_friends(user_id, partner_id):
+        return "friend"
+    c = conversation if conversation is not None else _conversation(user_id, partner_id)
+    if c is None or c.requested_by_id is None:
+        return "none"
+    if c.accepted_at:
+        return "accepted"
+    if c.requested_by_id == user_id:
+        return "outgoing"
+    return "declined" if c.declined_at else "incoming"
+
+
+def request_messages_left(user_id: int, partner_id: int) -> int | None:
+    """While my request waits: how many more messages I may send. None otherwise."""
+    c = _conversation(user_id, partner_id)
+    if chat_state(user_id, partner_id, c) not in ("outgoing", "none"):
+        return None
+    sent = DirectMessage.objects.filter(conversation=c, sender_id=user_id).count() if c else 0
+    return max(0, REQUEST_MESSAGES - sent)
+
+
+def connected_ids(user_id: int) -> set[int]:
+    """Friends and people whose message request was accepted: random chat never pairs them."""
+    out = set(friend_ids(user_id))
+    rows = Conversation.objects.filter(Q(user_a_id=user_id) | Q(user_b_id=user_id), accepted_at__isnull=False).values_list("user_a_id", "user_b_id")
+    for a, b in rows:
+        out.add(b if a == user_id else a)
+    out.discard(user_id)
+    return out
+
+
+def answer_message_request(user: User, partner_id, action: str) -> str:
+    """The person who got a request: "accept" opens the chat both ways; "delete" hides it for them."""
+    if not isinstance(partner_id, int):
+        raise SocialError("invalid", "Pick a chat.")
+    c = _conversation(user.id, partner_id)
+    if c is None or chat_state(user.id, partner_id, c) not in ("incoming", "declined"):
+        raise SocialError("not_found", "That request isn't waiting any more.")
+    now = timezone.now()
+    if action == "accept":
+        Conversation.objects.filter(pk=c.pk).update(accepted_at=now, declined_at=None)
+    elif action == "delete":
+        Conversation.objects.filter(pk=c.pk).update(declined_at=now)
+    else:
+        raise SocialError("invalid", "Accept or delete.")
+    _on_commit_push(user.id, {"type": "conversations.changed"})
+    if action == "accept":
+        _on_commit_push(partner_id, {"type": "conversations.changed"})
+    return "accepted" if action == "accept" else "deleted"
+
+
 # --- direct messages ------------------------------------------------------
 
 
@@ -388,19 +488,50 @@ def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None, repl
     """Text, an attachment (photo, video, voice note), or both."""
     if not isinstance(recipient_id, int) or recipient_id == sender.id:
         raise SocialError("invalid", "Pick someone to message.")
-    if not are_friends(sender.id, recipient_id):
-        raise SocialError("not_friends", "You can only message friends. Send a friend request first.")
-    if not User.objects.filter(id=recipient_id, is_active=True).exists():
+    recipient = User.objects.filter(id=recipient_id, is_active=True).first()
+    if recipient is None:
         raise SocialError("inactive", "This account isn't active.")
+    if is_blocked_between(sender.id, recipient_id):
+        raise SocialError("not_allowed", "You can't message this user.")
     x, y = ordered_pair(sender.id, recipient_id)
     with transaction.atomic():
+        existing = Conversation.objects.select_for_update().filter(user_a_id=x, user_b_id=y).first()
+        state = chat_state(sender.id, recipient_id, existing)
+        # Photos, videos and voice stay between friends; GIFs and text are fine once accepted.
+        if attachment_id and state != "friend":
+            raise SocialError("friends_only", "Photos, videos and voice messages are for friends. Send a friend request first.")
+        if state == "incoming":
+            # Writing back to a request accepts it.
+            Conversation.objects.filter(pk=existing.pk).update(accepted_at=timezone.now(), declined_at=None)
+            _on_commit_push(recipient_id, {"type": "conversations.changed"})
+        elif state in ("none", "outgoing"):
+            from apps.gifs.services import is_gif
+
+            if sender.is_guest:
+                raise SocialError("account_required", "Save your account with an email to message people who aren't your friends.")
+            if is_gif(text):
+                raise SocialError("text_only", "Message requests are text only until they accept.")
+            if state == "none":
+                if recipient.is_guest or not recipient.discoverable:
+                    raise SocialError("not_allowed", "You can't message this user. Send a friend request instead.")
+                started = Conversation.objects.filter(requested_by=sender, created_at__gte=timezone.now() - timedelta(days=1)).count()
+                if started >= REQUESTS_PER_DAY:
+                    raise SocialError("too_many", "You've messaged a lot of new people today. Try again tomorrow.")
+            else:
+                sent = DirectMessage.objects.filter(conversation=existing, sender=sender).count()
+                if sent >= REQUEST_MESSAGES:
+                    raise SocialError("request_limit", f"You can send {REQUEST_MESSAGES} messages until they accept your request.")
         attachment = None
         if attachment_id:
             try:
                 attachment = media.claim_for_message(sender.id, attachment_id, ("image", "video", "audio"))
             except (media.UploadError, ValueError, ValidationError):
                 raise SocialError("invalid_attachment", "That file can't be sent. Try uploading it again.")
-        conversation, _ = Conversation.objects.get_or_create(user_a_id=x, user_b_id=y)
+        conversation = existing or Conversation.objects.create(
+            user_a_id=x, user_b_id=y, requested_by=None if state == "friend" else sender
+        )
+        if existing and state == "none":
+            Conversation.objects.filter(pk=existing.pk).update(requested_by=sender)
         reply_to = message_ops.find_reply(DirectMessage, reply_id, conversation=conversation)
         message = DirectMessage.objects.create(
             conversation=conversation, sender=sender, content=text, attachment=attachment, reply_to=reply_to
@@ -408,7 +539,13 @@ def send_dm(sender: User, recipient_id: int, text: str, attachment_id=None, repl
         Conversation.objects.filter(pk=conversation.pk).update(last_message_at=message.created_at)
         # Your own message counts as read for you.
         _advance_read(conversation, sender.id, message.id)
-    return dm_payload(_load_dm(message.id), recipient_id)
+        if state in ("none", "outgoing"):
+            # A request: both lists move it to (or keep it in) the right place.
+            _on_commit_push(sender.id, {"type": "conversations.changed"})
+            _on_commit_push(recipient_id, {"type": "conversations.changed"})
+    payload = dm_payload(_load_dm(message.id), recipient_id)
+    payload["request"] = state in ("none", "outgoing")
+    return payload
 
 
 def auto_delete_days(user: User, partner_id: int) -> int:
@@ -513,18 +650,32 @@ def conversations_of(user: User, limit: int = 100) -> list[dict]:
             return closing.MASK
         return gif_label(c.last_content or "") or ATTACHMENT_PREVIEW.get(c.last_kind or "", "")
 
-    out = [
-        {
-            "user": brief(c.user_b if c.user_a_id == user.id else c.user_a),
-            "last_message": preview(c, c.user_b if c.user_a_id == user.id else c.user_a),
+    friends = set(friend_ids(user.id))
+
+    def request_of(c, partner_id) -> str | None:
+        """None for a normal chat; "incoming" / "outgoing" for a message request still waiting."""
+        if partner_id in friends or c.requested_by_id is None or c.accepted_at:
+            return None
+        if c.requested_by_id == user.id:
+            return "outgoing"
+        return "declined" if c.declined_at else "incoming"
+
+    out = []
+    for c in rows:
+        partner = c.user_b if c.user_a_id == user.id else c.user_a
+        req = request_of(c, partner.id)
+        if req == "declined":
+            continue  # you deleted this request: it stays out of your list
+        out.append({
+            "user": brief(partner),
+            "last_message": preview(c, partner),
             "last_from_me": c.last_sender_id == user.id,
             "last_message_at": c.last_message_at.isoformat(),
             "unread": c.unread,
+            "request": req,
             **chat_prefs(c, user.id),
             "_pinned_at": _mine(c, user.id, "pinned_at"),
-        }
-        for c in rows
-    ]
+        })
     # Pinned chats first, in the order they were pinned; then the most recent.
     pinned = sorted((r for r in out if r["_pinned_at"]), key=lambda r: r["_pinned_at"])
     rest = [r for r in out if not r["_pinned_at"]]

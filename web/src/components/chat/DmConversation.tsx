@@ -12,6 +12,8 @@ import {
   type DirectMessage,
   type ViewMode,
   type ChatPrefs,
+  type ChatState,
+  answerMessageRequest,
   setChatPrefs,
 } from "@/lib/api";
 import { useCalls } from "./calls/CallProvider";
@@ -59,7 +61,7 @@ function muteChoice(until: string | null) {
 
 export default function DmConversation({ userId, variant = "page", minimized = false, onToggleMin, onClose }: Props) {
   const router = useRouter();
-  const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive, unread, queueDm, outbox, retryDm, discardDm } =
+  const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive, unread, queueDm, outbox, retryDm, discardDm, askAccount } =
     useChat();
   // Unread when the chat was opened: "N new messages" goes above the first of them.
   const [unreadAtOpen] = useState(() => unread[userId] ?? 0);
@@ -77,6 +79,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const [partnerRead, setPartnerRead] = useState(0);
   const [autoDelete, setAutoDelete] = useState(7);
   const [prefs, setPrefs] = useState<ChatPrefs>({ muted: false, muted_until: null, pinned: false });
+  // Message requests between people who aren't friends (see ChatState).
+  const [chatState, setChatState] = useState<ChatState | null>(null);
+  const [requestLeft, setRequestLeft] = useState<number | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -94,6 +99,27 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   // A deactivated or deleted account: the old chat stays readable (as "********"), nothing can be sent.
   const gone = !!partner?.inactive;
   const isFriend = rel === "friend" && !gone;
+  const requestState = isFriend ? "friend" : (chatState ?? "none");
+  // Text (and GIFs once accepted) works without being friends; photos, voice and calls don't.
+  const canText =
+    isFriend ||
+    (!gone &&
+      (requestState === "accepted" ||
+        requestState === "incoming" ||
+        requestState === "declined" ||
+        ((requestState === "outgoing" || requestState === "none") && me?.is_guest === false && (requestLeft ?? 3) > 0)));
+
+  async function answerRequest(action: "accept" | "delete") {
+    try {
+      const res = await answerMessageRequest(userId, action, await getAccess());
+      if (action === "delete") {
+        if (onClose) onClose();
+        else router.push("/chat/inbox");
+      } else setChatState(res.chat_state);
+    } catch (e) {
+      setNotice(e instanceof ApiError ? e.message : "That didn't work. Try again.");
+    }
+  }
   const partnerOnline = friends.some((f) => f.user.id === userId && f.online);
   const partnerLastSeen = friends.find((f) => f.user.id === userId)?.last_seen ?? null;
 
@@ -120,6 +146,8 @@ export default function DmConversation({ userId, variant = "page", minimized = f
         setPartnerRead((r) => Math.max(r, res.partner_read_id ?? 0));
         setAutoDelete(res.auto_delete_days ?? 7);
         if (res.prefs) setPrefs(res.prefs);
+        setChatState(res.chat_state ?? null);
+        setRequestLeft(res.request_messages_left ?? null);
       })
       .catch((e) => {
         if (!cancelled && e instanceof ApiError && e.status === 404) setMissing(true);
@@ -153,7 +181,12 @@ export default function DmConversation({ userId, variant = "page", minimized = f
           // A random chat with this person moved in here: reload.
           getAccess()
             .then((access) => fetchDmHistory(userId, access))
-            .then((res) => setMessages((prev) => merge(prev, res.messages)))
+            .then((res) => {
+              setMessages((prev) => merge(prev, res.messages));
+              // A request accepted (or a new one) changes what this chat allows.
+              setChatState(res.chat_state ?? null);
+              setRequestLeft(res.request_messages_left ?? null);
+            })
             .catch(() => undefined);
         } else if (event.type === "dm.read" && event.user_id === userId) {
           setPartnerRead((r) => Math.max(r, event.last_id));
@@ -258,7 +291,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   }
 
   function send(text: string): boolean {
-    if (!isFriend) return false;
+    if (!canText) return false;
     if (editing) {
       lastOpAt.current = clock();
       if (!sendRaw({ type: "dm.edit", message_id: editing.id, content: text })) {
@@ -286,6 +319,12 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     );
     setNotice("");
     setReplying(null);
+    if (requestState === "none" || requestState === "outgoing") {
+      setChatState("outgoing");
+      setRequestLeft((n) => Math.max(0, (n ?? 3) - 1));
+    } else if (requestState === "incoming" || requestState === "declined") {
+      setChatState("accepted"); // writing back accepts their request
+    }
     return true;
   }
 
@@ -335,7 +374,13 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     : !socketLive
     ? "Reconnecting…"
     : !isFriend
-      ? "Not friends"
+      ? requestState === "accepted"
+        ? "Chat · not friends"
+        : requestState === "outgoing"
+          ? "Message request sent"
+          : requestState === "incoming" || requestState === "declined"
+            ? "Wants to chat with you"
+            : "Not friends"
       : partnerTyping
         ? "typing…"
         : partnerOnline
@@ -623,23 +668,59 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               </p>
             )}
             {gone && <p className="chat-notice">This account isn&apos;t active. You can&apos;t message or call it.</p>}
-            {!gone && !isFriend && partner && (
-              <p className="chat-notice">
-                You can only message friends.{" "}
-                {rel === "requested" ? (
-                  "Your friend request is waiting."
-                ) : (
-                  <button type="button" className="inline-link" onClick={async () => partner && setNotice(await addFriend(partner))}>
-                    {rel === "incoming" ? "Accept their friend request" : "Send a friend request"}
+            {!gone && !isFriend && partner && (requestState === "incoming" || requestState === "declined") && (
+              <div className="request-bar" role="group" aria-label="Message request">
+                <p>
+                  <b>{name} wants to chat with you.</b> They can&apos;t send photos or call unless you become friends.
+                </p>
+                <span>
+                  <button type="button" className="pill-btn primary" onClick={() => answerRequest("accept")}>
+                    Accept
                   </button>
+                  <button type="button" className="pill-btn" onClick={() => answerRequest("delete")}>
+                    Delete
+                  </button>
+                  <button type="button" className="pill-btn danger-text" onClick={() => setConfirming("block")}>
+                    Block
+                  </button>
+                </span>
+              </div>
+            )}
+            {!gone && !isFriend && partner && requestState !== "incoming" && requestState !== "declined" && (
+              <p className="chat-notice">
+                {me?.is_guest !== false && requestState !== "accepted" ? (
+                  <>
+                    Save your account to message people who aren&apos;t your friends.{" "}
+                    <button type="button" className="inline-link" onClick={() => askAccount()}>
+                      Save my account
+                    </button>
+                  </>
+                ) : requestState === "accepted" ? (
+                  "You're chatting without being friends: text and GIFs only. "
+                ) : requestState === "outgoing" ? (
+                  requestLeft === 0 ? (
+                    "Your message request is waiting. You can write again once they accept. "
+                  ) : (
+                    `Message request sent: ${requestLeft} more ${requestLeft === 1 ? "message" : "messages"} until they accept. `
+                  )
+                ) : (
+                  "Your first message goes to their message requests (text only, up to 3 until they accept). "
                 )}
+                {me?.is_guest === false &&
+                  (rel === "requested" ? (
+                    "Friend request sent."
+                  ) : (
+                    <button type="button" className="inline-link" onClick={async () => partner && setNotice(await addFriend(partner))}>
+                      {rel === "incoming" ? "Accept their friend request" : "Add friend"}
+                    </button>
+                  ))}
               </p>
             )}
             <Composer
               id={`dm-input-${userId}-${variant}`}
               draftKey={`dm:${userId}`}
-              placeholder={isFriend ? `Message ${name}` : "Messaging is off"}
-              disabled={!isFriend}
+              placeholder={canText ? `Message ${name}` : gone ? "Messaging is off" : "Waiting for them to accept"}
+              disabled={!canText}
               onSend={send}
               onTyping={sendTyping}
               replying={replying}
@@ -647,7 +728,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               onCancelReply={() => setReplying(null)}
               editing={editing}
               onCancelEdit={() => setEditing(null)}
-              onVoice={(blob, view) => sendFile(blob, "audio", voiceFilename(blob), view)}
+              onVoice={isFriend ? (blob, view) => sendFile(blob, "audio", voiceFilename(blob), view) : undefined}
               left={
                 <>
                   <input

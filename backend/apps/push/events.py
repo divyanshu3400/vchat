@@ -10,6 +10,10 @@ def dm_received(recipient_id: int, sender_id: int, nickname: str, content: str, 
 
     if is_muted(recipient_id, sender_id):
         return  # muted chat: no notification
+    from apps.social.services import chat_state
+
+    if chat_state(recipient_id, sender_id) in ("incoming", "declined"):
+        return  # message requests wait quietly in Requests
     from apps.gifs.services import label as gif_label
 
     text = gif_label(content.strip()) or KIND_PREVIEW.get(attachment_kind or "", "New message")

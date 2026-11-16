@@ -149,7 +149,7 @@ class MeView(APIView):
         return Response(MeSerializer(user).data)
 
 
-PRIVACY_FIELDS = ("show_last_seen", "show_online", "read_receipts")
+PRIVACY_FIELDS = ("show_last_seen", "show_online", "read_receipts", "discoverable")
 
 
 def _loginable(email: str):

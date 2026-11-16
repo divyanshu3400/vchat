@@ -112,7 +112,9 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
         if sent_key:
             await database_sync_to_async(cache.set)(sent_key, payload, 3600)
 
-        event = {"type": "user.event", "payload": {"type": "dm", "message": payload, "client_id": client_id}}
+        is_request = payload.pop("request", False)
+        # "request": a message request (no banner or notification for the person it's sent to).
+        event = {"type": "user.event", "payload": {"type": "dm", "message": payload, "client_id": client_id, "request": is_request}}
         for uid in {self.user.id, recipient_id}:
             await self.channel_layer.group_send(user_group(uid), event)
         attachment = payload.get("attachment") or {}

@@ -45,6 +45,8 @@ class User(AbstractUser):
     # receipts and you see nobody's "Seen" either.
     show_online = models.BooleanField(default=True)
     read_receipts = models.BooleanField(default=True)
+    # Others can find this account by name (Chats search) and send a message request.
+    discoverable = models.BooleanField(default=True)
 
     # --- closing the account (apps/accounts/closing.py) ---
     # Set while deactivated (is_active is False then): others see "vChat user" and "********".

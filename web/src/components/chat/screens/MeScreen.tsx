@@ -14,9 +14,10 @@ import AppSettings from "../nudges/AppSettings";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
-type PrivacyKey = "show_online" | "show_last_seen" | "read_receipts";
+type PrivacyKey = "discoverable" | "show_online" | "show_last_seen" | "read_receipts";
 // Give and take, like WhatsApp: hide yours and you don't see other people's either.
 const PRIVACY: [PrivacyKey, string, string][] = [
+  ["discoverable", "Let people find me by name", "Others can search for you in Chats and send a message request. Off: only friends and random chat."],
   ["show_online", "Show when I'm online", "Off: friends always see you as offline, and you won't see who's online."],
   ["show_last_seen", "Show my last seen", "Friends see when you were last online. Turn it off and you won't see theirs either."],
   ["read_receipts", "Read receipts", "Off: friends don't see when you've read their messages, and you won't see theirs."],

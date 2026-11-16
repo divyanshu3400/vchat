@@ -76,7 +76,8 @@ export default function MessageBanner() {
       subscribe((event) => {
         if (event.type !== "dm") return;
         const m = event.message;
-        if (!me || m.sender.id === me.id || isWatching(m.sender.id) || mutedRef.current.has(m.sender.id)) return;
+        // Message requests wait quietly in Chats > Message requests.
+        if (event.request || !me || m.sender.id === me.id || isWatching(m.sender.id) || mutedRef.current.has(m.sender.id)) return;
         if (phaseRef.current === "chatting" || document.visibilityState !== "visible" || !inAppAlertsOn()) return;
         const kind = m.attachment?.kind;
         const text = gifLabel(m.content) || (kind === "image" ? "📷 Photo" : kind === "video" ? "🎬 Video" : kind === "audio" ? "🎤 Voice message" : "");

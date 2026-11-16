@@ -75,16 +75,20 @@ async def test_resent_dm_after_a_reconnect_is_not_saved_twice():
     await a.disconnect()
 
 
-async def test_dm_to_non_friend_is_rejected():
+async def test_dm_to_a_non_friend_is_a_quiet_message_request():
     _, a_token = await make_user("alice")
     bob, b_token = await make_user("bob")
     a = await personal_socket(a_token)
     b = await personal_socket(b_token)
 
-    await a.send_json_to({"type": "dm", "to": bob.id, "content": "hi stranger"})
-    assert (await a.receive_json_from())["code"] == "not_friends"
-    assert await b.receive_nothing(timeout=0.3)
-    assert await database_sync_to_async(DirectMessage.objects.count)() == 0
+    await a.send_json_to({"type": "dm", "to": bob.id, "content": "hi stranger", "client_id": "r1"})
+    mine = [await a.receive_json_from() for _ in range(2)]
+    assert {e["type"] for e in mine} == {"dm", "conversations.changed"}
+    assert [e for e in mine if e["type"] == "dm"][0]["request"] is True
+    events = [await b.receive_json_from() for _ in range(2)]
+    assert {e["type"] for e in events} == {"dm", "conversations.changed"}
+    assert [e for e in events if e["type"] == "dm"][0]["request"] is True
+    assert await database_sync_to_async(DirectMessage.objects.count)() == 1
     await a.disconnect()
     await b.disconnect()
 

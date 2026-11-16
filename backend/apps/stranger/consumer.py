@@ -132,6 +132,11 @@ class StrangerMixin:
             else []
         )
         blocked = await database_sync_to_async(chat_services.blocked_user_ids)(self.user.id)
+        # Friends (and people whose message request was accepted) already know each other:
+        # random chat is for meeting someone new.
+        from apps.social.services import connected_ids
+
+        blocked = blocked | await database_sync_to_async(connected_ids)(self.user.id)
         me = matchmaker.Entry(
             channel=self.channel_name, user_id=self.user.id, nickname=self.user.nickname,
             gender=self.user.gender, region=region, want=want, interests=interests,

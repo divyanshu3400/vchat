@@ -7,6 +7,8 @@ export type ChatUser = {
   show_last_seen?: boolean;
   show_online?: boolean;
   read_receipts?: boolean;
+  /** Yours only: others can find you by name and send a message request. */
+  discoverable?: boolean;
   /** Deactivated or deleted: shown as "vChat user", messages as "********". */
   inactive?: boolean;
   /** Only ever present for yourself. */
@@ -124,7 +126,31 @@ export function setChatPrefs(userId: number, body: { mute?: string; pin?: boolea
   return request<ChatPrefs>(`/api/dms/${userId}/prefs`, { method: "POST", access, body: JSON.stringify(body) });
 }
 
-export function updateMe(body: { show_last_seen?: boolean; show_online?: boolean; read_receipts?: boolean }, access: string) {
+/** friend | accepted (their request accepted) | outgoing (my request) | incoming (theirs) | declined | none */
+export type ChatState = "friend" | "accepted" | "outgoing" | "incoming" | "declined" | "none";
+export type PersonResult = {
+  user: ChatUser;
+  relation: "friend" | "requested" | "incoming" | "none";
+  joined: string;
+  mutual_friends: number;
+};
+
+/** People by name (2+ letters), for Chats search. */
+export function searchPeople(q: string, offset: number, access: string) {
+  const qs = new URLSearchParams({ q, offset: String(offset) });
+  return request<{ results: PersonResult[]; next: number | null }>(`/api/people?${qs}`, { access });
+}
+
+/** Answer someone's message request: accept opens the chat both ways; delete hides it for you. */
+export function answerMessageRequest(userId: number, action: "accept" | "delete", access: string) {
+  return request<{ result: string; chat_state: ChatState }>(`/api/dms/${userId}/request`, {
+    method: "POST",
+    access,
+    body: JSON.stringify({ action }),
+  });
+}
+
+export function updateMe(body: { show_last_seen?: boolean; show_online?: boolean; read_receipts?: boolean; discoverable?: boolean }, access: string) {
   return request<ChatUser>("/api/auth/me", { method: "PATCH", access, body: JSON.stringify(body) });
 }
 
@@ -298,12 +324,14 @@ export type ConversationSummary = {
   last_from_me: boolean;
   last_message_at: string;
   unread: number;
+  /** A message request still waiting: theirs ("incoming") or yours ("outgoing"). */
+  request?: "incoming" | "outgoing" | null;
 } & Partial<ChatPrefs>;
 
 /** Events pushed on the personal socket (/ws/me/). */
 export type UserEvent =
   | { type: "ready"; user: ChatUser }
-  | { type: "dm"; message: DirectMessage; client_id: string }
+  | { type: "dm"; message: DirectMessage; client_id: string; request?: boolean }
   | { type: "dm.update"; message: DirectMessage }
   | { type: "dm.read"; user_id: number; last_id: number }
   | { type: "dm.typing"; user_id: number }
@@ -440,6 +468,8 @@ export function fetchDmHistory(userId: number, access: string, before?: number) 
     partner_read_id: number;
     auto_delete_days: number;
     prefs?: ChatPrefs;
+    chat_state?: ChatState;
+    request_messages_left?: number | null;
   }>(
     `/api/dms/${userId}/messages?${qs}`,
     { access },

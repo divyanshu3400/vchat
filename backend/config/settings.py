@@ -156,6 +156,7 @@ REST_FRAMEWORK = {
         "uploads": "60/hour",
         "media_open": "200/hour",
         "gifs": "300/hour",
+        "people_search": "120/hour",
     },
 }
 
