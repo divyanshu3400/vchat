@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- vChat chat wallpaper: one tile of doodles, repeated. Used as a mask, so the colour comes from CSS. -->
+  <!-- the vChat wave -->
+  <path d="M18 34c6-14 12-14 18 0s12 14 18 0 12-14 16-4"/>
+  <!-- speech bubble with dots -->
+  <path d="M120 18h40a10 10 0 0 1 10 10v18a10 10 0 0 1-10 10h-26l-12 10v-10h-2a10 10 0 0 1-10-10V28a10 10 0 0 1 10-10z"/>
+  <path d="M130 37h.01M140 37h.01M150 37h.01" stroke-width="3.4"/>
+  <!-- heart -->
+  <path d="M232 52c-9-6-16-12-16-20a8 8 0 0 1 16-2 8 8 0 0 1 16 2c0 8-7 14-16 20z"/>
+  <!-- paper plane -->
+  <path d="M30 104l40-16-12 40-9-14zM49 114l9-26"/>
+  <!-- star -->
+  <path d="M120 92l5 10 11 2-8 8 2 11-10-5-10 5 2-11-8-8 11-2z"/>
+  <!-- smiley -->
+  <circle cx="214" cy="112" r="16"/>
+  <path d="M207 117a10 10 0 0 0 14 0M208 106h.01M220 106h.01" stroke-width="2.6"/>
+  <!-- music note -->
+  <path d="M40 196v-34l22-6v32"/>
+  <circle cx="35" cy="196" r="6"/>
+  <circle cx="57" cy="188" r="6"/>
+  <!-- sparkle -->
+  <path d="M132 156v16M124 164h16M128 160l8 8M136 160l-8 8" stroke-width="1.8"/>
+  <!-- phone -->
+  <path d="M196 158h8l4 9-5 3a20 20 0 0 0 9 9l3-5 9 4v8a4 4 0 0 1-4 4 30 30 0 0 1-28-28 4 4 0 0 1 4-4z"/>
+  <!-- small hearts and dots to fill the gaps -->
+  <path d="M96 236c-4-3-8-6-8-10a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 4-4 7-8 10z"/>
+  <path d="M166 230c6-12 10-12 14 0s10 12 14 0"/>
+  <path d="M250 236h.01M84 66h.01M180 76h.01M20 252h.01M250 168h.01" stroke-width="4"/>
+  <!-- camera -->
+  <path d="M222 214h8l4-6h12l4 6h8a4 4 0 0 1 4 4v20a4 4 0 0 1-4 4h-36a4 4 0 0 1-4-4v-20a4 4 0 0 1 4-4z" transform="translate(-206 0)"/>
+  <circle cx="34" cy="227" r="6"/>
+</svg>

@@ -21,6 +21,26 @@ import { useDock } from "../Dock";
 import { looksLikeContact } from "../messages/richText";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
+
+/** Laptop: random chat in a floating window next to friends' windows. */
+export type WinControls = { minimized: boolean; onToggleMin: () => void; onClose: () => void };
+
+function WinButtons({ win }: { win: WinControls }) {
+  return (
+    <>
+      <button type="button" className="icon-btn" aria-label={win.minimized ? "Expand" : "Minimise"} onClick={win.onToggleMin}>
+        <Icon name={win.minimized ? "expand" : "min"} size={18} />
+      </button>
+      <button type="button" className="icon-btn" aria-label="Close" onClick={win.onClose}>
+        <Icon name="close" size={18} />
+      </button>
+    </>
+  );
+}
+
+const toggleOnHeader = (win: WinControls) => (e: React.MouseEvent) => {
+  if (!(e.target as HTMLElement).closest("button, .menu, a")) win.onToggleMin();
+};
 const REPORT_REASONS: [ReportReason, string][] = [
   ["sexual", "Sexual content"],
   ["harassment", "Harassment or hate"],
@@ -144,7 +164,7 @@ function IdleView() {
   );
 }
 
-function SearchingView() {
+function SearchingView({ compact = false }: { compact?: boolean }) {
   const { waiting, cancel, region, want, notice } = useStranger();
   const [tip, setTip] = useState(0);
   useEffect(() => {
@@ -165,7 +185,7 @@ function SearchingView() {
         <p className="st-tip">{TIPS[tip]}</p>
         {notice && <p className="chat-notice">{notice}</p>}
       </div>
-      <AdSlot kind="rect" className="st-rect" />
+      {!compact && <AdSlot kind="rect" className="st-rect" />}
       <button type="button" className="pill-btn" onClick={cancel}>
         Cancel
       </button>
@@ -173,7 +193,7 @@ function SearchingView() {
   );
 }
 
-function ChatView() {
+function ChatView({ win }: { win?: WinControls }) {
   const { me, getAccess, relation, addFriend, premium, setPremium } = useChat();
   const { openChat } = useDock();
   const [contactWarning, setContactWarning] = useState<string | null>(null);
@@ -335,19 +355,8 @@ function ChatView() {
   if (!partner) return null;
   const sub = [GENDER[partner.gender], regionName(partner.region)].filter(Boolean).join(" · ");
 
-  return (
-    <div className="conversation st-chat">
-      <ChatHeader
-        title={partner.nickname}
-        avatar={<Avatar name={partner.nickname} size={38} />}
-        subtitle={<span className={ended ? "" : "on"}>{ended ? "Chat ended" : `Stranger · ${sub}`}</span>}
-        actions={
+  const headActions = (
           <>
-            {!ended && (
-              <button type="button" className="icon-btn" aria-label="Watch YouTube together" title="Watch together" onClick={() => setWatchSheet(true)}>
-                <Icon name="play" />
-              </button>
-            )}
             {!ended && (
               <button
                 type="button"
@@ -372,6 +381,11 @@ function ChatView() {
               </button>
               {menu === "main" && (
                 <div className="menu" role="menu">
+                  {!ended && (
+                    <button type="button" role="menuitem" onClick={() => { setMenu(null); setWatchSheet(true); }}>
+                      Watch YouTube together
+                    </button>
+                  )}
                   <button type="button" role="menuitem" onClick={() => setMenu("report")}>
                     Report…
                   </button>
@@ -396,9 +410,31 @@ function ChatView() {
               )}
             </div>
           </>
-        }
-      />
+  );
+  const status = ended ? "Chat ended" : `Stranger · ${sub}`;
 
+  return (
+    <div className={win ? `win st-win${win.minimized ? " min" : ""}` : "conversation st-chat"}>
+      {win ? (
+        <header className="win-head" onClick={toggleOnHeader(win)}>
+          <Avatar name={partner.nickname} size={34} />
+          <div className="win-title">
+            <b>{partner.nickname}</b>
+            <small className={ended ? "" : "on"}>{status}</small>
+          </div>
+          {!win.minimized && headActions}
+          <WinButtons win={win} />
+        </header>
+      ) : (
+        <ChatHeader
+          title={partner.nickname}
+          avatar={<Avatar name={partner.nickname} size={36} />}
+          subtitle={<span className={ended ? "" : "on"}>{status}</span>}
+          actions={headActions}
+        />
+      )}
+      {!win?.minimized && (
+      <>
       <WatchPanel watch={watch} partnerName="the stranger" meId={me?.id} />
       {watchSheet && (
         <WatchStartSheet
@@ -411,17 +447,6 @@ function ChatView() {
       )}
       <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
         <p className="sys-line">You&apos;re chatting with a stranger{partner.region !== "any" ? ` from ${regionName(partner.region)}` : ""}. Say hi!</p>
-        <p className="safety-tip">
-          <Icon name="shield" size={16} />
-          <span>
-            Keep it anonymous. Don&apos;t share nude photos or your face in intimate calls; the other person can record anything.
-            If someone threatens you: block, report, don&apos;t pay. India: call <b>1930</b> or{" "}
-            <a href="https://cybercrime.gov.in" target="_blank" rel="noopener noreferrer">
-              cybercrime.gov.in
-            </a>
-            .
-          </span>
-        </p>
         {/* Strangers' photos and videos open only if you choose; their links ask first. When the chat
             ends, the messages are gone from the screen (friends keep them in their friend chat). */}
         {!ended && (
@@ -549,7 +574,7 @@ function ChatView() {
                   disabled={uploading !== null}
                   onClick={() => (photosUnlocked ? photoRef.current?.click() : setUnlockPhotos(true))}
                 >
-                  <Icon name={photosUnlocked ? "image" : "lock"} size={17} /> Photo
+                  <Icon name={photosUnlocked ? "image" : "lock"} size={17} /> <span className="strip-label">Photo</span>
                 </button>
                 <input
                   ref={photoRef}
@@ -568,6 +593,30 @@ function ChatView() {
           />
         )}
       </div>
+      </>
+      )}
+    </div>
+  );
+}
+
+/** Random chat as a floating window (laptops): start, look, chat and next, all inside it. */
+export function StrangerWindow({ win }: { win: WinControls }) {
+  const { phase, interstitial, finishInterstitial } = useStranger();
+  if (phase === "chatting" || phase === "ended") return <ChatView win={win} />;
+  return (
+    <div className={`win st-win${win.minimized ? " min" : ""}`}>
+      <header className="win-head" onClick={toggleOnHeader(win)}>
+        <span className="st-win-orb" aria-hidden="true">
+          <Icon name="shuffle" size={18} />
+        </span>
+        <div className="win-title">
+          <b>Random chat</b>
+          <small className={phase === "searching" ? "on" : ""}>{phase === "searching" ? "Looking for someone…" : "1-on-1 with a stranger"}</small>
+        </div>
+        <WinButtons win={win} />
+      </header>
+      {!win.minimized && (phase === "searching" ? <SearchingView compact /> : <IdleView />)}
+      {interstitial && ADS_ON && <Interstitial onDone={finishInterstitial} />}
     </div>
   );
 }

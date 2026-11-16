@@ -30,6 +30,8 @@ function merge(prev: DirectMessage[], incoming: DirectMessage[]) {
 const AUTO_DELETE_DAYS = [1, 7, 30, 365];
 const AUTO_DELETE_SHORT: Record<number, string> = { 1: "1 day", 7: "1 week", 30: "1 month", 365: "1 year" };
 const AUTO_DELETE_LABEL: Record<number, string> = { 1: "1 day", 7: "1 week", 30: "1 month", 365: "1 year" };
+// Outside the component: only ever called from event handlers.
+const clock = () => Date.now();
 const TYPING_SHOW_MS = 3500;
 const TYPING_SEND_GAP_MS = 2000;
 // Errors from a react/edit/delete just sent from this chat.
@@ -165,7 +167,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
 
   const op = useCallback(
     (payload: Record<string, unknown>) => {
-      lastOpAt.current = Date.now();
+      lastOpAt.current = clock();
       if (!sendRaw(payload)) setNotice("You're offline. Reconnecting…");
     },
     [sendRaw],
@@ -197,7 +199,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   function send(text: string): boolean {
     if (!isFriend) return false;
     if (editing) {
-      lastOpAt.current = Date.now();
+      lastOpAt.current = clock();
       if (!sendRaw({ type: "dm.edit", message_id: editing.id, content: text })) {
         setNotice("You're offline. Reconnecting…");
         return false;
@@ -398,9 +400,23 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               </button>
             )}
             {messages.length === 0 && partner && (
-              <p className="empty">
-                This is the start of your private chat with <b>{name}</b>. Only the two of you can see it.
-              </p>
+              <div className="say-hello">
+                <span className="say-hello-wave" aria-hidden="true">
+                  👋
+                </span>
+                <p>
+                  This is the start of your private chat with <b>{name}</b>. Only the two of you can see it.
+                </p>
+                {isFriend && (
+                  <div className="say-hello-chips">
+                    {["Hi 👋", "Hello!", "How's your day going?"].map((t) => (
+                      <button key={t} type="button" className="pill-btn" onClick={() => send(t)}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             {isFriend && (
               <button type="button" className="sys-line autodel-line" onClick={() => setProfileOpen(true)}>

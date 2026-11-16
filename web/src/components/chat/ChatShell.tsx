@@ -12,7 +12,7 @@ import CallProvider from "./calls/CallProvider";
 import CallScreen from "./calls/CallScreen";
 import { useChat } from "./ChatProvider";
 import ConversationList from "./ConversationList";
-import { DockProvider } from "./Dock";
+import { DockProvider, useDock } from "./Dock";
 import { Icon } from "./bits";
 import StrangerProvider, { useStranger } from "./stranger/StrangerProvider";
 import MessageBanner from "./nudges/MessageBanner";
@@ -137,13 +137,25 @@ function useStrangerLive(pathname: string) {
 
 function Rail({ pathname }: { pathname: string }) {
   const strangerLive = useStrangerLive(pathname);
+  const { isDesktop, openRandom } = useDock();
   return (
     <nav className="rail" aria-label="Main">
       <Link href="/" className="rail-logo" aria-label="vChat home page">
         v<i>c</i>
       </Link>
       {NAV.filter((n) => !("phoneOnly" in n)).map((n) => (
-        <Link key={n.href} href={n.href} className={`rail-item${isActive(pathname, n.href) ? " on" : ""}`}>
+        <Link
+          key={n.href}
+          href={n.href}
+          className={`rail-item${isActive(pathname, n.href) ? " on" : ""}`}
+          onClick={(e) => {
+            // Laptops: random chat opens as a window next to the others.
+            if (n.href === "/chat/stranger" && isDesktop && !e.metaKey && !e.ctrlKey) {
+              e.preventDefault();
+              openRandom();
+            }
+          }}
+        >
           <span className="tab-icon">
             <Icon name={n.icon} size={22} />
             {n.href === "/chat/stranger" && strangerLive && <span className="live-ping" aria-label="Random chat in progress" />}

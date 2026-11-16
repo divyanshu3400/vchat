@@ -9,7 +9,8 @@ import type { ChatUser } from "@/lib/api";
 import { useRoomPresence } from "@/lib/presence";
 import { ALL_ROOMS } from "@/lib/rooms";
 import { useChat } from "./ChatProvider";
-import { useDock } from "./Dock";
+import { RANDOM_WINDOW, useDock } from "./Dock";
+import { useStranger } from "./stranger/StrangerProvider";
 import { Avatar, Icon, timeAgo } from "./bits";
 
 type Tab = "all" | "friends" | "rooms" | "unread";
@@ -73,7 +74,19 @@ function FriendRequests() {
 export default function ConversationList() {
   const pathname = usePathname();
   const { me, friends, conversations, unread, socketLive } = useChat();
-  const { openChat, isDesktop } = useDock();
+  const { openChat, openRandom, isDesktop, parked } = useDock();
+  const stranger = useStranger();
+  const nameOf = (id: number) =>
+    friends.find((f) => f.user.id === id)?.user.nickname ?? conversations.find((c) => c.user.id === id)?.user.nickname ?? "Chat";
+  const lastLine = stranger.lines[stranger.lines.length - 1];
+  const randomPreview =
+    stranger.phase === "chatting"
+      ? lastLine
+        ? `${lastLine.mine ? "You: " : ""}${lastLine.content || (lastLine.attachment ? "📎 Attachment" : "")}`
+        : `Chatting with ${stranger.partner?.nickname ?? "a stranger"}`
+      : stranger.phase === "searching"
+        ? "Looking for someone…"
+        : "Talk to someone new, one-on-one";
   const presence = useRoomPresence();
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
@@ -189,9 +202,48 @@ export default function ConversationList() {
             </button>
           ))}
         </div>
+        {parked.length > 0 && (
+          <div className="parked" aria-label="Chats moved out of the windows">
+            {parked.map((id) =>
+              id === RANDOM_WINDOW ? (
+                <button key="random" type="button" className="parked-chip" onClick={openRandom} title="Random chat">
+                  <span className="parked-orb" aria-hidden="true">
+                    <Icon name="shuffle" size={18} />
+                  </span>
+                </button>
+              ) : (
+                <button key={id} type="button" className="parked-chip" onClick={() => openChat(id)} title={nameOf(id)}>
+                  <Avatar name={nameOf(id)} size={38} />
+                  {unread[id] ? <span className="badge">{unread[id]}</span> : null}
+                </button>
+              ),
+            )}
+          </div>
+        )}
       </div>
 
       <div className="list-scroll">
+        {tab === "all" && !q && (
+          <Link
+            href="/chat/stranger"
+            className={`conv conv-random${pathname === "/chat/stranger" ? " active" : ""}`}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey) return;
+              e.preventDefault();
+              openRandom();
+            }}
+          >
+            <span className="random-orb" aria-hidden="true">
+              <Icon name="shuffle" size={20} />
+            </span>
+            <span className="conv-mid">
+              <span className="conv-name">
+                Random chat {stranger.phase === "chatting" && <span className="tag live">Live</span>}
+              </span>
+              <span className="conv-preview">{randomPreview}</span>
+            </span>
+          </Link>
+        )}
         {tab !== "rooms" && <FriendRequests />}
 
         {tab !== "rooms" && (
