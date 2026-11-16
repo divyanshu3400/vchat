@@ -78,7 +78,7 @@ export default function ConversationList() {
   const stranger = useStranger();
   const nameOf = (id: number) =>
     friends.find((f) => f.user.id === id)?.user.nickname ?? conversations.find((c) => c.user.id === id)?.user.nickname ?? "Chat";
-  const lastLine = stranger.lines[stranger.lines.length - 1];
+  const lastLine = [...stranger.lines].reverse().find((l) => !l.card);
   const randomPreview =
     stranger.phase === "chatting"
       ? lastLine

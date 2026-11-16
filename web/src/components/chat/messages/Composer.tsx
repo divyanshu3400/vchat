@@ -92,6 +92,8 @@ export default function Composer({
   async function submit() {
     const text = draft.trim();
     if (!text || disabled) return;
+    // Keep typing: the keyboard stays up after a message goes (phones close it on blur).
+    boxRef.current?.focus({ preventScroll: true });
     if (await onSend(text)) {
       setDraft("");
       setPicker(false);
@@ -258,6 +260,7 @@ export default function Composer({
             <button
               type="button"
               className="icon-btn emoji-toggle"
+              onPointerDown={(e) => e.preventDefault()}
               aria-label="Emoji"
               aria-expanded={picker}
               disabled={disabled}
@@ -318,7 +321,15 @@ export default function Composer({
               <Icon name="mic" />
             </button>
           ) : (
-            <button className="send-btn" type="submit" disabled={disabled || empty} aria-label={editing ? "Save" : "Send"}>
+            <button
+              className="send-btn"
+              type="submit"
+              disabled={disabled || empty}
+              aria-label={editing ? "Save" : "Send"}
+              // Tapping Send mustn't take the focus from the text box, or the phone keyboard closes.
+              onPointerDown={(e) => e.preventDefault()}
+              onMouseDown={(e) => e.preventDefault()}
+            >
               <Icon name={editing ? "check" : "send"} />
             </button>
           )}

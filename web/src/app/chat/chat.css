@@ -788,3 +788,17 @@ button.head-who:active { background: var(--surface-2); }
 .dock .win .strip-label { display: none; }
 .dock .win .strip-btn { padding: 0 10px; }
 .dock .win .composer-strip { gap: 6px; }
+
+/* random chat: add the stranger as a friend, and the cards that follow */
+.fab-friend { position: absolute; right: 14px; bottom: 128px; z-index: 6; appearance: none; border: 0; cursor: pointer; display: inline-flex; align-items: center; gap: 0; padding: 0 12px; height: 44px; border-radius: 999px; background: var(--grad); color: var(--on-brand); box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--brand) 70%, transparent); animation: pop-in 0.25s ease both; }
+.fab-friend .icon:first-child { margin-right: -3px; }
+.win .fab-friend { bottom: 118px; right: 10px; height: 40px; padding: 0 10px; }
+.m-card { align-self: center; margin: 10px 0; max-width: min(92%, 380px); width: 100%; }
+.friend-card { display: grid; justify-items: center; gap: 4px; text-align: center; padding: 14px 16px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: 0 6px 18px -14px rgba(15, 36, 26, 0.4); }
+.friend-card.incoming { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); }
+.friend-card.done { background: var(--brand-soft); border-color: transparent; }
+.friend-card.muted { color: var(--muted); font-size: 13px; padding: 8px 12px; }
+.friend-card-icon { font-size: 26px; }
+.friend-card b { font-size: 14.5px; }
+.friend-card small { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.friend-card-actions { display: flex; gap: 8px; margin-top: 6px; }

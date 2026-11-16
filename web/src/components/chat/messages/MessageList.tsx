@@ -9,6 +9,8 @@ import { cleanWordsOn, firstYoutube, isJumboEmoji, looksLikeContact, mentions, m
 
 /** One message, whichever chat it came from (room, friend or random). */
 export type Msg = {
+  /** Not a message: something that happened (a friend request…), drawn by `renderCard`. */
+  card?: unknown;
   id: number;
   mine: boolean;
   senderId: number;
@@ -48,6 +50,8 @@ type Props = {
   extraActions?: (m: Msg) => MsgAction[];
   /** 1-on-1 chats: play a shared YouTube link for both people. */
   onWatch?: (video: string) => void;
+  /** Draws the cards among the messages (see Msg.card). */
+  renderCard?: (m: Msg) => React.ReactNode;
 };
 
 const dayKey = (iso: string) => new Date(iso).toDateString();
@@ -330,7 +334,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
 
 type MenuState = { m: Msg; style: CSSProperties; mine: string | null; confirmDelete: boolean; picker: boolean; at: number };
 
-export default function MessageList({ items, me, showNames, stranger, onReact, onReply, onEdit, onDelete, extraActions, onWatch }: Props) {
+export default function MessageList({ items, me, showNames, stranger, onReact, onReply, onEdit, onDelete, extraActions, onWatch, renderCard }: Props) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const maxSeen = useRef<number | null>(null);
@@ -399,6 +403,9 @@ export default function MessageList({ items, me, showNames, stranger, onReact, o
                 <span>{dayLabel(m.createdAt)}</span>
               </div>
             )}
+            {m.card ? (
+              <div className="m-card">{renderCard?.(m)}</div>
+            ) : (
             <Bubble
               m={m}
               first={!close(prev, m) || newDay}
@@ -413,6 +420,7 @@ export default function MessageList({ items, me, showNames, stranger, onReact, o
               onLink={setLink}
               onWatch={onWatch}
             />
+            )}
           </Fragment>
         );
       })}

@@ -12,7 +12,12 @@ import { useChat } from "../ChatProvider";
  */
 export type Phase = "idle" | "searching" | "chatting" | "ended";
 export type EndedBy = "you" | "stranger" | "connection";
+/** A friend request between the two of you, shown as a card inside the random chat. */
+export type FriendCard = { kind: "sent" | "received" | "friends" | "declined"; requestId?: number };
+
 export type Line = {
+  /** Cards (not messages) use negative ids. */
+  card?: FriendCard;
   id: number;
   mine: boolean;
   senderId: number;
@@ -24,6 +29,22 @@ export type Line = {
   edited: boolean;
   deleted: boolean;
 };
+
+function cardLine(card: FriendCard, mine: boolean, seq: number): Line {
+  return {
+    card,
+    id: -seq,
+    mine,
+    senderId: 0,
+    content: "",
+    at: new Date().toISOString(),
+    attachment: null,
+    replyTo: null,
+    reactions: {},
+    edited: false,
+    deleted: false,
+  };
+}
 
 function toLine(m: StrangerMessage, meId: number | undefined): Line {
   return {
@@ -98,6 +119,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
 
   const plus = usePlus();
   const meRef = useRef(me);
+  const partnerRef = useRef<StrangerPartner | null>(null);
+  const cardSeq = useRef(0);
   const plusRef = useRef(plus);
   const phaseRef = useRef(phase);
   const sessionRef = useRef(session);
@@ -133,7 +156,35 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             setPhase("searching");
             setWaiting(event.waiting);
             break;
+          case "friend_request": {
+            // A request between me and the stranger I'm talking to: a card in the chat.
+            const r = event.request;
+            const p = partnerRef.current;
+            const self = meRef.current;
+            if (!p || !self || phaseRef.current === "idle" || phaseRef.current === "searching") break;
+            const kind = r.from_user.id === p.id && r.to_user.id === self.id ? "received" : r.from_user.id === self.id && r.to_user.id === p.id ? "sent" : null;
+            if (!kind) break;
+            setLines((l) =>
+              l.some((x) => x.card?.requestId === r.id) ? l : [...l, cardLine({ kind, requestId: r.id }, kind === "sent", (cardSeq.current += 1))],
+            );
+            break;
+          }
+          case "friend_request_removed":
+            setLines((l) =>
+              l.map((x) => (x.card?.requestId === event.request_id && x.card.kind !== "friends" ? { ...x, card: { ...x.card, kind: "declined" } } : x)),
+            );
+            break;
+          case "friend_added": {
+            const p = partnerRef.current;
+            if (!p || event.friend.id !== p.id || phaseRef.current === "idle") break;
+            setLines((l) => [
+              ...l.map((x) => (x.card && (x.card.kind === "sent" || x.card.kind === "received") ? { ...x, card: { ...x.card, kind: "friends" as const } } : x)),
+              ...(l.some((x) => x.card) ? [] : [cardLine({ kind: "friends" }, false, (cardSeq.current += 1))]),
+            ]);
+            break;
+          }
           case "stranger.matched":
+            partnerRef.current = event.partner;
             setPartner(event.partner);
             setSession(event.session);
             setLines([]);

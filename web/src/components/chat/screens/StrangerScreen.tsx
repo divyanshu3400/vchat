@@ -16,7 +16,7 @@ import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
 import UnlockSheet from "../premium/UnlockSheet";
-import { useStranger } from "../stranger/StrangerProvider";
+import { useStranger, type FriendCard } from "../stranger/StrangerProvider";
 import { useDock } from "../Dock";
 import { looksLikeContact } from "../messages/richText";
 
@@ -194,7 +194,7 @@ function SearchingView({ compact = false }: { compact?: boolean }) {
 }
 
 function ChatView({ win }: { win?: WinControls }) {
-  const { me, getAccess, relation, addFriend, premium, setPremium } = useChat();
+  const { me, getAccess, relation, addFriend, answerRequest, premium, setPremium } = useChat();
   const { openChat } = useDock();
   const [contactWarning, setContactWarning] = useState<string | null>(null);
   const warnResolve = useRef<((sent: boolean) => void) | null>(null);
@@ -249,6 +249,7 @@ function ChatView({ win }: { win?: WinControls }) {
   const items = useMemo<Msg[]>(
     () =>
       lines.map((l) => ({
+        card: l.card,
         id: l.id,
         mine: l.mine,
         senderId: l.senderId,
@@ -368,11 +369,6 @@ function ChatView({ win }: { win?: WinControls }) {
                 <Icon name="phone" />
               </button>
             )}
-            {(rel === "none" || rel === "incoming") && (
-              <button type="button" className="pill-btn add-friend" onClick={async () => setNotice(await addFriend(partner))}>
-                <Icon name="plus" size={15} /> <span className="hide-phone">Add friend</span>
-              </button>
-            )}
             {rel === "requested" && <span className="tag">Request sent</span>}
             {rel === "friend" && <span className="tag">Friends</span>}
             <div className="menu-wrap">
@@ -459,6 +455,47 @@ function ChatView({ win }: { win?: WinControls }) {
           onEdit={ended ? undefined : onEdit}
           onDelete={ended ? undefined : onDelete}
           onWatch={ended ? undefined : (video) => watch.start(video)}
+          renderCard={(m) => {
+            const card = m.card as FriendCard;
+            const who = partner.nickname;
+            if (card.kind === "sent")
+              return (
+                <div className="friend-card">
+                  <span className="friend-card-icon">🤝</span>
+                  <b>You sent {who} a friend request</b>
+                  <small>Waiting for them to accept.</small>
+                </div>
+              );
+            if (card.kind === "received")
+              return (
+                <div className="friend-card incoming">
+                  <span className="friend-card-icon">🤝</span>
+                  <b>{who} wants to be friends</b>
+                  <small>Friends keep chatting after this chat ends, with photos and calls.</small>
+                  <span className="friend-card-actions">
+                    <button type="button" className="pill-btn primary" onClick={() => card.requestId && answerRequest(card.requestId, "accept").catch(() => setNotice("That request isn't waiting any more."))}>
+                      Accept
+                    </button>
+                    <button type="button" className="pill-btn" onClick={() => card.requestId && answerRequest(card.requestId, "decline").catch(() => undefined)}>
+                      Decline
+                    </button>
+                  </span>
+                </div>
+              );
+            if (card.kind === "friends")
+              return (
+                <div className="friend-card done">
+                  <span className="friend-card-icon">🎉</span>
+                  <b>You and {who} are friends now</b>
+                  <small>This chat will be saved in Chats.</small>
+                </div>
+              );
+            return (
+              <div className="friend-card muted">
+                <b>Friend request declined</b>
+              </div>
+            );
+          }}
         />
         )}
         {uploading !== null && (
@@ -499,6 +536,22 @@ function ChatView({ win }: { win?: WinControls }) {
         )}
       </div>
       <JumpToLatest away={scroll.away} unseen={scroll.unseen} onClick={scroll.jump} />
+      {!ended && (rel === "none" || rel === "incoming") && (
+        <button
+          type="button"
+          className="fab-friend"
+          onClick={async () => {
+            const msg = await addFriend(partner);
+            // Sent or accepted shows as a card in the chat; only problems need a notice.
+            if (!/^(Friend request sent|You and .* are now friends)/.test(msg)) setNotice(msg);
+          }}
+          aria-label={rel === "incoming" ? `Accept ${partner.nickname}'s friend request` : `Send ${partner.nickname} a friend request`}
+          title={rel === "incoming" ? "Accept friend request" : "Add friend"}
+        >
+          <Icon name="plus" size={16} />
+          <Icon name="me" size={18} />
+        </button>
+      )}
 
       {unlockPhotos && (
         <UnlockSheet
