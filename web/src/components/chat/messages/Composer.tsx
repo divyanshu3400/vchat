@@ -28,8 +28,8 @@ type Props = {
   onCancelEdit?: () => void;
   /** Voice messages: shown instead of Send while the box is empty. "twice": can be played 2 times. */
   onVoice?: (blob: Blob, view: "" | "twice") => void;
-  /** Buttons on the left of the box (photo…). */
-  left?: ReactNode;
+  /** Small icon buttons inside the box, at its right end (photo…), like the emoji button on the left. */
+  attach?: ReactNode;
   /** A strip of actions above the box (random chat: Next, End, photo). */
   toolbar?: ReactNode;
   autoFocusKey?: unknown;
@@ -53,7 +53,7 @@ export default function Composer({
   editing,
   onCancelEdit,
   onVoice,
-  left,
+  attach,
   toolbar,
   autoFocusKey,
   draftKey,
@@ -307,7 +307,6 @@ export default function Composer({
             submit();
           }}
         >
-          {left}
           <div className="input-shell">
             <button
               type="button"
@@ -361,6 +360,7 @@ export default function Composer({
                 }
               }}
             />
+            {attach && !editing && <div className="input-attach">{attach}</div>}
           </div>
           {onVoice && empty && !editing ? (
             <button

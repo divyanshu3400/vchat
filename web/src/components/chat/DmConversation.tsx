@@ -729,7 +729,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               editing={editing}
               onCancelEdit={() => setEditing(null)}
               onVoice={isFriend ? (blob, view) => sendFile(blob, "audio", voiceFilename(blob), view) : undefined}
-              left={
+              attach={
                 <>
                   <input
                     ref={fileRef}
