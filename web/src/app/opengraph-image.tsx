@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
 // The picture shown when someone shares a vChat link (WhatsApp, X, Facebook, Telegram…).
+// No emoji: next/og fetches emoji images from a CDN at build time, and the server may not reach it.
 export const alt = "vChat · Anonymous chat rooms, no sign-up";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
@@ -46,10 +47,10 @@ export default function OpenGraphImage() {
           </div>
         </div>
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 18, flex: 1, paddingLeft: 40 }}>
-          {bubble("hey 👋 where are you from?", false)}
+          {bubble("hey! where are you from?", false)}
           {bubble("Mumbai! you?", true)}
-          {bubble("Lisbon 🌊 add me?", false)}
-          {bubble("done ✅", true)}
+          {bubble("Lisbon :) add me?", false)}
+          {bubble("done!", true)}
         </div>
       </div>
     ),
