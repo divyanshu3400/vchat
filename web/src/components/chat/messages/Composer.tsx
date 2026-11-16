@@ -4,8 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { Icon } from "../bits";
 import { MAX_VOICE_SECONDS, useRecorder } from "../media/useRecorder";
 import { readDraft, writeDraft } from "./drafts";
-import EmojiPicker from "./EmojiPicker";
-import GifPicker from "./GifPicker";
+import MediaPanel, { type PanelTab } from "./MediaPanel";
 import { gifText } from "@/lib/gifs";
 import type { Msg } from "./MessageList";
 
@@ -60,8 +59,11 @@ export default function Composer({
   draftKey,
 }: Props) {
   const [draft, setDraft] = useState("");
-  const [picker, setPicker] = useState(false);
-  const [gifs, setGifs] = useState(false);
+  // Emoji / GIFs / stickers where the keyboard was (Telegram-style). null: the keyboard's turn.
+  const [panel, setPanel] = useState<PanelTab | null>(null);
+  const [lastTab, setLastTab] = useState<PanelTab>("emoji");
+  const [expanded, setExpanded] = useState(false);
+
   const [holding, setHolding] = useState<null | { x: number; t: number; slide: number }>(null);
   const [lockedRec, setLockedRec] = useState(false);
   const boxRef = useRef<HTMLTextAreaElement>(null);
@@ -115,15 +117,26 @@ export default function Composer({
     if (draft) el.style.height = `${Math.min(el.scrollHeight, MAX_ROWS_PX)}px`;
   }, [draft]);
 
+  function openPanel() {
+    setPanel(lastTab);
+    boxRef.current?.blur(); // the keyboard goes down, the panel takes its place
+  }
+
+  function closePanel(typeNext: boolean) {
+    setPanel(null);
+    setExpanded(false);
+    if (typeNext) boxRef.current?.focus({ preventScroll: true });
+  }
+
   async function submit() {
     const text = draft.trim();
     if (!text || disabled) return;
     // Keep typing: the keyboard stays up after a message goes (phones close it on blur).
-    boxRef.current?.focus({ preventScroll: true });
+    // With the emoji panel open, it stays open instead.
+    if (!panel) boxRef.current?.focus({ preventScroll: true });
     if (await onSend(text)) {
       if (editing) setDraft(readDraft(draftKey));
       else typeText("");
-      setPicker(false);
     }
   }
 
@@ -135,7 +148,8 @@ export default function Composer({
     typeText(next);
     requestAnimationFrame(() => {
       if (!el) return;
-      el.focus();
+      // The emoji panel stays open: move the caret without bringing the keyboard back.
+      if (!panel) el.focus();
       el.setSelectionRange(start + e.length, start + e.length);
     });
   }
@@ -223,22 +237,6 @@ export default function Composer({
           </button>
         </div>
       )}
-      {picker && (
-        <div className="picker-dock">
-          <EmojiPicker onPick={insertEmoji} onClose={() => setPicker(false)} />
-        </div>
-      )}
-      {gifs && (
-        <div className="picker-dock gif-dock">
-          <GifPicker
-            onClose={() => setGifs(false)}
-            onPick={async (g) => {
-              setGifs(false);
-              await onSend(gifText(g));
-            }}
-          />
-        </div>
-      )}
       {recording ? (
         <div className={`recorder2${holding ? " holding" : ""}`} role="group" aria-label="Recording a voice message">
           {voice.error ? (
@@ -315,32 +313,13 @@ export default function Composer({
               type="button"
               className="icon-btn emoji-toggle"
               onPointerDown={(e) => e.preventDefault()}
-              aria-label="Emoji"
-              aria-expanded={picker}
+              aria-label={panel ? "Keyboard" : "Emoji, GIFs and stickers"}
+              aria-expanded={!!panel}
               disabled={disabled}
-              onClick={() => {
-                setGifs(false);
-                setPicker((p) => !p);
-              }}
+              onClick={() => (panel ? closePanel(true) : openPanel())}
             >
-              <Icon name="smile" />
+              <Icon name={panel ? "keyboard" : "smile"} />
             </button>
-            {!editing && (
-              <button
-                type="button"
-                className="gif-toggle"
-                onPointerDown={(e) => e.preventDefault()}
-                aria-label="GIFs and stickers"
-                aria-expanded={gifs}
-                disabled={disabled}
-                onClick={() => {
-                  setPicker(false);
-                  setGifs((g) => !g);
-                }}
-              >
-                GIF
-              </button>
-            )}
             <textarea
               ref={boxRef}
               id={id}
@@ -353,6 +332,8 @@ export default function Composer({
               aria-label={placeholder}
               value={draft}
               disabled={disabled}
+              // Tapping the box brings the keyboard back in place of the panel.
+              onFocus={() => panel && closePanel(false)}
               onChange={(e) => {
                 // Some Android keyboards send Enter as a typed line break, not a key press.
                 const type = (e.nativeEvent as InputEvent).inputType;
@@ -407,6 +388,22 @@ export default function Composer({
             </button>
           )}
         </form>
+      )}
+      {panel && !recording && (
+        <MediaPanel
+          tab={panel}
+          setTab={(t) => {
+            setPanel(t);
+            setLastTab(t);
+          }}
+          expanded={expanded}
+          setExpanded={setExpanded}
+          onEmoji={insertEmoji}
+          onGif={async (g) => {
+            setExpanded(false);
+            await onSend(gifText(g));
+          }}
+        />
       )}
     </div>
   );

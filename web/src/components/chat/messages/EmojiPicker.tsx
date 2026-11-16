@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 /** The device's own emoji, a curated set, plus the ones you used last. No library, no images. */
-const GROUPS: [string, string, string][] = [
+export const GROUPS: [string, string, string][] = [
   ["Smileys", "😀", "😀 😃 😄 😁 😆 😅 🤣 😂 🙂 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😋 😛 😜 🤪 😝 🤗 🤭 🤫 🤔 🤐 🤨 😐 😑 😶 😏 😒 🙄 😬 😌 😔 😪 😴 😷 🤒 🥵 🥶 🥴 😵 🤯 🤠 🥳 😎 🤓 🧐 😕 😟 🙁 😮 😯 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 💀 🤡 👻 👽 🤖 💩"],
   ["Love", "❤️", "❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 💌 💋 🌹 🌷 🌸 💐 😻 💑 💏 👩‍❤️‍👨 🫶"],
   ["Hands", "👍", "👍 👎 👌 🤌 ✌️ 🤞 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 👋 🤚 🖐️ ✋ 👏 🙌 👐 🤲 🤝 🙏 💪 ✍️ 💅 🫡 🫠"],
@@ -14,7 +14,7 @@ const GROUPS: [string, string, string][] = [
 const RECENT_KEY = "vchat.recentEmoji";
 const RECENT_MAX = 24;
 
-function readRecent(): string[] {
+export function readRecent(): string[] {
   try {
     return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]");
   } catch {
