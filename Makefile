@@ -1,8 +1,8 @@
 # vChat: everyday commands.  Run `make` (or `make help`) to see them all.
 #
-# Run it from Git Bash on Windows (it has make). Pushing to GitHub happens there; every server
-# step runs inside WSL, where the deploy SSH key lives (the Makefile hops into WSL by itself).
-# Running it from inside WSL works too, if git can push from there.
+# Run it from Git Bash on Windows (it has make). The deploy SSH key lives in WSL; from Git Bash
+# the Makefile reads it from there and uses Windows' own ssh (WSL's network stalls on bigger
+# transfers over the office VPN). Without that it hops into WSL. Running it inside WSL works too.
 #
 # Values you may override:  make logs SERVICE=web LINES=500
 
@@ -25,11 +25,22 @@ COMPOSE  := cd ~/vchat/deploy && docker compose
 PY     := $(abspath $(firstword $(wildcard backend/.venv/Scripts/python.exe backend/.venv/bin/python)))
 DJANGO := cd backend && DJANGO_DEBUG=1 $(PY) manage.py
 
-# Server steps need the SSH key that lives in WSL. Outside WSL, `server` re-runs the same
-# target inside WSL; inside WSL it runs the command over SSH.
+# Server steps need the SSH key that lives in WSL. DIRECT: ssh from here (inside WSL, or from
+# Git Bash with the key read from WSL's disk). Otherwise `server` re-runs the target inside WSL.
 IN_WSL := $(shell grep -qi microsoft /proc/version 2>/dev/null && echo 1)
 WIN_DIR := $(shell cygpath -w "$(CURDIR)" 2>/dev/null)
-ifeq ($(IN_WSL),1)
+ifneq ($(IN_WSL),1)
+  WSL_KEY := $(shell wsl -e sh -c 'wslpath -w $$HOME/.ssh/github_actions_key' 2>/dev/null | tr -d '\r' | tr '\134' '/')
+  ifneq ($(wildcard $(WSL_KEY)),)
+    KEY := $(WSL_KEY)
+    DIRECT := 1
+  endif
+else
+  DIRECT := 1
+endif
+SSH      := ssh -i $(KEY) $(SSH_OPTS) $(HOST)
+SSH_TTY  := ssh -t -i $(KEY) -o ServerAliveInterval=30 $(HOST)
+ifeq ($(DIRECT),1)
   server     = $(SSH) $(1)
   server_tty = $(SSH_TTY) $(1)
 else
@@ -89,7 +100,7 @@ deploy-api: _clean-tree test _bundle ## Ship only the backend (runs migrations)
 	@$(MAKE) --no-print-directory status
 
 sync: _clean-tree _bundle ## Send the code to the server without rebuilding anything (Makefiles, docs, scripts)
-ifeq ($(IN_WSL),1)
+ifeq ($(DIRECT),1)
 	scp -i $(KEY) $(SSH_OPTS) .deploy.bundle $(HOST):/tmp/vchat.bundle
 	rm -f .deploy.bundle
 	$(SSH) 'cd ~/vchat && git pull -q origin $(BRANCH) && git log --oneline -1'
@@ -111,7 +122,7 @@ _bundle:
 	git bundle create .deploy.bundle $(BRANCH)
 
 _ship:
-ifeq ($(IN_WSL),1)
+ifeq ($(DIRECT),1)
 	scp -i $(KEY) $(SSH_OPTS) .deploy.bundle $(HOST):/tmp/vchat.bundle
 	rm -f .deploy.bundle
 	$(SSH) 'cd ~/vchat && git pull -q origin $(BRANCH) && git log --oneline -1 && cd deploy && docker compose up -d --build $(SERVICES) > ~/vchat-up.log 2>&1; echo "UP=$$?"; tail -3 ~/vchat-up.log; docker compose logs --no-log-prefix migrate 2>&1 | grep -E "Applying|No migrations" | tail -5'
@@ -168,7 +179,7 @@ backups: ## List the backups on the server
 	$(call server,'ls -lht $$HOME/vchat-data/backups | head -20')
 
 set-env: ## Change one server .env value, e.g. make set-env KEYNAME=FREE_FOR_ALL (asks for it; backs up .env; restarts)
-ifeq ($(IN_WSL),1)
+ifeq ($(DIRECT),1)
 	@test -n "$(KEYNAME)" || { echo "Usage: make set-env KEYNAME=NAME"; exit 1; }
 	@read -r -s -p "New value for $(KEYNAME) (hidden): " VALUE; echo; \
 	  printf '%s\n' "$$VALUE" | $(SSH) 'cd ~/vchat/deploy && IFS= read -r V && cp -p .env ".env.bak-$$(date +%Y%m%d-%H%M%S)" && sed -i "/^$(KEYNAME)=/d" .env && printf "%s=%s\n" "$(KEYNAME)" "$$V" >> .env && chmod 600 .env && echo "$(KEYNAME) set (old .env backed up)" && docker compose up -d backend web > /dev/null 2>&1 && echo "backend and web restarted"'
