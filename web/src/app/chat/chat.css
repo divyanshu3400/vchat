@@ -931,3 +931,23 @@ button.head-who:active { background: var(--surface-2); }
 .new-sep { display: flex; align-items: center; gap: 10px; margin: 12px 4px 8px; color: var(--brand); font-size: 12px; font-weight: 800; scroll-margin-top: 12px; }
 .new-sep::before, .new-sep::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--brand) 45%, transparent); }
 .new-sep span { padding: 3px 10px; border-radius: 999px; background: var(--brand-soft); }
+
+/* --- pinned / muted chats ---------------------------------------------------------------- */
+.conv-flag { display: inline-flex; align-items: center; color: var(--muted); margin-left: 4px; vertical-align: -2px; }
+.conv-flag.pin { color: var(--brand); margin-left: 0; }
+.conv-meta-row { display: inline-flex; align-items: center; gap: 6px; }
+.badge.muted { background: var(--muted); }
+
+/* --- random chat: interests and the opening ice-breaker -------------------------------------- */
+.st-optional { font-weight: 600; color: var(--muted); text-transform: none; letter-spacing: 0; margin-left: 6px; }
+.st-hint { color: var(--muted); font-size: 12px; }
+.interest-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.interest-chip { appearance: none; display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.1s; }
+.interest-chip:active { transform: scale(0.96); }
+.interest-chip.on { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); }
+.interest-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+.ice-card { display: grid; gap: 8px; justify-items: center; text-align: center; width: min(320px, 86%); margin: 6px auto; padding: 14px 14px 12px; border-radius: 18px; background: color-mix(in srgb, var(--brand) 7%, var(--surface)); border: 1px dashed color-mix(in srgb, var(--brand) 40%, var(--line)); }
+.ice-common { font-size: 12.5px; font-weight: 800; color: var(--brand); }
+.ice-q { font-size: 15px; line-height: 1.4; color: var(--fg); }
+.ice-actions { display: flex; gap: 8px; }
+.ice-actions .pill-btn { height: 32px; font-size: 13px; }

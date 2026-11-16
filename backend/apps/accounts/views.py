@@ -133,6 +133,14 @@ class MeView(APIView):
     def get(self, request):
         return Response(MeSerializer(request.user).data)
 
+    def patch(self, request):
+        """Privacy settings: {"show_last_seen": bool}."""
+        value = request.data.get("show_last_seen")
+        if isinstance(value, bool):
+            User.objects.filter(pk=request.user.pk).update(show_last_seen=value)
+            request.user.show_last_seen = value
+        return Response(MeSerializer(request.user).data)
+
 
 def _loginable(email: str):
     """Active, or deactivated by its owner (log in to come back). Never erased or admin-disabled."""

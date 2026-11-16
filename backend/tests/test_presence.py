@@ -107,7 +107,9 @@ async def test_friends_hear_online_and_offline_once():
     await b1.disconnect()
     assert await a.receive_nothing(timeout=0.2)  # bob still has b2 open
     await b2.disconnect()
-    assert await a.receive_json_from() == {"type": "presence", "user_id": bob.id, "online": False}
+    gone = await a.receive_json_from()
+    # Both allow "last seen" (the default): going offline says when.
+    assert gone.pop("last_seen") and gone == {"type": "presence", "user_id": bob.id, "online": False}
     await a.disconnect()
 
 

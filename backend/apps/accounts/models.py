@@ -35,6 +35,12 @@ class User(AbstractUser):
     device_hash = models.CharField(max_length=64, blank=True, db_index=True)
     last_ip_hash = models.CharField(max_length=64, blank=True)
 
+    # --- last seen ---
+    # When the last tab closed (updated while connected, too). Shown to friends only when both
+    # people allow it: hiding yours hides everyone's from you, like WhatsApp.
+    last_seen_at = models.DateTimeField(null=True, blank=True)
+    show_last_seen = models.BooleanField(default=True)
+
     # --- closing the account (apps/accounts/closing.py) ---
     # Set while deactivated (is_active is False then): others see "vChat user" and "********".
     deactivated_at = models.DateTimeField(null=True, blank=True)

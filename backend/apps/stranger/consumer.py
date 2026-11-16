@@ -7,7 +7,8 @@ other's channel; nothing is broadcast.
 client -> {"type": "stranger.find", "region": "any" | "<region slug>", "want": "any" | "F" | "M"}
           ("want" other than "any" needs Plus or a rewarded-ad grant: else error "locked_filter")
 server -> {"type": "stranger.waiting", "waiting": <people in the queue>}
-server -> {"type": "stranger.matched", "session": "<uuid>", "partner": {id, nickname, gender, region}}
+server -> {"type": "stranger.matched", "session": "<uuid>", "partner": {id, nickname, gender, region}, "common": [interests]}
+          (stranger.find may carry "interests": up to 5 of matchmaker.INTERESTS; most shared first)
 client -> {"type": "stranger.message", "content": "...", "client_id": "..."}
 server -> {"type": "stranger.message", "message": {id, session, sender_id, content, created_at}, "client_id": "..."}
           (+ "reply_to": <message id>, "attachment": <upload id> for a voice message, or a photo after an unlock)
@@ -122,10 +123,16 @@ class StrangerMixin:
         if self.stranger:
             await self._st_end(by="you")
 
+        raw_interests = content.get("interests")
+        interests = (
+            sorted({i for i in raw_interests if isinstance(i, str) and i in matchmaker.INTERESTS})[: matchmaker.MAX_INTERESTS]
+            if isinstance(raw_interests, list)
+            else []
+        )
         blocked = await database_sync_to_async(chat_services.blocked_user_ids)(self.user.id)
         me = matchmaker.Entry(
             channel=self.channel_name, user_id=self.user.id, nickname=self.user.nickname,
-            gender=self.user.gender, region=region, want=want,
+            gender=self.user.gender, region=region, want=want, interests=interests,
         )
         partner = await database_sync_to_async(matchmaker.find_or_wait)(me, blocked)
         if partner is None:
@@ -143,6 +150,7 @@ class StrangerMixin:
                 "session": sid,
                 "partner_channel": self.channel_name,
                 "partner": services.partner_brief(self.user, region),
+                "common": me.shared(partner),
             },
         )
         await self.send_json(
@@ -150,6 +158,8 @@ class StrangerMixin:
                 "type": "stranger.matched",
                 "session": sid,
                 "partner": {"id": partner.user_id, "nickname": partner.nickname, "gender": partner.gender, "region": partner.region},
+                # Interests you both picked: the app opens with an ice-breaker about them.
+                "common": me.shared(partner),
             }
         )
 
@@ -292,7 +302,9 @@ class StrangerMixin:
     async def stranger_paired(self, event):
         self.stranger = {"session": event["session"], "partner_channel": event["partner_channel"], "partner_id": event["partner"]["id"]}
         await _cache_set(_owner_key(event["session"], self.user.id), self.channel_name, _KEY_TTL)
-        await self.send_json({"type": "stranger.matched", "session": event["session"], "partner": event["partner"]})
+        await self.send_json(
+            {"type": "stranger.matched", "session": event["session"], "partner": event["partner"], "common": event.get("common", [])}
+        )
 
     async def stranger_deliver(self, event):
         if self.stranger and self.stranger["session"] == event["session"]:

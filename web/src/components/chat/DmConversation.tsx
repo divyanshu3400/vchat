@@ -11,6 +11,8 @@ import {
   type ChatUser,
   type DirectMessage,
   type ViewMode,
+  type ChatPrefs,
+  setChatPrefs,
 } from "@/lib/api";
 import { useCalls } from "./calls/CallProvider";
 import MediaSendSheet from "./media/MediaSendSheet";
@@ -21,7 +23,7 @@ import { useStickyScroll } from "./messages/useStickyScroll";
 import { WatchPanel, WatchStartSheet, useWatch } from "./watch/WatchTogether";
 import { useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
-import { Avatar, Icon } from "./bits";
+import { Avatar, Icon, lastSeenLabel } from "./bits";
 import Dropdown, { DropItem, DropSep } from "./Dropdown";
 
 function merge(prev: DirectMessage[], incoming: DirectMessage[]) {
@@ -49,6 +51,12 @@ type Props = {
   onClose?: () => void;
 };
 
+/** Which mute option is in effect: "always" without an end, else the closest of 8 hours / 1 week. */
+function muteChoice(until: string | null) {
+  if (!until) return "always";
+  return new Date(until).getTime() - Date.now() <= 9 * 3_600_000 ? "8h" : "1w";
+}
+
 export default function DmConversation({ userId, variant = "page", minimized = false, onToggleMin, onClose }: Props) {
   const router = useRouter();
   const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive, unread, queueDm, outbox, retryDm, discardDm } =
@@ -68,6 +76,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const [editing, setEditing] = useState<Msg | null>(null);
   const [partnerRead, setPartnerRead] = useState(0);
   const [autoDelete, setAutoDelete] = useState(7);
+  const [prefs, setPrefs] = useState<ChatPrefs>({ muted: false, muted_until: null, pinned: false });
   const [profileOpen, setProfileOpen] = useState(false);
   const [partnerTyping, setPartnerTyping] = useState(false);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -86,6 +95,15 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const gone = !!partner?.inactive;
   const isFriend = rel === "friend" && !gone;
   const partnerOnline = friends.some((f) => f.user.id === userId && f.online);
+  const partnerLastSeen = friends.find((f) => f.user.id === userId)?.last_seen ?? null;
+
+  async function changePrefs(body: { mute?: string; pin?: boolean }) {
+    try {
+      setPrefs(await setChatPrefs(userId, body, await getAccess()));
+    } catch (e) {
+      setNotice(e instanceof ApiError ? e.message : "That didn't work. Try again.");
+    }
+  }
   const { start: startCall } = useCalls();
   const isWindow = variant === "window";
 
@@ -101,6 +119,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
         setHasMore(res.has_more);
         setPartnerRead((r) => Math.max(r, res.partner_read_id ?? 0));
         setAutoDelete(res.auto_delete_days ?? 7);
+        if (res.prefs) setPrefs(res.prefs);
       })
       .catch((e) => {
         if (!cancelled && e instanceof ApiError && e.status === 404) setMissing(true);
@@ -321,7 +340,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
         ? "typing…"
         : partnerOnline
           ? "Online"
-          : "Offline";
+          : partnerLastSeen
+            ? lastSeenLabel(partnerLastSeen)
+            : "Offline";
 
   const confirmBar = confirming && (
     <div className="confirm-bar" role="alertdialog" aria-label="Confirm">
@@ -367,6 +388,38 @@ export default function DmConversation({ userId, variant = "page", minimized = f
           </span>
         </div>
       )}
+      {(isFriend || prefs.pinned) && (
+        <DropItem icon="pin" tone="blue" hint={prefs.pinned ? "Stays on top of your chats" : undefined} onClick={() => { setMenuOpen(false); changePrefs({ pin: !prefs.pinned }); }}>
+          {prefs.pinned ? "Unpin chat" : "Pin chat"}
+        </DropItem>
+      )}
+      <div className="dd-group" role="group" aria-label="Mute notifications">
+        <span className="dd-group-head">
+          <span className="dd-ic tone-brand" aria-hidden="true">
+            <Icon name={prefs.muted ? "belloff" : "bell"} size={18} />
+          </span>
+          <span className="dd-text">
+            <b>{prefs.muted ? "Muted" : "Mute notifications"}</b>
+            <small>
+              {prefs.muted
+                ? prefs.muted_until
+                  ? `Until ${new Date(prefs.muted_until).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+                  : "Until you turn it back on"
+                : "No notifications or banners from this chat"}
+            </small>
+          </span>
+        </span>
+        <span className="dd-seg">
+          {([["8h", "8 hours"], ["1w", "1 week"], ["always", "Always"], ["off", "Off"]] as const).map(([key, label]) => {
+            const on = key === "off" ? !prefs.muted : prefs.muted && muteChoice(prefs.muted_until) === key;
+            return (
+              <button key={key} type="button" className={on ? "on" : ""} aria-pressed={on} onClick={() => changePrefs({ mute: key })}>
+                {label}
+              </button>
+            );
+          })}
+        </span>
+      </div>
       <DropSep />
       {isFriend && (
         <DropItem icon="userminus" tone="muted" onClick={() => { setMenuOpen(false); setConfirming("unfriend"); }}>

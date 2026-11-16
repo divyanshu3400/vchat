@@ -12,6 +12,8 @@ Matching rules, in order:
   - region: compatible when either side picked "any" or both picked the same region
   - gender filter (Plus / rewarded ad): someone wanting women only meets women only, and is
     only offered to people whose own filter (if any) fits them
+  - interests: the most shared interests first (nobody waits for a perfect match: with none
+    shared, the usual order applies)
   - otherwise whoever has waited longest
 """
 
@@ -19,9 +21,16 @@ import json
 import threading
 import time
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 
 from django.conf import settings
+
+# What people can pick on the start screen (the app shows labels and emoji for these).
+INTERESTS = frozenset({
+    "music", "movies", "cricket", "football", "gaming", "anime", "books", "travel",
+    "food", "fitness", "tech", "art", "memes", "study", "pets", "fashion",
+})
+MAX_INTERESTS = 5
 
 QUEUE_KEY = "st:queue"
 LOCK_KEY = "st:lock"
@@ -40,6 +49,10 @@ class Entry:
     region: str  # "any" or a region room slug
     ts: float = 0.0
     want: str = "any"  # "any", or a gender ("F", "M") for Plus / rewarded-ad users
+    interests: list[str] = field(default_factory=list)
+
+    def shared(self, other: "Entry") -> list[str]:
+        return sorted(set(self.interests) & set(other.interests))
 
     def compatible(self, other: "Entry") -> bool:
         region_ok = self.region == "any" or other.region == "any" or self.region == other.region
@@ -183,7 +196,8 @@ def find_or_wait(me: Entry, blocked: set[int]) -> Entry | None:
         store.remove(me.channel)
         recent = store.recent(me.user_id, now)
         fallback = None
-        for other in store.entries():
+        best, best_shared = None, -1
+        for other in store.entries():  # longest waiting first
             if other.ts < stale_before:
                 store.remove(other.channel)
                 continue
@@ -192,7 +206,13 @@ def find_or_wait(me: Entry, blocked: set[int]) -> Entry | None:
             if other.user_id in recent:
                 fallback = fallback or other
                 continue
-            return _pair(store, me, other, now)
+            shared = len(me.shared(other))
+            if shared > best_shared:
+                best, best_shared = other, shared
+            if not me.interests:
+                break  # no interests: simply the longest waiting
+        if best:
+            return _pair(store, me, best, now)
         if fallback:
             return _pair(store, me, fallback, now)
         store.add(me)

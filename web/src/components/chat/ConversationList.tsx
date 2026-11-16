@@ -28,6 +28,9 @@ type PersonRow = {
   preview: string;
   at: string | null;
   unread: number;
+  /** Position among pinned chats, or -1. */
+  pin: number;
+  muted: boolean;
 };
 
 function FriendRequests() {
@@ -105,15 +108,19 @@ export default function ConversationList() {
         preview: (c.last_from_me ? "You: " : "") + c.last_message,
         at: c.last_message_at,
         unread: unread[c.user.id] ?? 0,
+        pin: c.pinned ? conversations.filter((x) => x.pinned).indexOf(c) : -1,
+        muted: !!c.muted,
       });
     }
     for (const f of friends) {
       if (!rows.has(f.user.id)) {
-        rows.set(f.user.id, { user: f.user, friend: true, online: f.online, preview: "Say hi 👋", at: null, unread: 0 });
+        rows.set(f.user.id, { user: f.user, friend: true, online: f.online, preview: "Say hi 👋", at: null, unread: 0, pin: -1, muted: false });
       }
     }
     return [...rows.values()].sort(
       (a, b) =>
+        // Pinned first, in the order they were pinned.
+        (a.pin < 0 ? 99 : a.pin) - (b.pin < 0 ? 99 : b.pin) ||
         (b.at ? Date.parse(b.at) : 0) - (a.at ? Date.parse(a.at) : 0) ||
         Number(b.online) - Number(a.online) ||
         a.user.nickname.localeCompare(b.user.nickname),
@@ -155,12 +162,24 @@ export default function ConversationList() {
           <span className="conv-name">
             {p.user.nickname}
             {!p.friend && <span className="tag">Not friends</span>}
+            {p.muted && (
+              <span className="conv-flag" title="Muted" aria-label="Muted">
+                <Icon name="belloff" size={13} />
+              </span>
+            )}
           </span>
           <span className="conv-preview">{p.preview}</span>
         </span>
         <span className="conv-meta">
           {p.at && <time dateTime={p.at}>{timeAgo(p.at)}</time>}
-          {p.unread > 0 && <span className="badge">{p.unread}</span>}
+          <span className="conv-meta-row">
+            {p.pin >= 0 && (
+              <span className="conv-flag pin" title="Pinned" aria-label="Pinned">
+                <Icon name="pin" size={13} />
+              </span>
+            )}
+            {p.unread > 0 && <span className={`badge${p.muted ? " muted" : ""}`}>{p.unread}</span>}
+          </span>
         </span>
       </a>
     );

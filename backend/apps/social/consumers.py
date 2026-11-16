@@ -28,6 +28,7 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
         await self.channel_layer.group_add(user_group(self.user.id), self.channel_name)
         await self.send_json({"type": "ready", "user": services.brief(self.user)})
         came_online = await database_sync_to_async(presence.connect_user)(self.user.id, self.channel_name)
+        await database_sync_to_async(services.touch_last_seen)(self.user.id)
         if came_online:
             await self._announce(online=True)
 
@@ -42,16 +43,18 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
 
     async def on_ping(self):
         await database_sync_to_async(presence.ping_user)(self.user.id, self.channel_name)
+        # Last seen stays roughly right even if the server never sees the tab close.
+        if await database_sync_to_async(cache.add)(f"lastseen:{self.user.id}", 1, 120):
+            await database_sync_to_async(services.touch_last_seen)(self.user.id)
         if getattr(self, "_visible", False):
             await database_sync_to_async(presence.set_visible)(self.user.id, self.channel_name, True)
         await self.stranger_heartbeat()
 
     async def _announce(self, online: bool):
         """Tell this user's friends they came online or went offline (only on the first/last tab)."""
-        friend_ids = await database_sync_to_async(services.friend_ids)(self.user.id)
-        event = {"type": "user.event", "payload": {"type": "presence", "user_id": self.user.id, "online": online}}
-        for fid in friend_ids:
-            await self.channel_layer.group_send(user_group(fid), event)
+        events = await database_sync_to_async(services.presence_events)(self.user.id, online)
+        for fid, payload in events:
+            await self.channel_layer.group_send(user_group(fid), {"type": "user.event", "payload": payload})
 
     async def handle(self, kind, content):
         if isinstance(kind, str) and kind.startswith("stranger.") and await self.stranger_handle(kind, content):

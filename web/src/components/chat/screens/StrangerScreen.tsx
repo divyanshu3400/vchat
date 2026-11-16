@@ -17,7 +17,8 @@ import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
 import UnlockSheet from "../premium/UnlockSheet";
-import { useStranger, type FriendCard } from "../stranger/StrangerProvider";
+import { INTERESTS, MAX_INTERESTS, interestLabel } from "@/lib/interests";
+import { useStranger, type FriendCard, type IceCard } from "../stranger/StrangerProvider";
 import { useDock } from "../Dock";
 import Dropdown, { DropItem, DropSep } from "../Dropdown";
 import { looksLikeContact } from "../messages/richText";
@@ -84,7 +85,7 @@ function Interstitial({ onDone }: { onDone: () => void }) {
 }
 
 function IdleView() {
-  const { region, setRegion, want, setWant, start, notice, endedBy } = useStranger();
+  const { region, setRegion, want, setWant, start, notice, endedBy, interests, toggleInterest } = useStranger();
   const { premium } = useChat();
   const presence = useRoomPresence();
   const [unlockFor, setUnlockFor] = useState<string | null>(null);
@@ -142,6 +143,30 @@ function IdleView() {
             }}
           />
         )}
+        <div className="st-field">
+          <span className="st-label">
+            Your interests <small className="st-optional">optional · up to {MAX_INTERESTS}</small>
+          </span>
+          <div className="interest-chips">
+            {INTERESTS.map((i) => {
+              const on = interests.includes(i.slug);
+              const full = !on && interests.length >= MAX_INTERESTS;
+              return (
+                <button
+                  key={i.slug}
+                  type="button"
+                  className={`interest-chip${on ? " on" : ""}`}
+                  aria-pressed={on}
+                  disabled={full}
+                  onClick={() => toggleInterest(i.slug)}
+                >
+                  <span aria-hidden="true">{i.emoji}</span> {i.label}
+                </button>
+              );
+            })}
+          </div>
+          <small className="st-hint">People who like the same things are matched first.</small>
+        </div>
         <label className="st-field" htmlFor="st-region">
           <span className="st-label">From</span>
           <select id="st-region" className="st-select" value={region} onChange={(e) => setRegion(e.target.value)}>
@@ -201,7 +226,7 @@ function ChatView({ win }: { win?: WinControls }) {
   const [contactWarning, setContactWarning] = useState<string | null>(null);
   const warnResolve = useRef<((sent: boolean) => void) | null>(null);
   const { start: startCall } = useCalls();
-  const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, act, typing } = useStranger();
+  const { phase, partner, session, lines, partnerTyping, endedBy, notice, setNotice, next, leave, send, act, typing, shuffleIce } = useStranger();
   const [replying, setReplying] = useState<Msg | null>(null);
   const [editing, setEditing] = useState<Msg | null>(null);
   const [uploading, setUploading] = useState<number | null>(null);
@@ -459,7 +484,32 @@ function ChatView({ win }: { win?: WinControls }) {
           onDelete={ended ? undefined : onDelete}
           onWatch={ended ? undefined : (video) => watch.start(video)}
           renderCard={(m) => {
-            const card = m.card as FriendCard;
+            const any = m.card as FriendCard | IceCard;
+            if (any.kind === "ice") {
+              return (
+                <div className="ice-card">
+                  {any.common.length > 0 ? (
+                    <span className="ice-common">
+                      You both like {any.common.map((c) => interestLabel(c)).join(" · ")}
+                    </span>
+                  ) : (
+                    <span className="ice-common">Say hi! Need an opener?</span>
+                  )}
+                  <b className="ice-q">“{any.question}”</b>
+                  {!ended && (
+                    <span className="ice-actions">
+                      <button type="button" className="pill-btn primary" onClick={() => submit(any.question)}>
+                        Ask this
+                      </button>
+                      <button type="button" className="pill-btn" onClick={shuffleIce} aria-label="Another question">
+                        <Icon name="shuffle" size={14} /> Another
+                      </button>
+                    </span>
+                  )}
+                </div>
+              );
+            }
+            const card = any;
             const who = partner.nickname;
             if (card.kind === "sent")
               return (

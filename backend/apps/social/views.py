@@ -115,8 +115,24 @@ class DmMessagesView(APIView):
                 "has_more": has_more,
                 "partner_read_id": services.partner_read_id(request.user, partner.id),
                 "auto_delete_days": services.auto_delete_days(request.user, partner.id),
+                "prefs": services.prefs_with(request.user, partner.id),
             }
         )
+
+
+class DmPrefsView(APIView):
+    """Your own settings for one chat: {"mute": "8h" | "1w" | "always" | "off"} and/or {"pin": true | false}."""
+
+    def post(self, request, user_id):
+        mute = request.data.get("mute")
+        pin = request.data.get("pin")
+        try:
+            prefs = services.set_chat_prefs(
+                request.user, user_id, mute=mute if isinstance(mute, str) else None, pin=pin if isinstance(pin, bool) else None
+            )
+        except SocialError as exc:
+            return Response({"code": exc.code, "detail": exc.detail}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(prefs)
 
 
 class DmReadView(APIView):

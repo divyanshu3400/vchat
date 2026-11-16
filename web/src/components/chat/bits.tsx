@@ -54,6 +54,8 @@ const ICONS: Record<string, string> = {
   play: "M7 4.5v15l12-7.5z",
   pause: "M8 5v14M16 5v14",
   bell: "M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0",
+  belloff: "M6 16v-5a6 6 0 0 1 9.5-4.9M18 11v5l2 2H8M10 20a2 2 0 0 0 4 0M3 3l18 18",
+  pin: "M12 17v5M9 3h6l-1 6 4 3v2H6v-2l4-3z",
   phoneapp: "M8 2h8a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM11 18h2",
   reply: "M10 8 4 13l6 5M4 13h11a5 5 0 0 1 5 5v1",
   smile: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01",
@@ -86,6 +88,20 @@ export function Icon({ name, size = 20 }: { name: keyof typeof ICONS | string; s
       <path d={ICONS[name] ?? ""} />
     </svg>
   );
+}
+
+/** "last seen 5 min ago", "last seen today at 14:05", "last seen 12 Nov". */
+export function lastSeenLabel(iso: string) {
+  const at = new Date(iso);
+  const s = Math.max(0, (Date.now() - at.getTime()) / 1000);
+  if (s < 60) return "last seen just now";
+  if (s < 3600) return `last seen ${Math.floor(s / 60)} min ago`;
+  const time = at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const today = new Date();
+  if (at.toDateString() === today.toDateString()) return `last seen today at ${time}`;
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  if (at.toDateString() === yesterday.toDateString()) return `last seen yesterday at ${time}`;
+  return `last seen ${at.toLocaleDateString([], { day: "numeric", month: "short" })}`;
 }
 
 export function timeAgo(iso: string) {

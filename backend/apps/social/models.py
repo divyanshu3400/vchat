@@ -66,6 +66,12 @@ class Conversation(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
     )
 
+    # Each side's own choices: no notifications until then (far future = always), pinned on top.
+    a_muted_until = models.DateTimeField(null=True, blank=True)
+    b_muted_until = models.DateTimeField(null=True, blank=True)
+    a_pinned_at = models.DateTimeField(null=True, blank=True)
+    b_pinned_at = models.DateTimeField(null=True, blank=True)
+
     AUTO_DELETE_CHOICES = (1, 7, 30, 365)
 
     def has_user(self, user_id: int) -> bool:

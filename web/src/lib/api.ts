@@ -3,6 +3,8 @@ export type ChatUser = {
   nickname: string;
   gender: string;
   is_guest?: boolean;
+  /** Yours only: do friends see when you were last online (and you theirs)? */
+  show_last_seen?: boolean;
   /** Deactivated or deleted: shown as "vChat user", messages as "********". */
   inactive?: boolean;
   /** Only ever present for yourself. */
@@ -107,6 +109,15 @@ export function verifyAccount(email: string, code: string, access: string) {
   });
 }
 
+/** Mute ("8h" | "1w" | "always" | "off") and/or pin one chat, for you only. */
+export function setChatPrefs(userId: number, body: { mute?: string; pin?: boolean }, access: string) {
+  return request<ChatPrefs>(`/api/dms/${userId}/prefs`, { method: "POST", access, body: JSON.stringify(body) });
+}
+
+export function updateMe(body: { show_last_seen?: boolean }, access: string) {
+  return request<ChatUser>("/api/auth/me", { method: "PATCH", access, body: JSON.stringify(body) });
+}
+
 /** Deactivate (log in to come back) or delete (saved: after 15 days; guests: now). Signs out. */
 export function closeAccount(kind: "deactivate" | "delete", body: { password?: string; confirm?: string }, access: string) {
   return request<{ deactivated?: boolean; deleted?: boolean; delete_after?: string }>(`/api/auth/account/${kind}`, {
@@ -199,7 +210,10 @@ export function reportUser(
 
 // --- friends & DMs ---------------------------------------------------------
 
-export type Friend = { user: ChatUser; since: string; online: boolean };
+/** last_seen: only while offline, and only when both of you show it. */
+export type Friend = { user: ChatUser; since: string; online: boolean; last_seen?: string | null };
+/** Your own settings for one chat. muted_until null while muted = always. */
+export type ChatPrefs = { muted: boolean; muted_until: string | null; pinned: boolean };
 export type RoomPresence = { rooms: Record<string, number>; online: number };
 export type FriendRequest = { id: number; from_user: ChatUser; to_user: ChatUser; created_at: string };
 export type AttachmentKind = "image" | "video" | "audio";
@@ -274,7 +288,7 @@ export type ConversationSummary = {
   last_from_me: boolean;
   last_message_at: string;
   unread: number;
-};
+} & Partial<ChatPrefs>;
 
 /** Events pushed on the personal socket (/ws/me/). */
 export type UserEvent =
@@ -290,11 +304,11 @@ export type UserEvent =
   | { type: "friend_request_removed"; request_id: number }
   | { type: "friend_added"; friend: ChatUser; online?: boolean; request_id: number }
   | { type: "friend_removed"; user_id: number }
-  | { type: "presence"; user_id: number; online: boolean }
+  | { type: "presence"; user_id: number; online: boolean; last_seen?: string }
   | { type: "pong" }
   | { type: "error"; code: string; detail: string; client_id: string }
   | { type: "stranger.waiting"; waiting: number }
-  | { type: "stranger.matched"; session: string; partner: StrangerPartner }
+  | { type: "stranger.matched"; session: string; partner: StrangerPartner; common?: string[] }
   | { type: "stranger.message"; message: StrangerMessage; client_id: string }
   | { type: "stranger.typing" }
   | { type: "stranger.update"; message: StrangerMessage }
@@ -413,6 +427,7 @@ export function fetchDmHistory(userId: number, access: string, before?: number) 
     has_more: boolean;
     partner_read_id: number;
     auto_delete_days: number;
+    prefs?: ChatPrefs;
   }>(
     `/api/dms/${userId}/messages?${qs}`,
     { access },

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
 import CloseAccountSheet from "@/components/account/CloseAccountSheet";
+import { updateMe } from "@/lib/api";
 import { useChat } from "../ChatProvider";
 import { ChatHeader } from "../ChatShell";
 import { Avatar, Icon } from "../bits";
@@ -17,6 +18,18 @@ export default function MeScreen() {
   const router = useRouter();
   const { me, friends, premium, askAccount, getAccess } = useChat();
   const [closing, setClosing] = useState<"deactivate" | "delete" | null>(null);
+  const [lastSeenOn, setLastSeenOn] = useState<boolean | null>(null);
+  const showLastSeen = lastSeenOn ?? me?.show_last_seen !== false;
+
+  async function toggleLastSeen(on: boolean) {
+    setLastSeenOn(on);
+    try {
+      const updated = await updateMe({ show_last_seen: on }, await getAccess());
+      setLastSeenOn(updated.show_last_seen !== false);
+    } catch {
+      setLastSeenOn(!on);
+    }
+  }
   const guest = me?.is_guest !== false;
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -124,6 +137,13 @@ export default function MeScreen() {
             </span>
             <ThemeToggle />
           </div>
+          <label className="setting">
+            <span>
+              <b>Show my last seen</b>
+              <small>Friends see when you were last online. Turn it off and you won&apos;t see theirs either.</small>
+            </span>
+            <input type="checkbox" className="switch" checked={showLastSeen} onChange={(e) => toggleLastSeen(e.target.checked)} />
+          </label>
           <label className="setting">
             <span>
               <b>Hide swear words</b>

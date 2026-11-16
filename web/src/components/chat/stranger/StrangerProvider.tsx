@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { ADS_ON } from "@/lib/ads";
 import { usePlus } from "@/lib/plus";
 import type { Attachment, ReplyPreview, StrangerMessage, StrangerPartner } from "@/lib/api";
+import { MAX_INTERESTS, iceBreaker, saveInterests, savedInterests } from "@/lib/interests";
 import { useChat } from "../ChatProvider";
 
 /**
@@ -14,10 +15,12 @@ export type Phase = "idle" | "searching" | "chatting" | "ended";
 export type EndedBy = "you" | "stranger" | "connection";
 /** A friend request between the two of you, shown as a card inside the random chat. */
 export type FriendCard = { kind: "sent" | "received" | "friends" | "declined"; requestId?: number };
+/** Opens every random chat: what you both like, and a question to start with. */
+export type IceCard = { kind: "ice"; common: string[]; question: string };
 
 export type Line = {
   /** Cards (not messages) use negative ids. */
-  card?: FriendCard;
+  card?: FriendCard | IceCard;
   id: number;
   mine: boolean;
   senderId: number;
@@ -30,7 +33,7 @@ export type Line = {
   deleted: boolean;
 };
 
-function cardLine(card: FriendCard, mine: boolean, seq: number): Line {
+function cardLine(card: FriendCard | IceCard, mine: boolean, seq: number): Line {
   return {
     card,
     id: -seq,
@@ -83,6 +86,10 @@ type StrangerValue = {
   notice: string;
   interstitial: boolean;
   setRegion: (region: string) => void;
+  interests: string[];
+  toggleInterest: (slug: string) => void;
+  /** Another starter question in the opening card. */
+  shuffleIce: () => void;
   setNotice: (text: string) => void;
   start: () => void;
   next: () => void;
@@ -114,6 +121,19 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   const [endedBy, setEndedBy] = useState<EndedBy | null>(null);
   const [region, setRegion] = useState("any");
   const [want, setWant] = useState("any");
+  // Up to 5, remembered on this device; people who share more are matched first.
+  const [interests, setInterestsState] = useState<string[]>([]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read from this device's storage after mount
+    setInterestsState(savedInterests());
+  }, []);
+  const toggleInterest = useCallback((slug: string) => {
+    setInterestsState((prev) => {
+      const next = prev.includes(slug) ? prev.filter((x) => x !== slug) : prev.length < MAX_INTERESTS ? [...prev, slug] : prev;
+      saveInterests(next);
+      return next;
+    });
+  }, []);
   const [notice, setNotice] = useState("");
   const [interstitial, setInterstitial] = useState(false);
 
@@ -165,13 +185,17 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             const kind = r.from_user.id === p.id && r.to_user.id === self.id ? "received" : r.from_user.id === self.id && r.to_user.id === p.id ? "sent" : null;
             if (!kind) break;
             setLines((l) =>
-              l.some((x) => x.card?.requestId === r.id) ? l : [...l, cardLine({ kind, requestId: r.id }, kind === "sent", (cardSeq.current += 1))],
+              l.some((x) => x.card?.kind !== "ice" && x.card?.requestId === r.id) ? l : [...l, cardLine({ kind, requestId: r.id }, kind === "sent", (cardSeq.current += 1))],
             );
             break;
           }
           case "friend_request_removed":
             setLines((l) =>
-              l.map((x) => (x.card?.requestId === event.request_id && x.card.kind !== "friends" ? { ...x, card: { ...x.card, kind: "declined" } } : x)),
+              l.map((x) =>
+                x.card && x.card.kind !== "ice" && x.card.requestId === event.request_id && x.card.kind !== "friends"
+                  ? { ...x, card: { ...x.card, kind: "declined" as const } }
+                  : x,
+              ),
             );
             break;
           case "friend_added": {
@@ -179,7 +203,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             if (!p || event.friend.id !== p.id || phaseRef.current === "idle") break;
             setLines((l) => [
               ...l.map((x) => (x.card && (x.card.kind === "sent" || x.card.kind === "received") ? { ...x, card: { ...x.card, kind: "friends" as const } } : x)),
-              ...(l.some((x) => x.card) ? [] : [cardLine({ kind: "friends" }, false, (cardSeq.current += 1))]),
+              ...(l.some((x) => x.card && x.card.kind !== "ice") ? [] : [cardLine({ kind: "friends" }, false, (cardSeq.current += 1))]),
             ]);
             break;
           }
@@ -187,7 +211,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             partnerRef.current = event.partner;
             setPartner(event.partner);
             setSession(event.session);
-            setLines([]);
+            setLines([cardLine({ kind: "ice", common: event.common ?? [], question: iceBreaker(event.common ?? []) }, false, (cardSeq.current += 1))]);
             setEndedBy(null);
             setPartnerTyping(false);
             setNotice("");
@@ -266,13 +290,13 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   );
 
   const find = useCallback(() => {
-    if (!sendRaw({ type: "stranger.find", region, want })) {
+    if (!sendRaw({ type: "stranger.find", region, want, interests })) {
       setNotice("You're offline. Reconnecting…");
       return;
     }
     setNotice("");
     setPhase("searching");
-  }, [region, want, sendRaw]);
+  }, [region, want, interests, sendRaw]);
 
   useEffect(() => {
     findRef.current = find;
@@ -325,6 +349,14 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
     [sendRaw],
   );
 
+  const shuffleIce = useCallback(
+    () =>
+      setLines((l) =>
+        l.map((x) => (x.card?.kind === "ice" ? { ...x, card: { ...x.card, question: iceBreaker(x.card.common, x.card.question) } } : x)),
+      ),
+    [],
+  );
+
   const typing = useCallback(() => {
     const now = Date.now();
     if (now - lastTypingSent.current < TYPING_SEND_GAP_MS) return;
@@ -348,6 +380,9 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       notice: !socketLive && phase === "chatting" ? "Connection lost. Reconnecting…" : notice,
       interstitial,
       setRegion,
+      interests,
+      toggleInterest,
+      shuffleIce,
       setNotice,
       start,
       next,
@@ -358,7 +393,7 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
       typing,
       finishInterstitial,
     }),
-    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, socketLive, interstitial, start, next, cancel, leave, send, act, typing, finishInterstitial],
+    [phase, partner, session, lines, partnerTyping, waiting, endedBy, region, want, notice, socketLive, interstitial, interests, toggleInterest, shuffleIce, start, next, cancel, leave, send, act, typing, finishInterstitial],
   );
 
   return <StrangerContext.Provider value={value}>{children}</StrangerContext.Provider>;

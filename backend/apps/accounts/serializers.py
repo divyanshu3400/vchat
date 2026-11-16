@@ -40,7 +40,7 @@ class MeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "nickname", "gender", "is_guest", "email"]
+        fields = ["id", "nickname", "gender", "is_guest", "email", "show_last_seen"]
         read_only_fields = fields
 
 

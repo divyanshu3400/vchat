@@ -219,7 +219,10 @@ def friends_of(user: User) -> list[dict]:
     # Deactivated friends stay listed (as "vChat user"); accounts disabled by an admin don't.
     others = [(u, since) for u, since in others if u.is_active or closing.is_gone(u)]
     online = presence.online_among(u.id for u, _ in others)
-    friends = [{"user": brief(u), "since": since.isoformat(), "online": u.id in online} for u, since in others]
+    friends = [
+        {"user": brief(u), "since": since.isoformat(), "online": u.id in online, "last_seen": last_seen_for(user, u, u.id in online)}
+        for u, since in others
+    ]
     return sorted(friends, key=lambda f: f["user"]["nickname"].lower())
 
 
@@ -244,6 +247,96 @@ def remove_social_links(a: User, b: User) -> None:
             for uid in (a.id, b.id):
                 _on_commit_push(uid, {"type": "friend_request_removed", "request_id": req_id})
         pending.update(status=FriendRequest.Status.CANCELLED, responded_at=timezone.now())
+
+
+# --- mute, pin, last seen ----------------------------------------------------
+
+MUTE_FOR = {"8h": timedelta(hours=8), "1w": timedelta(days=7), "always": timedelta(days=36500)}
+MAX_PINNED = 3
+
+
+def _mine(c: Conversation, user_id: int, what: str):
+    return getattr(c, f"{'a' if c.user_a_id == user_id else 'b'}_{what}")
+
+
+def is_muted(user_id: int, partner_id: int) -> bool:
+    c = _conversation(user_id, partner_id)
+    until = c and _mine(c, user_id, "muted_until")
+    return bool(until and until > timezone.now())
+
+
+def set_chat_prefs(user: User, partner_id, mute=None, pin=None) -> dict:
+    """Your own settings for one chat: mute ("8h" | "1w" | "always" | "off") and pin (bool)."""
+    if not isinstance(partner_id, int) or partner_id == user.id:
+        raise SocialError("invalid", "Pick a chat.")
+    if not are_friends(user.id, partner_id) and _conversation(user.id, partner_id) is None:
+        raise SocialError("not_found", "That chat doesn't exist.")
+    if mute is not None and mute != "off" and mute not in MUTE_FOR:
+        raise SocialError("invalid", "Mute for 8 hours, a week, or always.")
+    side = "a" if user.id < partner_id else "b"
+    x, y = ordered_pair(user.id, partner_id)
+    now = timezone.now()
+    with transaction.atomic():
+        c, _ = Conversation.objects.select_for_update().get_or_create(user_a_id=x, user_b_id=y)
+        if mute is not None:
+            setattr(c, f"{side}_muted_until", None if mute == "off" else now + MUTE_FOR[mute])
+        if pin is True and not getattr(c, f"{side}_pinned_at"):
+            pinned = Conversation.objects.filter(
+                Q(user_a=user, a_pinned_at__isnull=False) | Q(user_b=user, b_pinned_at__isnull=False)
+            ).count()
+            if pinned >= MAX_PINNED:
+                raise SocialError("too_many_pins", f"You can pin up to {MAX_PINNED} chats.")
+            setattr(c, f"{side}_pinned_at", now)
+        elif pin is False:
+            setattr(c, f"{side}_pinned_at", None)
+        c.save()
+    _on_commit_push(user.id, {"type": "conversations.changed"})
+    return chat_prefs(c, user.id)
+
+
+def chat_prefs(c: Conversation, user_id: int) -> dict:
+    until = _mine(c, user_id, "muted_until")
+    now = timezone.now()
+    muted = bool(until and until > now)
+    return {
+        "muted": muted,
+        # null while muted: "always" (shown without a date)
+        "muted_until": until.isoformat() if muted and until < now + timedelta(days=3650) else None,
+        "pinned": _mine(c, user_id, "pinned_at") is not None,
+    }
+
+
+def prefs_with(user: User, partner_id: int) -> dict:
+    c = _conversation(user.id, partner_id)
+    return chat_prefs(c, user.id) if c else {"muted": False, "muted_until": None, "pinned": False}
+
+
+def last_seen_for(viewer: User, other: User, online: bool) -> str | None:
+    """Only when both allow it, and only while offline."""
+    if online or not other.last_seen_at or not (viewer.show_last_seen and other.show_last_seen):
+        return None
+    return other.last_seen_at.isoformat()
+
+
+def presence_events(user_id: int, online: bool) -> list[tuple[int, dict]]:
+    """For each friend: the presence event to send. Going offline records the moment (last seen)."""
+    now = timezone.now()
+    if not online:
+        User.objects.filter(pk=user_id).update(last_seen_at=now)
+    shows = User.objects.filter(pk=user_id, show_last_seen=True).exists()
+    ids = friend_ids(user_id)
+    allow = set(User.objects.filter(id__in=ids, show_last_seen=True).values_list("id", flat=True)) if shows else set()
+    out = []
+    for fid in ids:
+        payload = {"type": "presence", "user_id": user_id, "online": online}
+        if not online and fid in allow:
+            payload["last_seen"] = now.isoformat()
+        out.append((fid, payload))
+    return out
+
+
+def touch_last_seen(user_id: int) -> None:
+    User.objects.filter(pk=user_id).update(last_seen_at=timezone.now())
 
 
 # --- direct messages ------------------------------------------------------
@@ -383,13 +476,21 @@ def conversations_of(user: User, limit: int = 100) -> list[dict]:
             return closing.MASK
         return c.last_content or ATTACHMENT_PREVIEW.get(c.last_kind or "", "")
 
-    return [
+    out = [
         {
             "user": brief(c.user_b if c.user_a_id == user.id else c.user_a),
             "last_message": preview(c, c.user_b if c.user_a_id == user.id else c.user_a),
             "last_from_me": c.last_sender_id == user.id,
             "last_message_at": c.last_message_at.isoformat(),
             "unread": c.unread,
+            **chat_prefs(c, user.id),
+            "_pinned_at": _mine(c, user.id, "pinned_at"),
         }
         for c in rows
     ]
+    # Pinned chats first, in the order they were pinned; then the most recent.
+    pinned = sorted((r for r in out if r["_pinned_at"]), key=lambda r: r["_pinned_at"])
+    rest = [r for r in out if not r["_pinned_at"]]
+    for r in out:
+        del r["_pinned_at"]
+    return pinned + rest

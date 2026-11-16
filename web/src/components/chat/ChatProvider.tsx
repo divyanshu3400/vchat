@@ -235,7 +235,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         noteOpened(event.attachment_id, event.views_left);
         break;
       case "presence":
-        setFriends((l) => l.map((f) => (f.user.id === event.user_id ? { ...f, online: event.online } : f)));
+        setFriends((l) =>
+          l.map((f) => (f.user.id === event.user_id ? { ...f, online: event.online, last_seen: event.online ? null : (event.last_seen ?? null) } : f)),
+        );
         break;
       case "error":
         if (event.client_id) {

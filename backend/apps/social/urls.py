@@ -15,4 +15,5 @@ urlpatterns = [
     path("dms/", views.ConversationListView.as_view(), name="dm-list"),
     path("dms/<int:user_id>/messages/", views.DmMessagesView.as_view(), name="dm-messages"),
     path("dms/<int:user_id>/read/", views.DmReadView.as_view(), name="dm-read"),
+    path("dms/<int:user_id>/prefs/", views.DmPrefsView.as_view(), name="dm-prefs"),
 ]

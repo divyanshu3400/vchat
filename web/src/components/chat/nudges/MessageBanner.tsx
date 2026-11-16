@@ -55,7 +55,11 @@ type Shown = { id: number; nickname: string; text: string; key: number };
  * for a few seconds, a soft sound and a buzz. Tap it to open that chat. Not during a random chat.
  */
 export default function MessageBanner() {
-  const { me, subscribe, isWatching } = useChat();
+  const { me, subscribe, isWatching, conversations } = useChat();
+  const mutedRef = useRef(new Set<number>());
+  useEffect(() => {
+    mutedRef.current = new Set(conversations.filter((c) => c.muted).map((c) => c.user.id));
+  }, [conversations]);
   const { openChat } = useDock();
   const { phase } = useStranger();
   const [shown, setShown] = useState<Shown | null>(null);
@@ -71,7 +75,7 @@ export default function MessageBanner() {
       subscribe((event) => {
         if (event.type !== "dm") return;
         const m = event.message;
-        if (!me || m.sender.id === me.id || isWatching(m.sender.id)) return;
+        if (!me || m.sender.id === me.id || isWatching(m.sender.id) || mutedRef.current.has(m.sender.id)) return;
         if (phaseRef.current === "chatting" || document.visibilityState !== "visible" || !inAppAlertsOn()) return;
         const kind = m.attachment?.kind;
         const text = m.content || (kind === "image" ? "📷 Photo" : kind === "video" ? "🎬 Video" : kind === "audio" ? "🎤 Voice message" : "");
