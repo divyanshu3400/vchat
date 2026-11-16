@@ -6,10 +6,12 @@ from django.conf import settings
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import AccessToken
 
+from apps.accounts import moderation
 from apps.accounts.models import User
 
 CLOSE_NOT_FOUND = 4404
 CLOSE_UNAUTHORIZED = 4401
+CLOSE_BANNED = 4403
 
 
 class AuthenticatedJsonConsumer(AsyncJsonWebsocketConsumer):
@@ -33,7 +35,13 @@ class AuthenticatedJsonConsumer(AsyncJsonWebsocketConsumer):
         if self._auth_task:
             self._auth_task.cancel()
         if self.user is not None:
+            await self.channel_layer.group_discard(moderation.account_group(self.user.id), self.channel_name)
             await self.on_leave()
+
+    async def account_banned(self, event):
+        user = await database_sync_to_async(User.objects.get)(pk=self.user.pk)
+        await self.send_json({"type": "error", **moderation.ban_payload(user), "client_id": ""})
+        await self.close(code=CLOSE_BANNED)
 
     async def receive_json(self, content, **kwargs):
         if not isinstance(content, dict):
@@ -49,9 +57,15 @@ class AuthenticatedJsonConsumer(AsyncJsonWebsocketConsumer):
                 await self.error("unauthorized", "Your session expired. Reload to continue.")
                 await self.close(code=CLOSE_UNAUTHORIZED)
                 return
+            if user.is_banned:
+                await self.send_json({"type": "error", **moderation.ban_payload(user), "client_id": ""})
+                await self.close(code=CLOSE_BANNED)
+                return
             self.user = user
             if self._auth_task:
                 self._auth_task.cancel()
+            # A ban closes every socket of this account at once.
+            await self.channel_layer.group_add(moderation.account_group(user.id), self.channel_name)
             return await self.on_authenticated()
 
         if kind == "auth":

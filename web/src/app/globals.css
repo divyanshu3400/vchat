@@ -259,3 +259,30 @@ p { margin: 0; }
 @media (max-width: 767px) {
   .account-sheet { top: auto; bottom: 0; translate: -50% 0; width: 100vw; border-radius: 24px 24px 0 0; padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px)); }
 }
+
+/* ---------- About, Rules, Privacy, Terms, Report, Contact ---------- */
+.legal { padding-block: 40px 24px; }
+.prose { max-width: 760px; margin: 0 auto; font-size: 16.5px; line-height: 1.7; color: var(--fg); }
+.prose h1 { font-size: clamp(32px, 6vw, 46px); letter-spacing: -0.02em; margin-bottom: 8px; }
+.prose h2 { font-size: 22px; margin: 36px 0 10px; letter-spacing: -0.01em; }
+.prose h3 { font-size: 16.5px; margin: 20px 0 6px; font-family: var(--body); font-weight: 800; }
+.prose p, .prose ul, .prose ol { margin: 0 0 12px; }
+.prose ul, .prose ol { padding-left: 22px; display: grid; gap: 6px; }
+.prose a { color: var(--brand); font-weight: 700; text-underline-offset: 2px; }
+.prose b { font-weight: 800; }
+.legal-updated { font-family: var(--mono); font-size: 12.5px; color: var(--faint); }
+.legal-intro { font-size: 18px; color: var(--muted); margin-top: 14px !important; padding: 16px 18px; background: var(--brand-soft); border-radius: 16px; border: 1px solid color-mix(in srgb, var(--brand) 22%, var(--line)); }
+.contact-form { display: grid; gap: 14px; margin-top: 18px; padding: 20px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); }
+.contact-form label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.contact-form input, .contact-form select, .contact-form textarea { width: 100%; font: inherit; font-size: 16px; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; outline: none; }
+.contact-form textarea { min-height: 140px; resize: vertical; }
+.contact-form input:focus, .contact-form select:focus, .contact-form textarea:focus { border-color: var(--brand); }
+.contact-form .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.contact-done { padding: 18px; border-radius: 16px; background: var(--brand-soft); font-weight: 600; }
+
+/* a banned account */
+.banned-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: var(--bg); text-align: center; }
+.banned-screen > div { max-width: 460px; display: grid; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 28px; box-shadow: var(--shadow); }
+.banned-screen h1 { font-family: var(--display); font-size: 28px; color: var(--danger); }
+.banned-screen p { color: var(--muted); line-height: 1.6; }
+.banned-screen a { color: var(--brand); font-weight: 800; }

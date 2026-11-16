@@ -43,7 +43,6 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="wrap foot">
         <span>© {new Date().getFullYear()} vChat · Anonymous chat rooms for adults</span>
-        {/* TODO: real pages. Privacy, Terms and Report abuse are required before launch and for ad network approval. */}
         <ul>
           <li><Link href="/about">About</Link></li>
           <li><Link href="/rules">Chat rules</Link></li>

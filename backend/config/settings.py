@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     "apps.media",
     "apps.calls",
     "apps.watch",
+    "apps.support",
 ]
 
 MIDDLEWARE = [
@@ -130,7 +131,10 @@ else:
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework_simplejwt.authentication.JWTAuthentication"],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+        "apps.accounts.moderation.NotBanned",
+    ],
     # Rate limits are per visitor IP. Behind the app nginx, X-Forwarded-For holds exactly the
     # visitor's address (nginx overwrites it), so trust one proxy hop. Unset in development.
     "NUM_PROXIES": int(os.environ["NUM_PROXIES"]) if os.environ.get("NUM_PROXIES") else None,
@@ -144,6 +148,7 @@ REST_FRAMEWORK = {
         "guest_signup": "10/hour",
         "email_codes": "10/hour",
         "login": "30/hour",
+        "contact": "5/hour",
         "reports": "30/hour",
         "friend_requests": "40/hour",
         "rewards": "20/hour",
@@ -177,6 +182,8 @@ if EMAIL_HOST:
 elif DEBUG:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 EMAIL_ENABLED = bool(EMAIL_HOST) or DEBUG or TESTING
+# Where contact-page messages go.
+SUPPORT_EMAIL = os.environ.get("SUPPORT_EMAIL", "support@techyugantar.in")
 
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),

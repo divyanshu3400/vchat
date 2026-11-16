@@ -13,7 +13,7 @@ from apps.accounts.models import User
 from apps.social.services import remove_social_links
 
 from . import presence, services
-from . import message_ops
+from . import automod, message_ops
 from .models import Block, Message, Room
 from .realtime import push_control
 from .serializers import ReportCreateSerializer, RoomSerializer
@@ -110,4 +110,5 @@ class ReportCreateView(generics.CreateAPIView):
     throttle_scope = "reports"
 
     def perform_create(self, serializer):
-        serializer.save(reporter=self.request.user)
+        report = serializer.save(reporter=self.request.user)
+        automod.after_report(report.reported_user_id)

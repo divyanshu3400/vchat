@@ -197,6 +197,10 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
             break;
           case "error":
             if (["rate_limited", "no_chat", "locked_photos", "invalid_attachment"].includes(event.code)) setNotice(event.detail);
+            if (event.code === "random_suspended") {
+              setPhase("idle");
+              setNotice(event.detail);
+            }
             else if (phaseRef.current === "chatting" && ["too_late", "not_yours", "gone", "not_found", "invalid_reaction", "not_text", "invalid_message"].includes(event.code)) setNotice(event.detail);
             if (event.code === "locked_filter") {
               // The unlock ran out (or never existed): fall back to "Anyone" and say why.

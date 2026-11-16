@@ -19,6 +19,10 @@ def clean_content(raw) -> str:
     limit = settings.VCHAT["MESSAGE_MAX_LENGTH"]
     if len(text) > limit:
         raise InvalidMessage(f"Message is longer than {limit} characters.")
+    from .automod import has_slur
+
+    if has_slur(text):
+        raise InvalidMessage("That message has a slur in it. Hate speech isn't allowed on vChat.")
     return text
 
 

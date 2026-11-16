@@ -120,6 +120,14 @@ export function resetPassword(email: string, code: string, password: string) {
   });
 }
 
+/** The contact page. `website` is a hidden field only bots fill in. */
+export function sendContact(
+  input: { topic: string; name: string; email: string; message: string; website: string },
+  access?: string,
+) {
+  return request<{ detail: string }>("/api/contact", { method: "POST", access, body: JSON.stringify(input) });
+}
+
 /** The machine-readable reason in an API error, e.g. "account_required". */
 export function errorCode(e: unknown): string | undefined {
   if (!(e instanceof ApiError) || !e.body || typeof e.body !== "object") return undefined;

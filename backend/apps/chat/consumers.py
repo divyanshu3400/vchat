@@ -1,6 +1,6 @@
 from channels.db import database_sync_to_async
 
-from . import message_ops, presence, services
+from . import automod, message_ops, presence, services
 from .models import Message, Room
 from .realtime import control_group
 from .ws_auth import AuthenticatedJsonConsumer
@@ -63,6 +63,14 @@ class RoomConsumer(AuthenticatedJsonConsumer):
         allowed = await database_sync_to_async(services.allow_message)(self.user.id, self.room)
         if not allowed:
             return await self.error("rate_limited", "You're sending messages too fast. Wait a moment.", client_id)
+        muted = await database_sync_to_async(automod.check_room_message)(self.user.id, text)
+        if muted:
+            minutes = max(1, round(muted / 60))
+            return await self.error(
+                "muted",
+                f"You're muted in rooms for {minutes} more minute{'s' if minutes != 1 else ''} for repeating messages or posting too many links.",
+                client_id,
+            )
 
         # Persist first, then broadcast: a message everyone saw is always in history.
         payload = await self._save_message(text, content.get("reply_to"))

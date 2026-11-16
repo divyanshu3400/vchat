@@ -16,9 +16,8 @@ export const metadata: Metadata = {
   },
   description:
     "Chat with strangers from around the world in free anonymous chat rooms. No sign-up, no email. Pick a nickname, join a room and make friends.",
-  openGraph: { type: "website", siteName: "vChat", url: "/" },
+  openGraph: { type: "website", siteName: "vChat" },
   twitter: { card: "summary_large_image" },
-  alternates: { canonical: "/" },
 };
 
 export const viewport: Viewport = {

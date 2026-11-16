@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from . import email_auth
+from . import email_auth, moderation
 from .email_auth import AccountError
 from .models import EmailCode, User
 from .serializers import (
@@ -40,12 +40,16 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
     )
 
 
-def _start_session(user: User, status_code: int = status.HTTP_200_OK) -> Response:
+def _start_session(user: User, request, status_code: int = status.HTTP_200_OK) -> Response:
     """Log in: an access token in the body, the refresh token in the httpOnly cookie."""
+    if user.is_banned:
+        return Response(moderation.ban_payload(user), status=status.HTTP_403_FORBIDDEN)
+    new_device = moderation.remember_device(user, request)
     refresh = RefreshToken.for_user(user)
     refresh["sv"] = user.session_version
     response = Response({"user": MeSerializer(user).data, "access": str(refresh.access_token)}, status=status_code)
     _set_refresh_cookie(response, str(refresh))
+    moderation.set_device_cookie(response, new_device)
     return response
 
 
@@ -73,11 +77,18 @@ class GuestSignupView(APIView):
     def post(self, request):
         serializer = GuestSignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        device_hash, _ = moderation.device_of(request)
+        ip = moderation.client_ip(request)
+        if moderation.evading(device_hash, moderation.digest(ip) if ip else ""):
+            return Response(
+                {"code": "banned", "detail": "You can't start a new account right now: this browser or network is under a ban."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         user = User.create_guest(
             nickname=serializer.validated_data["nickname"],
             gender=serializer.validated_data.get("gender", ""),
         )
-        return _start_session(user, status.HTTP_201_CREATED)
+        return _start_session(user, request, status.HTTP_201_CREATED)
 
 
 class CookieRefreshView(APIView):
@@ -99,8 +110,13 @@ class CookieRefreshView(APIView):
         # A password reset ends every session started before it.
         if user is None or refresh.get("sv", 0) != user.session_version:
             return Response({"detail": "Session expired."}, status=status.HTTP_401_UNAUTHORIZED)
+        if user.is_banned:
+            return Response(moderation.ban_payload(user), status=status.HTTP_403_FORBIDDEN)
 
-        return Response({"user": MeSerializer(user).data, "access": str(refresh.access_token)})
+        new_device = moderation.remember_device(user, request)
+        response = Response({"user": MeSerializer(user).data, "access": str(refresh.access_token)})
+        moderation.set_device_cookie(response, new_device)
+        return response
 
 
 class LogoutView(APIView):
@@ -186,7 +202,7 @@ class LoginView(APIView):
         user = User.objects.filter(email__iexact=s.validated_data["email"], is_guest=False, is_active=True).first()
         if user is None or not user.check_password(s.validated_data["password"]):
             return Response({"code": "wrong_login", "detail": "Wrong email or password."}, status=400)
-        return _start_session(user)
+        return _start_session(user, request)
 
 
 class ForgotPasswordView(APIView):
@@ -239,4 +255,4 @@ class ResetPasswordView(APIView):
         user.set_password(s.validated_data["password"])
         User.objects.filter(pk=user.pk).update(password=user.password, session_version=F("session_version") + 1)
         user.refresh_from_db()
-        return _start_session(user)
+        return _start_session(user, request)

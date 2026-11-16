@@ -91,6 +91,8 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [premium, setPremiumState] = useState<PremiumStatus | null>(null);
   const [socketLive, setSocketLive] = useState(false);
+  // A banned account: the whole chat shows why, and nothing keeps reconnecting.
+  const [banned, setBanned] = useState<string | null>(null);
 
   const setPremium = useCallback((status: PremiumStatus) => {
     setPremiumState(status);
@@ -226,6 +228,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         access = await getAccess();
       } catch (e) {
         if (e instanceof ApiError && e.status === 401) return; // redirected to sign-up
+        if (errorCode(e) === "banned") return setBanned(e instanceof ApiError ? e.message : "This account is banned.");
         return scheduleRetry();
       }
       if (cancelled) return;
@@ -234,6 +237,11 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       ws.onopen = () => ws.send(JSON.stringify({ type: "auth", token: access }));
       ws.onmessage = (ev) => {
         const event = JSON.parse(ev.data) as UserEvent;
+        if (event.type === "error" && event.code === "banned") {
+          cancelled = true;
+          setBanned(event.detail);
+          return;
+        }
         if (event.type === "ready") {
           attempt = 0;
           setSocketLive(true);
@@ -449,6 +457,20 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     }),
     [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount],
   );
+
+  if (banned) {
+    return (
+      <div className="banned-screen" role="alert">
+        <div>
+          <h1>Account banned</h1>
+          <p>{banned}</p>
+          <p>
+            <a href="/rules">Chat rules</a> · <a href="/contact">Contact us</a>
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ChatContext.Provider value={value}>

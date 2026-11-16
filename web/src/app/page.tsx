@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import ChatPreview from "@/components/ChatPreview";
 import JoinForm from "@/components/JoinForm";
@@ -5,12 +6,13 @@ import { RoomCount } from "@/components/LiveCounts";
 import RoomClock from "@/components/RoomClock";
 import { AdSlot, SiteFooter, SiteHeader } from "@/components/SiteChrome";
 import { REGION_ROOMS, TOPIC_ROOMS } from "@/lib/rooms";
+import { SITE } from "@/lib/site";
 
 const FAQ = [
   ["Is vChat free?", "Yes. Chat rooms, private messages, friends and calls are all free. The site is supported by ads."],
   [
     "Do I need to register?",
-    "No. Pick a nickname and you're in. You can save your profile with Google later if you want to keep your friends on another phone or laptop.",
+    "No. Pick a nickname and you're in. To keep your friends and log in on another phone or laptop, save your account with an email and a password whenever you like.",
   ],
   ["Who can join?", "Anyone aged 18 or older, from any country. Rooms are in English, grouped by region and by topic."],
   [
@@ -19,9 +21,33 @@ const FAQ = [
   ],
   [
     "Can I video call someone I just met?",
-    "Only after you're friends. Strangers can't call you, so you decide who gets that close.",
+    "Video calls are only between friends. In a random chat you can ask for a voice call, and it starts only if the other person accepts.",
+  ],
+  [
+    "Can we watch videos together?",
+    "Yes. In a chat with a friend or a stranger, share a YouTube link and it plays for both of you, in sync.",
   ],
 ] as const;
+
+export const metadata: Metadata = { alternates: { canonical: "/" } };
+
+// Who we are, for Google's knowledge panel and sitelinks search.
+const siteJsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE.name,
+    url: SITE.url,
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE.name,
+    url: SITE.url,
+    email: SITE.supportEmail,
+    parentOrganization: { "@type": "Organization", name: SITE.operator },
+  },
+];
 
 // FAQ rich results in Google search.
 const faqJsonLd = {
@@ -34,6 +60,7 @@ export default function Home() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(siteJsonLd) }} />
       <SiteHeader />
 
       <main>
@@ -125,8 +152,8 @@ export default function Home() {
                   <span className="tag">Friends that stick</span>
                   <h3 style={{ marginTop: 12 }}>Your friend list lives on, even as a guest.</h3>
                   <p style={{ marginTop: 12 }}>
-                    Message friends privately, see when they&apos;re online, and start a voice or video call. Save with
-                    Google to keep them on every device.
+                    Message friends privately, see when they&apos;re online, and start a voice or video call. Save your
+                    account with an email to keep them on every device.
                   </p>
                 </div>
                 <div className="friends" aria-label="Example friend list">

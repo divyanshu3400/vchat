@@ -26,11 +26,24 @@ class User(AbstractUser):
     # Bumped when the password is reset: every session signed in before that stops refreshing.
     session_version = models.PositiveIntegerField(default=0)
 
+    # --- moderation ---
+    banned_until = models.DateTimeField(null=True, blank=True)
+    ban_reason = models.CharField(max_length=200, blank=True)
+    # Several reports in a short time: out of random chat until then (or until a moderator clears it).
+    random_blocked_until = models.DateTimeField(null=True, blank=True)
+    # Hashes (never the raw values) of this browser's device cookie and the last IP, for ban evasion.
+    device_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    last_ip_hash = models.CharField(max_length=64, blank=True)
+
     class Meta:
         constraints = [
             # One account per email, whatever the capitals. Guests have no email.
             models.UniqueConstraint(Lower("email"), condition=~Q(email=""), name="uniq_user_email_ci"),
         ]
+
+    @property
+    def is_banned(self) -> bool:
+        return self.banned_until is not None and self.banned_until > timezone.now()
 
     @property
     def is_plus(self) -> bool:
@@ -51,6 +64,24 @@ class User(AbstractUser):
 
     def __str__(self) -> str:
         return f"{self.nickname} ({self.username})"
+
+
+class BanMark(models.Model):
+    """Stops a banned person from coming back as a new guest: their device cookie (for the length of
+    the ban) and IP (at most a day, since mobile networks share IPs). Values are HMAC hashes."""
+
+    class Kind(models.TextChoices):
+        DEVICE = "device", "Device"
+        IP = "ip", "IP address"
+
+    kind = models.CharField(max_length=6, choices=Kind.choices)
+    value_hash = models.CharField(max_length=64)
+    until = models.DateTimeField()
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="ban_marks")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["value_hash", "until"], name="banmark_lookup")]
 
 
 class EmailCode(models.Model):

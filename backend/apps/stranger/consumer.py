@@ -36,6 +36,7 @@ import time
 from channels.db import database_sync_to_async
 from django.conf import settings
 from django.core.cache import cache
+from django.utils import timezone
 
 from apps.chat import message_ops
 from apps.chat import services as chat_services
@@ -92,6 +93,15 @@ class StrangerMixin:
         return True
 
     async def _st_find(self, content):
+        blocked_until = await database_sync_to_async(
+            lambda: type(self.user).objects.filter(pk=self.user.pk).values_list("random_blocked_until", flat=True).first()
+        )()
+        if blocked_until and blocked_until > timezone.now():
+            return await self.error(
+                "random_suspended",
+                "You were reported by several people, so random chat is paused for you until "
+                f"{blocked_until:%d %b, %H:%M} UTC while a moderator takes a look. Rooms and friends still work.",
+            )
         region = content.get("region", "any")
         if region != "any" and region not in REGION_SLUGS:
             region = "any"
