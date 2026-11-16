@@ -51,8 +51,11 @@ type Props = {
 
 export default function DmConversation({ userId, variant = "page", minimized = false, onToggleMin, onClose }: Props) {
   const router = useRouter();
-  const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive, unread } =
+  const { me, getAccess, friends, conversations, relation, sendDm, sendRaw, subscribe, markRead, watchDm, addFriend, unfriend, socketLive, unread, queueDm, outbox, retryDm, discardDm } =
     useChat();
+  // Unread when the chat was opened: "N new messages" goes above the first of them.
+  const [unreadAtOpen] = useState(() => unread[userId] ?? 0);
+  const jumpedToNew = useRef(false);
   const unreadElsewhere = Object.entries(unread).reduce((n, [id, c]) => (Number(id) === userId ? n : n + c), 0);
   const [settingNote, setSettingNote] = useState("");
   const known = friends.find((f) => f.user.id === userId)?.user ?? conversations.find((c) => c.user.id === userId)?.user;
@@ -154,8 +157,8 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const scroll = useStickyScroll(listRef, messages.length, [minimized, partnerTyping]);
 
   const items = useMemo<Msg[]>(
-    () =>
-      messages.map((m) => ({
+    () => [
+      ...messages.map((m) => ({
         id: m.id,
         mine: m.sender.id === me?.id,
         senderId: m.sender.id,
@@ -166,10 +169,43 @@ export default function DmConversation({ userId, variant = "page", minimized = f
         reactions: m.reactions ?? {},
         edited: m.edited,
         deleted: m.deleted,
-        status: m.sender.id === me?.id ? (m.id <= partnerRead ? "seen" : "sent") : undefined,
+        status: m.sender.id === me?.id ? (m.id <= partnerRead ? ("seen" as const) : ("sent" as const)) : undefined,
       })),
-    [messages, me?.id, partnerRead],
+      // Written but not confirmed yet: shown at once, with a clock (or "Not sent · Retry").
+      ...outbox
+        .filter((o) => o.to === userId)
+        .map((o, i) => ({
+          id: -1_000_000 - i,
+          mine: true,
+          senderId: me?.id ?? 0,
+          content: o.content,
+          attachment: null,
+          createdAt: o.createdAt,
+          replyTo: o.replyTo,
+          reactions: {},
+          edited: false,
+          deleted: false,
+          pending: { state: o.state, error: o.error, key: o.clientId },
+        })),
+    ],
+    [messages, me?.id, partnerRead, outbox, userId],
   );
+
+  const newFrom = useMemo(() => {
+    if (!unreadAtOpen) return null;
+    const theirs = messages.filter((m) => m.sender.id === userId && !m.deleted);
+    const first = theirs[Math.max(0, theirs.length - unreadAtOpen)];
+    return first ? { id: first.id, count: Math.min(unreadAtOpen, theirs.length) } : null;
+  }, [messages, unreadAtOpen, userId]);
+
+  // Opening a chat with new messages: start at the "new messages" line, not the very bottom.
+  useEffect(() => {
+    if (!newFrom || jumpedToNew.current) return;
+    jumpedToNew.current = true;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => listRef.current?.querySelector("[data-new-sep]")?.scrollIntoView({ block: "start" })),
+    );
+  }, [newFrom]);
 
   const op = useCallback(
     (payload: Record<string, unknown>) => {
@@ -214,10 +250,21 @@ export default function DmConversation({ userId, variant = "page", minimized = f
       return true;
     }
     scroll.follow();
-    if (!sendDm(userId, text, undefined, replying?.id)) {
-      setNotice("You're offline. Reconnecting…");
-      return false;
-    }
+    // Shown at once; sent now, or by itself when the connection is back.
+    queueDm(
+      userId,
+      text,
+      replying
+        ? {
+            id: replying.id,
+            sender_id: replying.senderId,
+            nickname: replying.mine ? (me?.nickname ?? "You") : name,
+            text: replying.content,
+            kind: replying.attachment?.kind ?? null,
+            deleted: false,
+          }
+        : null,
+    );
     setNotice("");
     setReplying(null);
     return true;
@@ -441,6 +488,9 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               onEdit={onEdit}
               onDelete={onDelete}
               onWatch={isFriend ? (video) => watch.start(video) : undefined}
+              onRetry={(m) => m.pending && retryDm(m.pending.key)}
+              onDiscard={(m) => m.pending && discardDm(m.pending.key)}
+              newFrom={newFrom}
             />
             {uploading !== null && (
               <div className="m me last uploading">
@@ -534,6 +584,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
             )}
             <Composer
               id={`dm-input-${userId}-${variant}`}
+              draftKey={`dm:${userId}`}
               placeholder={isFriend ? `Message ${name}` : "Messaging is off"}
               disabled={!isFriend}
               onSend={send}

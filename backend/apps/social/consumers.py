@@ -89,6 +89,14 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
         except chat_services.InvalidMessage as exc:
             return await self.error("invalid_message", str(exc), client_id)
 
+        # The app re-sends unconfirmed messages after a reconnect. If this one was already saved
+        # (its confirmation was lost with the old connection), confirm it again instead of saving twice.
+        sent_key = f"dmsent:{self.user.id}:{client_id}" if client_id else ""
+        if sent_key:
+            already = await database_sync_to_async(cache.get)(sent_key)
+            if already:
+                return await self.send_json({"type": "dm", "message": already, "client_id": client_id})
+
         if not await database_sync_to_async(chat_services.allow_message)(self.user.id):
             return await self.error("rate_limited", "You're sending messages too fast. Wait a moment.", client_id)
 
@@ -98,6 +106,8 @@ class UserConsumer(WatchMixin, CallMixin, StrangerMixin, AuthenticatedJsonConsum
             )
         except SocialError as exc:
             return await self.error(exc.code, exc.detail, client_id)
+        if sent_key:
+            await database_sync_to_async(cache.set)(sent_key, payload, 3600)
 
         event = {"type": "user.event", "payload": {"type": "dm", "message": payload, "client_id": client_id}}
         for uid in {self.user.id, recipient_id}:

@@ -315,6 +315,7 @@ export default function ChatRoom({ slug }: { slug: string }) {
         )}
         <Composer
           id="chat-input"
+          draftKey={`room:${slug}`}
           placeholder={status === "live" ? "Say something nice…" : "Connecting…"}
           disabled={status !== "live"}
           onSend={send}

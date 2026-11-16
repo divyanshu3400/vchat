@@ -56,6 +56,25 @@ async def test_dm_between_friends_reaches_both_and_is_saved():
     await b.disconnect()
 
 
+async def test_resent_dm_after_a_reconnect_is_not_saved_twice():
+    alice, a_token = await make_user("alice")
+    bob, _ = await make_user("bob")
+    await make_friends(alice, bob)
+    a = await personal_socket(a_token)
+    await a.send_json_to({"type": "dm", "to": bob.id, "content": "once", "client_id": "same-1"})
+    first = await a.receive_json_from()
+    await a.disconnect()
+
+    # The app didn't see the confirmation and sends it again on a new connection.
+    a = await personal_socket(a_token)
+    await a.send_json_to({"type": "dm", "to": bob.id, "content": "once", "client_id": "same-1"})
+    again = await a.receive_json_from()
+    assert again["type"] == "dm" and again["client_id"] == "same-1"
+    assert again["message"]["id"] == first["message"]["id"]
+    assert await database_sync_to_async(DirectMessage.objects.count)() == 1
+    await a.disconnect()
+
+
 async def test_dm_to_non_friend_is_rejected():
     _, a_token = await make_user("alice")
     bob, b_token = await make_user("bob")

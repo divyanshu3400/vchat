@@ -919,3 +919,15 @@ button.head-who:active { background: var(--surface-2); }
 .close-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .pill-btn.danger:disabled { opacity: 0.45; cursor: not-allowed; }
 .welcome-back { border-color: color-mix(in srgb, var(--brand) 40%, var(--line)); }
+
+/* --- sending state, "new messages" line ------------------------------------------------- */
+.m.pending .bubble { opacity: 0.78; }
+.m.pending.failed .bubble { opacity: 1; border-color: color-mix(in srgb, var(--danger) 55%, var(--line)); }
+.tick.wait { color: inherit; opacity: 0.8; }
+.m.failed .tick.wait { color: var(--danger); opacity: 1; }
+.send-failed, .send-queued { margin: 3px 10px 0; font-size: 12px; text-align: right; }
+.send-failed { color: var(--danger); font-weight: 700; }
+.send-queued { color: var(--muted); }
+.new-sep { display: flex; align-items: center; gap: 10px; margin: 12px 4px 8px; color: var(--brand); font-size: 12px; font-weight: 800; scroll-margin-top: 12px; }
+.new-sep::before, .new-sep::after { content: ""; flex: 1; height: 1px; background: color-mix(in srgb, var(--brand) 45%, transparent); }
+.new-sep span { padding: 3px 10px; border-radius: 999px; background: var(--brand-soft); }

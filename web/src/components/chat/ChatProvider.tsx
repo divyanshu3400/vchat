@@ -26,10 +26,27 @@ import {
   type PremiumStatus,
   type Friend,
   type FriendRequest,
+  type ReplyPreview,
   type UserEvent,
 } from "@/lib/api";
 
 export type Relation = "self" | "friend" | "requested" | "incoming" | "none";
+
+/**
+ * A text message to a friend that the server hasn't confirmed yet. Shown at once with a clock;
+ * "queued" while offline (sent when the connection is back), "failed" when the server refused it.
+ * Re-sending is safe: the server recognises the same clientId and doesn't save it twice.
+ */
+export type OutboxItem = {
+  clientId: string;
+  to: number;
+  content: string;
+  replyTo: ReplyPreview | null;
+  createdAt: string;
+  state: "sending" | "queued" | "failed";
+  error?: string;
+};
+const FLUSH_GAP_MS = 350; // queued messages go one by one, under the rate limit
 
 export const HEARTBEAT_MS = 25_000;
 const FRIENDS_ONLINE_POLL_MS = 60_000;
@@ -45,6 +62,11 @@ type ChatContextValue = {
   socketLive: boolean;
   relation: (userId: number) => Relation;
   sendDm: (to: number, content: string, attachmentId?: string, replyTo?: number) => boolean;
+  /** Text to a friend: shown at once, sent now or as soon as the connection is back. */
+  queueDm: (to: number, content: string, replyTo: ReplyPreview | null) => void;
+  outbox: OutboxItem[];
+  retryDm: (clientId: string) => void;
+  discardDm: (clientId: string) => void;
   /** Send any message on the personal socket. False while it is reconnecting. */
   sendRaw: (payload: Record<string, unknown>) => boolean;
   subscribe: (fn: (event: UserEvent) => void) => () => void;
@@ -109,6 +131,11 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [premium, setPremiumState] = useState<PremiumStatus | null>(null);
   const [socketLive, setSocketLive] = useState(false);
+  const [outbox, setOutbox] = useState<OutboxItem[]>([]);
+  const outboxRef = useRef<OutboxItem[]>([]);
+  useEffect(() => {
+    outboxRef.current = outbox;
+  }, [outbox]);
   // A banned account: the whole chat shows why, and nothing keeps reconnecting.
   const [banned, setBanned] = useState<string | null>(null);
 
@@ -210,9 +237,16 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       case "presence":
         setFriends((l) => l.map((f) => (f.user.id === event.user_id ? { ...f, online: event.online } : f)));
         break;
+      case "error":
+        if (event.client_id) {
+          setOutbox((l) => l.map((o) => (o.clientId === event.client_id ? { ...o, state: "failed", error: event.detail } : o)));
+        }
+        break;
       case "dm": {
         const m = event.message;
         const mine = m.sender.id === self?.id;
+        // Our own message is confirmed: it leaves the outbox (the real one is in the chat now).
+        if (mine && event.client_id) setOutbox((l) => l.filter((o) => o.clientId !== event.client_id));
         const partner = mine ? m.recipient_id : m.sender.id;
         if (mine) countSent();
         if (!mine && !watched.current.has(partner)) {
@@ -272,6 +306,16 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
           // Is this tab on screen? People looking at vChat get no notifications.
           ws.send(JSON.stringify({ type: "visible", visible: document.visibilityState === "visible" }));
           resync().catch(() => undefined);
+          // Messages written while offline (or not confirmed before the drop) go now, in order.
+          outboxRef.current
+            .filter((o) => o.state !== "failed")
+            .forEach((o, i) =>
+              setTimeout(() => {
+                if (ws.readyState !== WebSocket.OPEN) return;
+                ws.send(JSON.stringify({ type: "dm", to: o.to, content: o.content, reply_to: o.replyTo?.id, client_id: o.clientId }));
+                setOutbox((l) => l.map((x) => (x.clientId === o.clientId ? { ...x, state: "sending" } : x)));
+              }, i * FLUSH_GAP_MS),
+            );
           // Keeps this tab counted as online (the server forgets silent sockets after ~70 s).
           clearInterval(heartbeat);
           heartbeat = setInterval(() => {
@@ -356,6 +400,34 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
     );
     return true;
   }, []);
+
+  const pushOut = useCallback((o: OutboxItem) => {
+    const ws = socket.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+    ws.send(JSON.stringify({ type: "dm", to: o.to, content: o.content, reply_to: o.replyTo?.id, client_id: o.clientId }));
+    return true;
+  }, []);
+
+  const queueDm = useCallback(
+    (to: number, content: string, replyTo: ReplyPreview | null) => {
+      const item: OutboxItem = { clientId: crypto.randomUUID(), to, content, replyTo, createdAt: new Date().toISOString(), state: "sending" };
+      item.state = pushOut(item) ? "sending" : "queued";
+      setOutbox((l) => [...l, item]);
+    },
+    [pushOut],
+  );
+
+  const retryDm = useCallback(
+    (clientId: string) => {
+      const o = outboxRef.current.find((x) => x.clientId === clientId);
+      if (!o) return;
+      const state = pushOut(o) ? "sending" : "queued";
+      setOutbox((l) => l.map((x) => (x.clientId === clientId ? { ...x, state, error: undefined } : x)));
+    },
+    [pushOut],
+  );
+
+  const discardDm = useCallback((clientId: string) => setOutbox((l) => l.filter((x) => x.clientId !== clientId)), []);
 
   const sendRaw = useCallback((payload: Record<string, unknown>) => {
     const ws = socket.current;
@@ -488,6 +560,10 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       socketLive,
       relation,
       sendDm,
+      queueDm,
+      outbox,
+      retryDm,
+      discardDm,
       sendRaw,
       subscribe,
       addFriend,
@@ -502,7 +578,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       push,
       isWatching,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount, push, isWatching],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, queueDm, outbox, retryDm, discardDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount, push, isWatching],
   );
 
   if (banned) {

@@ -25,6 +25,8 @@ export type Msg = {
   deleted: boolean;
   /** Your own messages: "seen" once the other person read it (friend chats). */
   status?: "sent" | "seen";
+  /** Not confirmed by the server yet (see ChatProvider's outbox). */
+  pending?: { state: "sending" | "queued" | "failed"; error?: string; key: string };
 };
 
 export type MsgAction = { label: string; icon?: string; onClick: () => void; danger?: boolean };
@@ -52,6 +54,11 @@ type Props = {
   onWatch?: (video: string) => void;
   /** Draws the cards among the messages (see Msg.card). */
   renderCard?: (m: Msg) => React.ReactNode;
+  /** Your messages that didn't send: try again, or drop them. */
+  onRetry?: (m: Msg) => void;
+  onDiscard?: (m: Msg) => void;
+  /** "N new messages" goes above this message (unread when the chat was opened). */
+  newFrom?: { id: number; count: number } | null;
 };
 
 const dayKey = (iso: string) => new Date(iso).toDateString();
@@ -115,15 +122,19 @@ type BubbleProps = {
   onReply: (m: Msg) => void;
   onLink: (url: string) => void;
   onWatch?: (video: string) => void;
+  onRetry?: (m: Msg) => void;
+  onDiscard?: (m: Msg) => void;
 };
 
-const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, stranger, onMenu, onReact, onReply, onLink, onWatch }: BubbleProps) {
+const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, stranger, onMenu, onReact, onReply, onLink, onWatch, onRetry, onDiscard }: BubbleProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   const press = useRef<{ x: number; y: number; t: ReturnType<typeof setTimeout> | undefined; swiping: boolean; dx: number } | null>(null);
   const lastTap = useRef(0);
   const [clean] = useState(cleanWordsOn);
 
   const mine = m.mine;
+  // Deleted, or not sent yet: nothing to react to, reply to or open a menu on.
+  const frozen = m.deleted || !!m.pending;
   const jumbo = !m.deleted && !m.attachment && !m.replyTo && isJumboEmoji(m.content);
   const yt = !m.deleted && m.content ? firstYoutube(m.content) : null;
   const mentioned = !mine && !!meNick && mentions(m.content, meNick);
@@ -131,7 +142,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
   const reactions = Object.entries(m.reactions).sort((a, b) => b[1].length - a[1].length);
 
   function toggleHeart() {
-    if (m.deleted) return;
+    if (frozen) return;
     onReact(m.id, mineEmoji === "❤️" ? null : "❤️");
     navigator.vibrate?.(8);
   }
@@ -158,7 +169,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
 
   return (
     <div
-      className={`m${mine ? " me" : ""}${first ? " first" : ""}${last ? " last" : ""}${mentioned ? " mentioned" : ""}`}
+      className={`m${mine ? " me" : ""}${first ? " first" : ""}${last ? " last" : ""}${mentioned ? " mentioned" : ""}${m.pending ? ` pending ${m.pending.state}` : ""}`}
       data-mid={m.id}
     >
       {showNames && !mine && first && (
@@ -171,7 +182,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
         className="m-row"
         ref={rowRef}
         onContextMenu={(e) => {
-          if (m.deleted) return;
+          if (frozen) return;
           e.preventDefault();
           onMenu(m, e.currentTarget);
         }}
@@ -185,7 +196,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
             swiping: false,
             dx: 0,
             t: setTimeout(() => {
-              if (!m.deleted && press.current && !press.current.swiping) {
+              if (!frozen && press.current && !press.current.swiping) {
                 navigator.vibrate?.(12);
                 onMenu(m, el);
                 press.current = null;
@@ -200,7 +211,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           const dx = (t.clientX - p.x) * dir;
           const dy = t.clientY - p.y;
           if (Math.abs(dx) > 8 || Math.abs(dy) > 8) clearTimeout(p.t);
-          if (!p.swiping && dx > 12 && Math.abs(dy) < 24 && !m.deleted) p.swiping = true;
+          if (!p.swiping && dx > 12 && Math.abs(dy) < 24 && !frozen) p.swiping = true;
           if (p.swiping) {
             p.dx = Math.max(0, Math.min(dx, 90));
             setShift(p.dx);
@@ -287,14 +298,19 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           <span className="meta">
             {m.edited && <em>edited</em>}
             {timeLabel(m.createdAt)}
-            {mine && m.status && !m.deleted && (
+            {m.pending && (
+              <i className="tick wait" aria-label={m.pending.state === "failed" ? "Not sent" : m.pending.state === "queued" ? "Waiting for connection" : "Sending"}>
+                <Icon name={m.pending.state === "failed" ? "close" : "timer"} size={13} />
+              </i>
+            )}
+            {mine && m.status && !m.deleted && !m.pending && (
               <i className={`tick${m.status === "seen" ? " seen" : ""}`} aria-label={m.status === "seen" ? "Seen" : "Sent"}>
                 <Icon name={m.status === "seen" ? "checks" : "check"} size={14} />
               </i>
             )}
           </span>
         </div>
-        {!m.deleted && (
+        {!frozen && (
           <div className="m-tools">
             <button type="button" aria-label="React" onClick={(e) => onMenu(m, e.currentTarget.closest(".m-row") as HTMLElement)}>
               <Icon name="smile" size={16} />
@@ -305,6 +321,19 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           </div>
         )}
       </div>
+      {m.pending?.state === "failed" && (
+        <p className="send-failed" role="alert">
+          {m.pending.error || "Not sent."}{" "}
+          <button type="button" className="inline-link" onClick={() => onRetry?.(m)}>
+            Retry
+          </button>
+          {" · "}
+          <button type="button" className="inline-link" onClick={() => onDiscard?.(m)}>
+            Delete
+          </button>
+        </p>
+      )}
+      {m.pending?.state === "queued" && last && <p className="send-queued">Waiting for connection. It&apos;ll send by itself.</p>}
       {stranger && !mine && !m.deleted && looksLikeContact(m.content) && (
         <p className="contact-flag" role="note">
           <Icon name="shield" size={13} /> Never share your number, photos or money with strangers.
@@ -334,7 +363,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
 
 type MenuState = { m: Msg; style: CSSProperties; mine: string | null; confirmDelete: boolean; picker: boolean; at: number };
 
-export default function MessageList({ items, me, showNames, stranger, onReact, onReply, onEdit, onDelete, extraActions, onWatch, renderCard }: Props) {
+export default function MessageList({ items, me, showNames, stranger, onReact, onReply, onEdit, onDelete, extraActions, onWatch, renderCard, onRetry, onDiscard, newFrom }: Props) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const maxSeen = useRef<number | null>(null);
@@ -403,6 +432,11 @@ export default function MessageList({ items, me, showNames, stranger, onReact, o
                 <span>{dayLabel(m.createdAt)}</span>
               </div>
             )}
+            {newFrom && m.id === newFrom.id && (
+              <div className="new-sep" role="separator" data-new-sep="">
+                <span>{newFrom.count === 1 ? "1 new message" : `${newFrom.count} new messages`}</span>
+              </div>
+            )}
             {m.card ? (
               <div className="m-card">{renderCard?.(m)}</div>
             ) : (
@@ -419,6 +453,8 @@ export default function MessageList({ items, me, showNames, stranger, onReact, o
               onReply={onReply}
               onLink={setLink}
               onWatch={onWatch}
+              onRetry={onRetry}
+              onDiscard={onDiscard}
             />
             )}
           </Fragment>

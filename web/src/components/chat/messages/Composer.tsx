@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Icon } from "../bits";
 import { MAX_VOICE_SECONDS, useRecorder } from "../media/useRecorder";
+import { readDraft, writeDraft } from "./drafts";
 import EmojiPicker from "./EmojiPicker";
 import type { Msg } from "./MessageList";
 
@@ -31,6 +32,8 @@ type Props = {
   /** A strip of actions above the box (random chat: Next, End, photo). */
   toolbar?: ReactNode;
   autoFocusKey?: unknown;
+  /** Keeps unsent text for this chat on this device ("dm:12", "room:lobby"). */
+  draftKey?: string;
 };
 
 function fmt(s: number) {
@@ -52,6 +55,7 @@ export default function Composer({
   left,
   toolbar,
   autoFocusKey,
+  draftKey,
 }: Props) {
   const [draft, setDraft] = useState("");
   const [picker, setPicker] = useState(false);
@@ -69,6 +73,18 @@ export default function Composer({
     twiceRef.current = false;
     setTwice(false);
   });
+
+  // This chat's unsent text, from the last visit.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read from this device's storage after mount (not on the server)
+    setDraft(readDraft(draftKey));
+  }, [draftKey]);
+
+  /** Typing: the box, and this chat's saved draft (not while editing an old message). */
+  function typeText(text: string) {
+    setDraft(text);
+    if (!editing) writeDraft(draftKey, text);
+  }
 
   // Start editing: the box takes the message's text.
   useEffect(() => {
@@ -102,7 +118,8 @@ export default function Composer({
     // Keep typing: the keyboard stays up after a message goes (phones close it on blur).
     boxRef.current?.focus({ preventScroll: true });
     if (await onSend(text)) {
-      setDraft("");
+      if (editing) setDraft(readDraft(draftKey));
+      else typeText("");
       setPicker(false);
     }
   }
@@ -112,7 +129,7 @@ export default function Composer({
     const start = el?.selectionStart ?? draft.length;
     const end = el?.selectionEnd ?? draft.length;
     const next = draft.slice(0, start) + e + draft.slice(end);
-    setDraft(next);
+    typeText(next);
     requestAnimationFrame(() => {
       if (!el) return;
       el.focus();
@@ -194,7 +211,7 @@ export default function Composer({
             aria-label={editing ? "Cancel editing" : "Cancel reply"}
             onClick={() => {
               if (editing) {
-                setDraft("");
+                setDraft(readDraft(draftKey));
                 onCancelEdit?.();
               } else onCancelReply?.();
             }}
@@ -310,7 +327,7 @@ export default function Composer({
                   submit();
                   return;
                 }
-                setDraft(e.target.value);
+                typeText(e.target.value);
                 if (e.target.value) onTyping?.();
               }}
               onKeyUp={(e) => {
@@ -324,7 +341,7 @@ export default function Composer({
                   submit();
                 } else if (e.key === "Escape" && (editing || replying)) {
                   if (editing) {
-                    setDraft("");
+                    setDraft(readDraft(draftKey));
                     onCancelEdit?.();
                   } else onCancelReply?.();
                 }
