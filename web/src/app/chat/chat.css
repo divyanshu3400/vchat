@@ -1058,3 +1058,7 @@ html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); 
 .media-ask-actions .pill-btn { min-width: 0; }
 .timed { width: 250px; }
 .gif-msg { width: 220px; }
+
+/* Scrolling pages (Me, Home, Rooms): sections keep their full height; the page scrolls instead.
+   (.settings has overflow: hidden, which otherwise lets a flex column squash it to a line.) */
+.page-scroll > * { flex-shrink: 0; }
