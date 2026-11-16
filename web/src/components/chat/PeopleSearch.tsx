@@ -74,7 +74,7 @@ export default function PeopleSearch({ query, skip }: { query: string; skip: Set
       ) : (
         shown.map((r) => (
           <button key={r.user.id} type="button" className="conv conv-person" onClick={() => setOpen(r)}>
-            <Avatar name={r.user.nickname} size={44} />
+            <Avatar id={r.user.id} name={r.user.nickname} size={44} />
             <span className="conv-mid">
               <span className="conv-name">
                 {r.user.nickname}
@@ -179,7 +179,7 @@ function PersonSheet({
       <div className="sheet person-sheet">
         <span className="sheet-grab" aria-hidden="true" />
         <div className="person-head">
-          <Avatar name={u.nickname} size={64} />
+          <Avatar id={u.id} name={u.nickname} size={64} />
           <div>
             <h2>{u.nickname}</h2>
             <p className="muted-text">

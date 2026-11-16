@@ -8,6 +8,7 @@ import { usePush } from "@/lib/push";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { noteOpened } from "./media/viewCounts";
 import { gifLabel } from "@/lib/gifs";
+import { setAvatarPhotos } from "@/lib/avatars";
 import {
   answerFriendRequest,
   ApiError,
@@ -54,6 +55,8 @@ const FRIENDS_ONLINE_POLL_MS = 60_000;
 
 type ChatContextValue = {
   me: ChatUser | null;
+  /** After editing your profile: the server's new copy of you. */
+  replaceMe: (user: ChatUser) => void;
   /** A valid access token; refreshes it from the session cookie when it is about to expire. */
   getAccess: () => Promise<string>;
   friends: Friend[];
@@ -199,6 +202,15 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     friendsRef.current = friends;
   }, [friends]);
+
+  // Photos: yours and your friends' (others never get a link).
+  useEffect(() => {
+    setAvatarPhotos([...(me ? [[me.id, me.avatar] as [number, string | null | undefined]] : []), ...friends.map((f) => [f.user.id, f.user.avatar] as [number, string | null | undefined])]);
+  }, [me, friends]);
+  const replaceMe = useCallback((user: ChatUser) => {
+    meRef.current = user;
+    setMe(user);
+  }, []);
 
   const handleEvent = useCallback((event: UserEvent) => {
     const self = meRef.current;
@@ -580,8 +592,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
       askAccount,
       push,
       isWatching,
+      replaceMe,
     }),
-    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, queueDm, outbox, retryDm, discardDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount, push, isWatching],
+    [me, getAccess, friends, incoming, outgoing, unread, socketLive, relation, sendDm, queueDm, outbox, retryDm, discardDm, sendRaw, subscribe, addFriend, answerRequest, unfriend, markRead, watchDm, conversations, premium, setPremium, askAccount, push, isWatching, replaceMe],
   );
 
   if (banned) {

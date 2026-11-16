@@ -40,8 +40,25 @@ class MeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "nickname", "gender", "is_guest", "email", "show_last_seen", "show_online", "read_receipts", "discoverable"]
+        fields = [
+            "id", "nickname", "gender", "is_guest", "email", "show_last_seen", "show_online", "read_receipts", "discoverable",
+            "handle", "avatar", "handle_next_change",
+        ]
         read_only_fields = fields
+
+    avatar = serializers.SerializerMethodField()
+    handle_next_change = serializers.SerializerMethodField()
+
+    def get_avatar(self, user):
+        from .profile import avatar_url
+
+        return avatar_url(user)
+
+    def get_handle_next_change(self, user):
+        from .profile import next_handle_change
+
+        at = next_handle_change(user)
+        return at.isoformat() if at else None
 
 
 class EmailField(serializers.EmailField):

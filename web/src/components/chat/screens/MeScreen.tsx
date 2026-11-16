@@ -12,6 +12,7 @@ import { Avatar, Icon } from "../bits";
 import { cleanWordsOn, setCleanWords } from "../messages/richText";
 import AppSettings from "../nudges/AppSettings";
 import SoundSettings from "../nudges/SoundSettings";
+import EditProfileSheet from "./EditProfileSheet";
 
 const GENDER: Record<string, string> = { M: "Man", F: "Woman", O: "Other" };
 
@@ -43,6 +44,7 @@ export default function MeScreen() {
   }
   const guest = me?.is_guest !== false;
   const [confirmLeave, setConfirmLeave] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [clean, setClean] = useState(() => (typeof window === "undefined" ? true : cleanWordsOn()));
 
@@ -57,15 +59,26 @@ export default function MeScreen() {
       <ChatHeader title="Me" />
       <div className="page-scroll">
         <section className="profile-card">
-          {me && <Avatar name={me.nickname} size={72} />}
-          <div>
+          {me && (
+            <button type="button" className="profile-avatar" onClick={() => setEditing(true)} aria-label="Edit profile">
+              <Avatar id={me.id} name={me.nickname} size={72} />
+            </button>
+          )}
+          <div className="profile-text">
             <h2>{me?.nickname ?? "…"}</h2>
+            {me?.handle && <p className="profile-handle">@{me.handle}</p>}
             <p className="muted-text">
               {guest ? "Guest" : "Saved account"}
               {me?.gender ? ` · ${GENDER[me.gender] ?? ""}` : ""} · {friends.length} {friends.length === 1 ? "friend" : "friends"}
             </p>
           </div>
+          {me && (
+            <button type="button" className="pill-btn profile-edit" onClick={() => setEditing(true)}>
+              <Icon name="edit" size={15} /> Edit
+            </button>
+          )}
         </section>
+        {editing && me && <EditProfileSheet me={me} onClose={() => setEditing(false)} />}
 
         {me && guest ? (
           <section className="save-card" aria-labelledby="save-title">

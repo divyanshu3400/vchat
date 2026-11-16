@@ -490,7 +490,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
 
   const header = isWindow ? (
     <header className="win-head" onClick={(e) => !(e.target as HTMLElement).closest("button, .dd") && onToggleMin?.()}>
-      <Avatar name={name} size={34} online={isFriend ? partnerOnline : undefined} />
+      <Avatar id={userId} name={name} size={34} online={isFriend ? partnerOnline : undefined} />
       <div className="win-title">
         <b>{name}</b>
         <small className={partnerOnline && isFriend ? "on" : ""}>{status}</small>
@@ -510,7 +510,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
       back="/chat/inbox"
       backBadge={unreadElsewhere}
       onTitleClick={() => setProfileOpen(true)}
-      avatar={<Avatar name={name} size={36} online={isFriend ? partnerOnline : undefined} />}
+      avatar={<Avatar id={userId} name={name} size={36} online={isFriend ? partnerOnline : undefined} />}
       subtitle={<span className={partnerOnline && isFriend ? "on" : ""}>{status}</span>}
       actions={
         <>
@@ -620,7 +620,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                   ×
                 </button>
                 <div className="profile-top">
-                  <Avatar name={name} size={64} online={isFriend ? partnerOnline : undefined} />
+                  <Avatar id={userId} name={name} size={64} online={isFriend ? partnerOnline : undefined} />
                   <div>
                     <h2>{name}</h2>
                     <p className="account-why">

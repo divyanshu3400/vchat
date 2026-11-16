@@ -82,7 +82,7 @@ export default function MessageBanner() {
       }}
       aria-live="polite"
     >
-      <Avatar name={shown.nickname} size={36} />
+      <Avatar id={shown.id} name={shown.nickname} size={36} />
       <span className="msg-banner-text">
         <b>{shown.nickname}</b>
         <span>{shown.text}</span>

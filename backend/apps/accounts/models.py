@@ -19,6 +19,15 @@ class User(AbstractUser):
         OTHER = "O", "Other"
 
     nickname = models.CharField(max_length=18)
+    # --- profile ---
+    # Public @username: unique, lowercase. Saved accounts only; changeable every 14 days.
+    handle = models.CharField(max_length=20, null=True, blank=True, unique=True)
+    handle_changed_at = models.DateTimeField(null=True, blank=True)
+    # The handle given up last; nobody else can take it for 14 days (no impersonating friends).
+    previous_handle = models.CharField(max_length=20, blank=True, db_index=True)
+    # Profile photo (square JPEG, no metadata). Only friends get a link to it.
+    avatar = models.FileField(upload_to="avatars/", blank=True, max_length=200)
+    avatar_version = models.PositiveIntegerField(default=0)
     gender = models.CharField(max_length=1, choices=Gender.choices, blank=True)
     is_guest = models.BooleanField(default=True)
     age_confirmed_at = models.DateTimeField(null=True, blank=True)

@@ -1,5 +1,7 @@
 /** Small presentational pieces shared by the chat screens. */
 
+import { useAvatarPhoto } from "@/lib/avatars";
+
 // Warm, readable on both themes; picked by nickname so a person keeps their colour.
 const AVATAR_COLOURS = ["#FFB23F", "#3DDCB0", "#FF8FA9", "#A9B8FF", "#FFD36E", "#C9A7FF", "#7FD8FF", "#F7A36B"];
 
@@ -16,20 +18,33 @@ export function Avatar({
   name,
   size = 40,
   online,
+  id,
+  src,
 }: {
   name: string;
   size?: number;
   /** undefined: no presence dot at all. */
   online?: boolean;
+  /** Whose avatar: shows their photo if they're you or a friend (see lib/avatars). */
+  id?: number;
+  /** A photo to show instead (e.g. a preview while editing). */
+  src?: string | null;
 }) {
+  const known = useAvatarPhoto(id);
+  const photo = name === GONE_NAME ? undefined : (src ?? known);
   return (
     <span
-      className="avatar"
+      className={`avatar${photo ? " has-photo" : ""}`}
       // "vChat user" is a closed account: a plain grey circle.
       style={{ width: size, height: size, background: name === GONE_NAME ? "var(--line)" : colourFor(name), fontSize: Math.round(size * 0.4) }}
       aria-hidden="true"
     >
-      {name.replace(/[^a-z0-9]/gi, "")[0]?.toUpperCase() ?? "?"}
+      {photo ? (
+        // eslint-disable-next-line @next/next/no-img-element -- signed, private link: no image optimiser
+        <img src={photo} alt="" className="avatar-img" draggable={false} />
+      ) : (
+        (name.replace(/[^a-z0-9]/gi, "")[0]?.toUpperCase() ?? "?")
+      )}
       {online !== undefined && <i className={`presence-dot${online ? " on" : ""}`} />}
     </span>
   );

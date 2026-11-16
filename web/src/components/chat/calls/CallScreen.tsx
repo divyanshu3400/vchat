@@ -211,7 +211,7 @@ export default function CallScreen() {
               <StreamVideo stream={remoteStream} className="call-pip-video" videoRef={remoteRef} />
             ) : (
               <span className="call-pip-wait">
-                <Avatar name={peerName} size={46} />
+                <Avatar id={call.stranger ? undefined : call.peer.id} name={peerName} size={46} />
               </span>
             )}
             {localStream && !cameraOff && <StreamVideo stream={localStream} muted className="call-pip-self" />}
@@ -259,9 +259,9 @@ export default function CallScreen() {
 
       <div className="call-top">
         {!video ? (
-          <VoiceRing name={peerName} stream={remoteStream} talking={call.phase === "active" && !mini} />
+          <VoiceRing id={call.stranger ? undefined : call.peer.id} name={peerName} stream={remoteStream} talking={call.phase === "active" && !mini} />
         ) : (
-          (!inCall || !remoteStream) && <Avatar name={peerName} size={104} />
+          (!inCall || !remoteStream) && <Avatar id={call.stranger ? undefined : call.peer.id} name={peerName} size={104} />
         )}
         <h2>{peerName}</h2>
         <p className="call-status">{call.phase === "active" && call.startedAt ? <Timer since={call.startedAt} /> : status}</p>

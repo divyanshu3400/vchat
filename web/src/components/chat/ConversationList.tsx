@@ -165,7 +165,7 @@ export default function ConversationList() {
           openChat(p.user.id);
         }}
       >
-        <Avatar name={p.user.nickname} size={44} online={p.friend ? p.online : undefined} />
+        <Avatar id={p.user.id} name={p.user.nickname} size={44} online={p.friend ? p.online : undefined} />
         <span className="conv-mid">
           <span className="conv-name">
             {p.user.nickname}
@@ -197,7 +197,7 @@ export default function ConversationList() {
     <div className="conv-list">
       <div className="list-head">
         <div className="me-row">
-          {me && <Avatar name={me.nickname} size={40} online={socketLive} />}
+          {me && <Avatar id={me.id} name={me.nickname} size={40} online={socketLive} />}
           <div>
             <b>{me?.nickname ?? "…"}</b>
             <small className={socketLive ? "on" : ""}>{socketLive ? "Online" : "Connecting…"}</small>
@@ -240,7 +240,7 @@ export default function ConversationList() {
                 </button>
               ) : (
                 <button key={id} type="button" className="parked-chip" onClick={() => openChat(id)} title={nameOf(id)}>
-                  <Avatar name={nameOf(id)} size={38} />
+                  <Avatar id={id} name={nameOf(id)} size={38} />
                   {unread[id] ? <span className="badge">{unread[id]}</span> : null}
                 </button>
               ),
@@ -298,7 +298,7 @@ export default function ConversationList() {
                     openChat(c.user.id);
                   }}
                 >
-                  <Avatar name={c.user.nickname} size={40} />
+                  <Avatar id={c.user.id} name={c.user.nickname} size={40} />
                   <span className="conv-mid">
                     <span className="conv-name">{c.user.nickname}</span>
                     <span className="conv-preview">{c.last_message}</span>

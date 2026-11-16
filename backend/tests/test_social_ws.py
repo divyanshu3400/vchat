@@ -114,7 +114,7 @@ async def test_friend_request_and_accept_are_pushed_live():
     added_for_bob = await b.receive_json_from()
     assert added_for_alice == {
         "type": "friend_added",
-        "friend": {"id": bob.id, "nickname": "bob", "gender": "O"},
+        "friend": {"id": bob.id, "nickname": "bob", "gender": "O", "handle": ""},
         "online": True,  # bob has a personal socket open
         "request_id": req_id,
     }

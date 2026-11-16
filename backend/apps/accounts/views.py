@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import F, Q
 from rest_framework import status
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -134,10 +135,20 @@ class MeView(APIView):
         return Response(MeSerializer(request.user).data)
 
     def patch(self, request):
-        """Privacy settings: {"show_last_seen" | "show_online" | "read_receipts": bool}."""
+        """Privacy settings ({"show_last_seen" | "show_online" | "read_receipts" | "discoverable": bool})
+        and profile ({"nickname": str, "handle": str})."""
         from apps.social.services import online_visibility_changed
 
+        from . import profile
+
         user = request.user
+        try:
+            if "nickname" in request.data:
+                profile.set_nickname(user, request.data.get("nickname"))
+            if "handle" in request.data:
+                profile.set_handle(user, request.data.get("handle"))
+        except profile.ProfileError as exc:
+            return Response({"detail": exc.detail, "field": exc.field}, status=status.HTTP_400_BAD_REQUEST)
         changes = {f: request.data[f] for f in PRIVACY_FIELDS if isinstance(request.data.get(f), bool)}
         if changes:
             online_changed = "show_online" in changes and changes["show_online"] != user.show_online
@@ -334,3 +345,57 @@ class ResetPasswordView(APIView):
         User.objects.filter(pk=user.pk).update(password=user.password, session_version=F("session_version") + 1)
         user.refresh_from_db()
         return _start_session(user, request)
+
+
+class AvatarView(APIView):
+    """Your profile photo: POST a file (multipart "file") to set it, DELETE to remove it."""
+
+    parser_classes = [MultiPartParser]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "uploads"
+
+    def post(self, request):
+        from . import profile
+
+        try:
+            profile.set_avatar(request.user, request.FILES.get("file"))
+        except profile.ProfileError as exc:
+            return Response({"detail": exc.detail, "field": exc.field}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(MeSerializer(request.user).data)
+
+    def delete(self, request):
+        from . import profile
+
+        profile.remove_avatar(request.user)
+        return Response(MeSerializer(request.user).data)
+
+
+class HandleCheckView(APIView):
+    """Is this @username free for me? {"handle", "available", "detail"} (detail says why not)."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "people_search"
+
+    def get(self, request):
+        from . import profile
+
+        handle = profile.normalise_handle(request.query_params.get("handle"))
+        if handle == (request.user.handle or ""):
+            return Response({"handle": handle, "available": True, "detail": "That's your username."})
+        problem = profile.handle_problem(request.user, handle)
+        return Response({"handle": handle, "available": problem is None, "detail": problem or ""})
+
+
+def avatar_file(request, token):
+    """A profile photo through a signed link that only the owner and their friends are given."""
+    from django.http import FileResponse, Http404
+
+    from . import profile
+
+    user = profile.resolve_avatar(token)
+    if user is None:
+        raise Http404
+    response = FileResponse(user.avatar.open("rb"), content_type="image/jpeg")
+    response["Cache-Control"] = "private, max-age=86400, immutable"
+    response["X-Content-Type-Options"] = "nosniff"
+    return response

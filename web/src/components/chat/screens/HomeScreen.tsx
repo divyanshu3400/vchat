@@ -148,7 +148,7 @@ export default function HomeScreen() {
                   <div className="friend-strip">
                     {online.map((f) => (
                       <button key={f.user.id} type="button" className="friend-chip" onClick={() => openChat(f.user.id)}>
-                        <Avatar name={f.user.nickname} size={50} online />
+                        <Avatar id={f.user.id} name={f.user.nickname} size={50} online />
                         <span>{f.user.nickname}</span>
                       </button>
                     ))}
@@ -166,7 +166,7 @@ export default function HomeScreen() {
                   <div className="home-recent">
                     {recent.map((c) => (
                       <button key={c.user.id} type="button" className="home-recent-row" onClick={() => openChat(c.user.id)}>
-                        <Avatar name={c.user.nickname} size={38} />
+                        <Avatar id={c.user.id} name={c.user.nickname} size={38} />
                         <span>
                           <b>{c.user.nickname}</b>
                           <small>

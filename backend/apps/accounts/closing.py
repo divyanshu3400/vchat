@@ -41,7 +41,7 @@ def public_user(user) -> dict:
     """What other people get to see of an account."""
     if is_gone(user):
         return {"id": user.id, "nickname": GONE_NAME, "gender": "", "inactive": True}
-    return {"id": user.id, "nickname": user.nickname, "gender": user.gender}
+    return {"id": user.id, "nickname": user.nickname, "gender": user.gender, "handle": user.handle or ""}
 
 
 # --- deactivate / reactivate -------------------------------------------------------
@@ -146,6 +146,11 @@ def erase(user: User) -> None:
         user.username = f"deleted_{user.pk}"
         user.email = ""
         user.nickname = GONE_NAME
+        user.handle = None
+        user.previous_handle = ""
+        if user.avatar:
+            user.avatar.storage.delete(user.avatar.name)
+            user.avatar = ""
         user.gender = ""
         user.first_name = user.last_name = ""
         user.set_unusable_password()

@@ -30,9 +30,16 @@ class SocialError(Exception):
         self.detail = detail
 
 
-def brief(user: User) -> dict:
-    # A deactivated or deleted account shows as "vChat user".
-    return closing.public_user(user)
+def brief(user: User, friend: bool = False) -> dict:
+    # A deactivated or deleted account shows as "vChat user". The photo is for friends only.
+    data = closing.public_user(user)
+    if friend:
+        from apps.accounts.profile import avatar_url
+
+        url = avatar_url(user)
+        if url:
+            data["avatar"] = url
+    return data
 
 
 def request_payload(req: FriendRequest) -> dict:
@@ -158,11 +165,11 @@ def _accept(req: FriendRequest) -> None:
     online = presence.online_among([req.from_user_id, req.to_user_id])
     _on_commit_push(
         req.from_user_id,
-        {"type": "friend_added", "friend": brief(req.to_user), "online": req.to_user_id in online, "request_id": req.id},
+        {"type": "friend_added", "friend": brief(req.to_user, friend=True), "online": req.to_user_id in online, "request_id": req.id},
     )
     _on_commit_push(
         req.to_user_id,
-        {"type": "friend_added", "friend": brief(req.from_user), "online": req.from_user_id in online, "request_id": req.id},
+        {"type": "friend_added", "friend": brief(req.from_user, friend=True), "online": req.from_user_id in online, "request_id": req.id},
     )
     transaction.on_commit(lambda: push_events.request_accepted(req.from_user_id, req.to_user_id, req.to_user.nickname))
     # Met in random chat? That chat continues in their friend chat.
@@ -221,7 +228,7 @@ def friends_of(user: User) -> list[dict]:
     others = [(u, since) for u, since in others if u.is_active or closing.is_gone(u)]
     online = visible_online(user, [u.id for u, _ in others])
     friends = [
-        {"user": brief(u), "since": since.isoformat(), "online": u.id in online, "last_seen": last_seen_for(user, u, u.id in online)}
+        {"user": brief(u, friend=True), "since": since.isoformat(), "online": u.id in online, "last_seen": last_seen_for(user, u, u.id in online)}
         for u, since in others
     ]
     return sorted(friends, key=lambda f: f["user"]["nickname"].lower())
@@ -400,8 +407,16 @@ def search_people(viewer: User, query: str, offset: int = 0) -> dict:
     if len(q) < 2:
         return {"results": [], "next": None}
     hidden = blocked_user_ids(viewer.id) | {viewer.id}
-    base = _active_people().exclude(id__in=hidden).filter(nickname__icontains=q)
-    starts = base.annotate(rank=Case(When(nickname__istartswith=q, then=Value(0)), default=Value(1), output_field=IntegerField()))
+    # "@name" looks for usernames only; plain text matches names and usernames.
+    by_handle = q.startswith("@")
+    h = q.lstrip("@").lower()
+    if by_handle and len(h) < 2:
+        return {"results": [], "next": None}
+    match = Q(handle__startswith=h) if by_handle else Q(nickname__icontains=q) | Q(handle__startswith=h)
+    base = _active_people().exclude(id__in=hidden).filter(match)
+    starts = base.annotate(
+        rank=Case(When(handle=h, then=Value(0)), When(nickname__istartswith=q, then=Value(1)), default=Value(2), output_field=IntegerField())
+    )
     page = list(starts.order_by("rank", "nickname", "id")[offset : offset + SEARCH_PAGE + 1])
     more = len(page) > SEARCH_PAGE
     page = page[:SEARCH_PAGE]
@@ -413,7 +428,7 @@ def search_people(viewer: User, query: str, offset: int = 0) -> dict:
         mutual = len(friends & set(friend_ids(u.id))) if friends else 0
         relation = "friend" if u.id in friends else "requested" if u.id in sent else "incoming" if u.id in got else "none"
         results.append({
-            "user": brief(u),
+            "user": brief(u, friend=relation == "friend"),
             "relation": relation,
             "joined": u.date_joined.strftime("%b %Y"),
             "mutual_friends": mutual,

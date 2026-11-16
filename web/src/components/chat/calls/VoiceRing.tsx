@@ -69,7 +69,7 @@ const reducedMotion = () => typeof window !== "undefined" && window.matchMedia?.
  * ring turns slowly; once you're talking, soft waves around it rise and fall with the other
  * person's voice (louder voice, bigger waves).
  */
-export function VoiceRing({ name, stream, talking, size = 104 }: { name: string; stream: MediaStream | null; talking: boolean; size?: number }) {
+export function VoiceRing({ id, name, stream, talking, size = 104 }: { id?: number; name: string; stream: MediaStream | null; talking: boolean; size?: number }) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const box = size + 150; // room for the waves around the avatar
 
@@ -116,7 +116,7 @@ export function VoiceRing({ name, stream, talking, size = 104 }: { name: string;
     <span className={`voice-ring${talking ? " talking" : " waiting"}`} style={{ width: size + 20, height: size + 20 }}>
       <canvas ref={canvas} className="voice-wave" style={{ width: box, height: box }} aria-hidden="true" />
       <span className="voice-ring-band" aria-hidden="true" />
-      <Avatar name={name} size={size} />
+      <Avatar id={id} name={name} size={size} />
     </span>
   );
 }

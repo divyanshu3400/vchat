@@ -11,6 +11,12 @@ export type ChatUser = {
   discoverable?: boolean;
   /** Deactivated or deleted: shown as "vChat user", messages as "********". */
   inactive?: boolean;
+  /** Public @username ("" or null: none yet). */
+  handle?: string | null;
+  /** Profile photo link: yours, and your friends' only. */
+  avatar?: string | null;
+  /** Yours only: when the @username can change again (null: now). */
+  handle_next_change?: string | null;
   /** Only ever present for yourself. */
   email?: string;
 };
@@ -150,8 +156,26 @@ export function answerMessageRequest(userId: number, action: "accept" | "delete"
   });
 }
 
-export function updateMe(body: { show_last_seen?: boolean; show_online?: boolean; read_receipts?: boolean; discoverable?: boolean }, access: string) {
+export function updateMe(
+  body: { show_last_seen?: boolean; show_online?: boolean; read_receipts?: boolean; discoverable?: boolean; nickname?: string; handle?: string },
+  access: string,
+) {
   return request<ChatUser>("/api/auth/me", { method: "PATCH", access, body: JSON.stringify(body) });
+}
+
+/** Set (a file) or remove (null) your profile photo. Returns you, with the new link. */
+export async function setAvatar(file: Blob | null, access: string): Promise<ChatUser> {
+  if (!file) return request<ChatUser>("/api/auth/me/avatar", { method: "DELETE", access });
+  const form = new FormData();
+  form.append("file", file, "avatar.jpg");
+  const res = await fetch("/api/auth/me/avatar/", { method: "POST", body: form, headers: { Authorization: `Bearer ${access}` } });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, body ?? { detail: res.status === 413 ? "That photo is too big." : "Upload failed." });
+  return body as ChatUser;
+}
+
+export function checkHandle(handle: string, access: string) {
+  return request<{ handle: string; available: boolean; detail: string }>(`/api/auth/handle/check/?handle=${encodeURIComponent(handle)}`, { access });
 }
 
 /** Deactivate (log in to come back) or delete (saved: after 15 days; guests: now). Signs out. */
