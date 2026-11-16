@@ -68,6 +68,8 @@ const ICONS: Record<string, string> = {
   videooff: "M16 10.5l5-3v9l-5-3M10 5h3.5A2.5 2.5 0 0 1 16 7.5V11M3 3l18 18M14.6 18.9a2.5 2.5 0 0 1-1.1.1h-8A2.5 2.5 0 0 1 3 16.5v-9c0-.9.5-1.7 1.2-2.1",
   hangup: "M3 14.5c5-5 13-5 18 0l-2.5 2.5-3.5-1.5V13a10 10 0 0 0-6 0v2.5L5.5 17z",
   shield: "M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6zM9 12l2 2 4-4",
+  eye: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z",
+  timer: "M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM12 9v4l2.5 2M9 2h6",
 };
 
 export function Icon({ name, size = 20 }: { name: keyof typeof ICONS | string; size?: number }) {

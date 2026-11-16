@@ -10,8 +10,10 @@ import {
   type AttachmentKind,
   type ChatUser,
   type DirectMessage,
+  type ViewMode,
 } from "@/lib/api";
 import { useCalls } from "./calls/CallProvider";
+import MediaSendSheet from "./media/MediaSendSheet";
 import { voiceFilename } from "./media/useRecorder";
 import Composer from "./messages/Composer";
 import MessageList, { JumpToLatest, type Msg } from "./messages/MessageList";
@@ -71,6 +73,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
   const [menuOpen, setMenuOpen] = useState(false);
   const [uploading, setUploading] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [picked, setPicked] = useState<File | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const [watchSheet, setWatchSheet] = useState(false);
   const watch = useWatch({ kind: "dm", with: userId });
@@ -224,7 +227,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     sendRaw({ type: "dm.typing", to: userId });
   }
 
-  async function sendFile(file: Blob, kind: AttachmentKind, filename: string) {
+  async function sendFile(file: Blob, kind: AttachmentKind, filename: string, view: ViewMode | "" = "", caption = "") {
     if (!isFriend) return;
     setNotice("");
     scroll.follow();
@@ -232,8 +235,8 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     const replyTo = replying?.id;
     setReplying(null);
     try {
-      const up = await uploadMedia(file, kind, await getAccess(), setUploading, filename);
-      if (!sendDm(userId, "", up.id, replyTo)) setNotice("You're offline. Reconnecting…");
+      const up = await uploadMedia(file, kind, await getAccess(), setUploading, filename, view);
+      if (!sendDm(userId, caption, up.id, replyTo)) setNotice("You're offline. Reconnecting…");
     } catch (e) {
       setNotice(e instanceof ApiError ? e.message : "Couldn't send that file.");
     }
@@ -532,7 +535,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
               onCancelReply={() => setReplying(null)}
               editing={editing}
               onCancelEdit={() => setEditing(null)}
-              onVoice={(blob) => sendFile(blob, "audio", voiceFilename(blob))}
+              onVoice={(blob, view) => sendFile(blob, "audio", voiceFilename(blob), view)}
               left={
                 <>
                   <input
@@ -544,7 +547,7 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       e.target.value = "";
-                      if (file) sendFile(file, file.type.startsWith("video/") ? "video" : "image", file.name);
+                      if (file) setPicked(file);
                     }}
                   />
                   <button
@@ -556,6 +559,16 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                   >
                     <Icon name="image" />
                   </button>
+                  {picked && (
+                    <MediaSendSheet
+                      file={picked}
+                      onCancel={() => setPicked(null)}
+                      onSend={(view, caption) => {
+                        setPicked(null);
+                        sendFile(picked, picked.type.startsWith("video/") ? "video" : "image", picked.name, view, caption);
+                      }}
+                    />
+                  )}
                 </>
               }
             />

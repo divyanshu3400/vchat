@@ -6,6 +6,7 @@ import AccountSheet from "@/components/account/AccountSheet";
 import { markEngaged } from "@/lib/install";
 import { usePush } from "@/lib/push";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { noteOpened } from "./media/viewCounts";
 import {
   answerFriendRequest,
   ApiError,
@@ -202,6 +203,9 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
         break;
       case "friend_removed":
         setFriends((l) => l.filter((f) => f.user.id !== event.user_id));
+        break;
+      case "media.opened":
+        noteOpened(event.attachment_id, event.views_left);
         break;
       case "presence":
         setFriends((l) => l.map((f) => (f.user.id === event.user_id ? { ...f, online: event.online } : f)));

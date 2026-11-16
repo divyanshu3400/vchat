@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdSlot from "@/components/AdSlot";
 import { ADS_ON } from "@/lib/ads";
-import { ApiError, blockUser, reportUser, uploadMedia, type ReportReason } from "@/lib/api";
+import { ApiError, blockUser, reportUser, uploadMedia, type ReportReason, type ViewMode } from "@/lib/api";
 import { useCalls } from "../calls/CallProvider";
+import MediaSendSheet from "../media/MediaSendSheet";
 import { voiceFilename } from "../media/useRecorder";
 import Composer from "../messages/Composer";
 import MessageList, { JumpToLatest, type Msg } from "../messages/MessageList";
@@ -203,17 +204,18 @@ function ChatView({ win }: { win?: WinControls }) {
   const [replying, setReplying] = useState<Msg | null>(null);
   const [editing, setEditing] = useState<Msg | null>(null);
   const [uploading, setUploading] = useState<number | null>(null);
+  const [picked, setPicked] = useState<File | null>(null);
   const [unlockPhotos, setUnlockPhotos] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
   const photosUnlocked = !!premium?.plus || (premium?.grants.random_photos?.uses_left ?? 0) > 0;
 
-  async function sendVoice(blob: Blob) {
+  async function sendVoice(blob: Blob, view: ViewMode | "" = "") {
     setNotice("");
     setUploading(0);
     const replyTo = replying?.id;
     setReplying(null);
     try {
-      const up = await uploadMedia(blob, "audio", await getAccess(), setUploading, voiceFilename(blob));
+      const up = await uploadMedia(blob, "audio", await getAccess(), setUploading, voiceFilename(blob), view);
       if (!send("", up.id, replyTo)) setNotice("You're offline. Reconnecting…");
     } catch (e) {
       setNotice(e instanceof ApiError ? e.message : "Couldn't send the voice message.");
@@ -221,12 +223,12 @@ function ChatView({ win }: { win?: WinControls }) {
     setUploading(null);
   }
 
-  async function sendPhoto(file: File) {
+  async function sendPhoto(file: File, view: ViewMode | "" = "", caption = "") {
     setNotice("");
     setUploading(0);
     try {
-      const up = await uploadMedia(file, "image", await getAccess(), setUploading, file.name);
-      if (!send("", up.id)) setNotice("You're offline. Reconnecting…");
+      const up = await uploadMedia(file, "image", await getAccess(), setUploading, file.name, view);
+      if (!send(caption, up.id)) setNotice("You're offline. Reconnecting…");
       else if (premium && !premium.plus && premium.grants.random_photos) {
         // Keep the "photos left" count honest without another request.
         const g = premium.grants.random_photos;
@@ -638,9 +640,19 @@ function ChatView({ win }: { win?: WinControls }) {
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     e.target.value = "";
-                    if (file) sendPhoto(file);
+                    if (file) setPicked(file);
                   }}
                 />
+                {picked && (
+                  <MediaSendSheet
+                    file={picked}
+                    onCancel={() => setPicked(null)}
+                    onSend={(view, caption) => {
+                      setPicked(null);
+                      sendPhoto(picked, view, caption);
+                    }}
+                  />
+                )}
               </>
             }
           />

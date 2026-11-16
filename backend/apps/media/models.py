@@ -28,6 +28,12 @@ class Attachment(models.Model):
     created_at = models.DateTimeField()
     # Set once it is sent: an attachment goes into exactly one message.
     used_at = models.DateTimeField(null=True, blank=True)
+    # Disappearing media. "" = normal. Photos and videos: "once" (until closed) or "10" / "20" / "30"
+    # seconds on screen; voice: "twice" (two listens). Only the recipient can open it, through
+    # services.open_timed(); the file is kept hidden for reports (see purge_old_data), never re-shown.
+    view_mode = models.CharField(max_length=5, blank=True, default="")
+    views = models.PositiveSmallIntegerField(default=0)
+    opened_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         indexes = [models.Index(fields=["owner", "-created_at"], name="attachment_owner")]

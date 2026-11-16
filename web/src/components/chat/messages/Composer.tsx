@@ -24,8 +24,8 @@ type Props = {
   /** Editing one of your messages: the box holds its text, Send saves it. */
   editing?: Msg | null;
   onCancelEdit?: () => void;
-  /** Voice messages: shown instead of Send while the box is empty. */
-  onVoice?: (blob: Blob) => void;
+  /** Voice messages: shown instead of Send while the box is empty. "twice": can be played 2 times. */
+  onVoice?: (blob: Blob, view: "" | "twice") => void;
   /** Buttons on the left of the box (photo…). */
   left?: ReactNode;
   /** A strip of actions above the box (random chat: Next, End, photo). */
@@ -61,7 +61,14 @@ export default function Composer({
   const holdRef = useRef<{ x: number; t: number; slide: number } | null>(null);
   const shiftHeld = useRef(false);
   const editingId = editing?.id;
-  const voice = useRecorder((blob) => onVoice?.(blob));
+  // A recording that can be played only 2 times (set while recording, before Send).
+  const [twice, setTwice] = useState(false);
+  const twiceRef = useRef(false);
+  const voice = useRecorder((blob) => {
+    onVoice?.(blob, twiceRef.current ? "twice" : "");
+    twiceRef.current = false;
+    setTwice(false);
+  });
 
   // Start editing: the box takes the message's text.
   useEffect(() => {
@@ -120,6 +127,8 @@ export default function Composer({
     holdRef.current = { x: e.clientX, t: Date.now(), slide: 0 };
     setHolding(holdRef.current);
     setLockedRec(false);
+    twiceRef.current = false;
+    setTwice(false);
     voice.start();
   }
 
@@ -229,6 +238,20 @@ export default function Composer({
                 </span>
               )}
               {!holding && <span className="rec-max">{fmt(MAX_VOICE_SECONDS)}</span>}
+              {!holding && (
+                <button
+                  type="button"
+                  className={`twice-btn${twice ? " on" : ""}`}
+                  aria-pressed={twice}
+                  title={twice ? "Can be played 2 times" : "Let them play it only 2 times"}
+                  onClick={() => {
+                    twiceRef.current = !twice;
+                    setTwice(!twice);
+                  }}
+                >
+                  2×
+                </button>
+              )}
               {holding ? (
                 <span className="send-btn mic-live" aria-label="Release to send">
                   <Icon name="mic" />

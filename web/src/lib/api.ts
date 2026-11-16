@@ -196,11 +196,16 @@ export type Attachment = {
   id: string;
   kind: AttachmentKind;
   mime: string;
-  url: string; // signed, expires after a few hours; reload messages for a fresh one
+  url: string; // signed, expires after a few hours; reload messages for a fresh one. "" for disappearing media.
   width: number | null;
   height: number | null;
   size: number;
+  /** Disappearing media: "once" | "10" | "20" | "30" (photos, videos), "twice" (voice). */
+  view?: ViewMode;
+  views_left?: number;
+  opened?: boolean;
 };
+export type ViewMode = "once" | "10" | "20" | "30" | "twice";
 export type DirectMessage = {
   id: number;
   sender: ChatUser;
@@ -222,10 +227,12 @@ export function uploadMedia(
   access: string,
   onProgress?: (fraction: number) => void,
   filename = "upload",
+  view: ViewMode | "" = "",
 ): Promise<{ id: string; kind: AttachmentKind }> {
   return new Promise((resolve, reject) => {
     const form = new FormData();
     form.append("kind", kind);
+    if (view) form.append("view", view);
     form.append("file", file, filename);
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/api/media/");
@@ -245,6 +252,11 @@ export function uploadMedia(
     xhr.send(form);
   });
 }
+/** The recipient opens disappearing media: a short-lived link (a photo's works once). */
+export function openTimedMedia(id: string, access: string) {
+  return request<{ url: string; seconds: number | null; views_left: number }>(`/api/media/${id}/open`, { method: "POST", access });
+}
+
 export type ConversationSummary = {
   user: ChatUser;
   last_message: string;
@@ -262,6 +274,7 @@ export type UserEvent =
   | { type: "dm.typing"; user_id: number }
   | { type: "dm.settings"; users: number[]; auto_delete_days: number; by: ChatUser }
   | { type: "conversations.changed" }
+  | { type: "media.opened"; attachment_id: string; views_left: number }
   | { type: "friend_request"; request: FriendRequest }
   | { type: "friend_request_removed"; request_id: number }
   | { type: "friend_added"; friend: ChatUser; online?: boolean; request_id: number }

@@ -4,6 +4,7 @@
   random chats ............................. 7 days after they end, unless someone reported them
   room messages ............................ 1 year, unless a report from the last 2 years needs them
   photos, videos, voice messages ........... with their message, at most 1 year; unsent uploads: 1 day
+  view-once / timed media .................. hidden copy for reports: 30 days, even if its message is gone
   reports, contact messages ................ 2 years
   email codes .............................. 2 days; expired ban marks ........ 30 days
 """
@@ -25,6 +26,7 @@ MESSAGES = timedelta(days=365)
 RANDOM_CHATS = timedelta(days=7)
 MEDIA = timedelta(days=365)
 UNSENT_UPLOADS = timedelta(days=1)
+TIMED_MEDIA = timedelta(days=30)
 REPORTS = timedelta(days=730)
 
 
@@ -63,11 +65,13 @@ class Command(BaseCommand):
             ).exclude(id__in=reported_sessions),
         )
 
+        # Disappearing media is kept (hidden) 30 days for reports, even after its message is gone.
+        kept_for_reports = Q(created_at__gte=now - TIMED_MEDIA) & ~Q(view_mode="")
         old_files = Attachment.objects.filter(
             Q(created_at__lt=now - MEDIA)
             | Q(used_at__isnull=True, created_at__lt=now - UNSENT_UPLOADS)
             # sent, but its message is gone (auto-deleted, or the random chat expired)
-            | Q(used_at__isnull=False, dm_message__isnull=True, stranger_message__isnull=True)
+            | (Q(used_at__isnull=False, dm_message__isnull=True, stranger_message__isnull=True) & ~kept_for_reports)
         )
         count = old_files.count()
         if not dry_run:
@@ -75,6 +79,15 @@ class Command(BaseCommand):
                 a.file.delete(save=False)
                 a.delete()
         self.report("files", count)
+
+        # Still in a chat after 30 days: the file goes, the message stays and shows "expired".
+        timed = Attachment.objects.exclude(view_mode="").exclude(file="").filter(created_at__lt=now - TIMED_MEDIA)
+        count = timed.count()
+        if not dry_run:
+            for a in timed.iterator():
+                a.file.delete(save=False)
+                Attachment.objects.filter(pk=a.pk).update(file="")
+        self.report("disappearing media files", count)
 
         self.purge("email codes", EmailCode.objects.filter(created_at__lt=now - timedelta(days=2)))
         self.purge("expired ban marks", BanMark.objects.filter(until__lt=now - timedelta(days=30)))

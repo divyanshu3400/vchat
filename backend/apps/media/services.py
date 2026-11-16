@@ -5,14 +5,21 @@
   GPS location) and anything hidden after the image data.
 - Videos and voice notes are stored as uploaded, within size limits (no transcoding yet).
 - Files are only reachable through signed links that expire.
+- Disappearing media (view once, 10/20/30 s, voice twice) never has a link in a message: the
+  recipient asks open_timed() for a short-lived one, and the count is kept here, not by the app.
 """
 
 import io
+import secrets
+import time
 
 from django.conf import settings
 from django.core import signing
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
+from django.db.models import F
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -22,6 +29,10 @@ from .models import Attachment
 MAX_BYTES = {"image": 8 * 1024 * 1024, "video": 25 * 1024 * 1024, "audio": 3 * 1024 * 1024}
 MAX_IMAGE_SIDE = 1600
 SIGNER_SALT = "vchat.media"
+TIMED_SALT = "vchat.media.timed"
+VIEW_MODES = {"image": ("once", "10", "20", "30"), "video": ("once", "10", "20", "30"), "audio": ("twice",)}
+# How long an opened link works. A photo's link works once (the app downloads it, then shows it).
+TIMED_LINK_SECONDS = {"image": 60, "video": 15 * 60, "audio": 15 * 60}
 
 Image.MAX_IMAGE_PIXELS = 40_000_000  # refuse decompression bombs
 
@@ -69,9 +80,20 @@ def _process_image(data: bytes) -> tuple[bytes, int, int]:
     return out.getvalue(), img.width, img.height
 
 
-def store_upload(owner, kind: str, upload) -> Attachment:
+def max_views(attachment: Attachment) -> int:
+    return 2 if attachment.view_mode == "twice" else 1
+
+
+def view_seconds(attachment: Attachment) -> int | None:
+    """Seconds on screen for a timed photo or video; None when it stays until closed."""
+    return int(attachment.view_mode) if attachment.view_mode.isdigit() else None
+
+
+def store_upload(owner, kind: str, upload, view: str = "") -> Attachment:
     if kind not in MAX_BYTES:
         raise UploadError("Unknown kind of file.")
+    if view and view not in VIEW_MODES[kind]:
+        raise UploadError("That timer isn't available for this file.")
     if upload.size > MAX_BYTES[kind]:
         raise UploadError(f"That file is too big. The limit is {MAX_BYTES[kind] // (1024 * 1024)} MB.")
     data = upload.read()
@@ -92,7 +114,9 @@ def store_upload(owner, kind: str, upload) -> Attachment:
             raise UploadError("That recording couldn't be read.")
         mime = {"webm": "audio/webm", "audio/ogg": "audio/ogg"}.get(sniffed, "audio/mp4")
 
-    attachment = Attachment(owner=owner, kind=kind, mime=mime, size=len(data), width=width, height=height, created_at=timezone.now())
+    attachment = Attachment(
+        owner=owner, kind=kind, mime=mime, size=len(data), width=width, height=height, created_at=timezone.now(), view_mode=view
+    )
     attachment.file.save("upload", ContentFile(data), save=False)
     attachment.save()
     return attachment
@@ -130,13 +154,82 @@ def resolve(token: str) -> Attachment | None:
         hex_id = signing.TimestampSigner(salt=SIGNER_SALT).unsign(token, max_age=settings.VCHAT["MEDIA_LINK_SECONDS"])
     except signing.BadSignature:  # also covers expired links
         return None
-    return Attachment.objects.filter(id=hex_id, used_at__isnull=False).first()
+    # Disappearing media has no lasting link (see open_timed).
+    return Attachment.objects.filter(id=hex_id, used_at__isnull=False, view_mode="").first()
+
+
+class OpenError(Exception):
+    def __init__(self, code: str, detail: str, status: int = 400):
+        super().__init__(detail)
+        self.code = code
+        self.detail = detail
+        self.status = status
+
+
+def _chat_of(attachment: Attachment):
+    """(message, the two people in its chat) or (None, ())."""
+    for name, chat in (("dm_message", "conversation"), ("stranger_message", "session")):
+        message = getattr(attachment, name, None)  # reverse one-to-one: missing raises AttributeError
+        if message is not None:
+            room = getattr(message, chat)
+            return message, (room.user_a_id, room.user_b_id)
+    return None, ()
+
+
+def open_timed(user, attachment_id) -> tuple[dict, tuple[int, ...]]:
+    """The recipient opens disappearing media: counts the view and returns a short-lived link.
+    Returns (response, the two people in the chat, who are told it was opened)."""
+    try:
+        attachment = Attachment.objects.filter(id=attachment_id, used_at__isnull=False).exclude(view_mode="").first()
+    except (ValueError, ValidationError):
+        attachment = None
+    if attachment is None:
+        raise OpenError("not_found", "That file isn't available.", 404)
+    message, people = _chat_of(attachment)
+    if message is None or message.deleted_at or user.id not in people or message.sender_id == user.id:
+        raise OpenError("not_found", "That file isn't available.", 404)
+    if not attachment.file:
+        raise OpenError("gone", "This has expired.", 410)
+    limit = max_views(attachment)
+    counted = Attachment.objects.filter(id=attachment.id, views__lt=limit).update(
+        views=F("views") + 1, opened_at=Coalesce(F("opened_at"), timezone.now())
+    )
+    if not counted:
+        raise OpenError("spent", "You've already opened this.", 410)
+
+    nonce = secrets.token_urlsafe(9)
+    ttl = TIMED_LINK_SECONDS[attachment.kind]
+    if attachment.kind == "image":
+        cache.set(f"mediaonce:{nonce}", 1, ttl)
+    token = signing.dumps({"a": attachment.id.hex, "n": nonce, "e": int(time.time()) + ttl}, salt=TIMED_SALT, compress=True)
+    data = {
+        "url": reverse("media-timed", kwargs={"token": token}),
+        "seconds": view_seconds(attachment),
+        "views_left": limit - attachment.views - 1,
+    }
+    return data, people
+
+
+def resolve_timed(token: str) -> Attachment | None:
+    """A link from open_timed(): before it expires, and a photo's only once."""
+    try:
+        data = signing.loads(token, salt=TIMED_SALT)
+    except signing.BadSignature:
+        return None
+    if not isinstance(data, dict) or data.get("e", 0) < time.time():
+        return None
+    attachment = Attachment.objects.filter(id=data.get("a"), used_at__isnull=False).exclude(view_mode="").first()
+    if attachment is None or not attachment.file:
+        return None
+    if attachment.kind == "image" and not cache.delete(f"mediaonce:{data.get('n')}"):
+        return None
+    return attachment
 
 
 def payload(attachment: Attachment | None) -> dict | None:
     if attachment is None:
         return None
-    return {
+    out = {
         "id": str(attachment.id),
         "kind": attachment.kind,
         "mime": attachment.mime,
@@ -145,3 +238,8 @@ def payload(attachment: Attachment | None) -> dict | None:
         "height": attachment.height,
         "size": attachment.size,
     }
+    if attachment.view_mode:
+        # No link: the recipient opens it through open_timed(), the sender can't open it again.
+        left = max(0, max_views(attachment) - attachment.views) if attachment.file else 0
+        out.update(url="", view=attachment.view_mode, views_left=left, opened=attachment.views > 0)
+    return out

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import type { Attachment } from "@/lib/api";
 import { Icon } from "../bits";
 import AudioPlayer from "./AudioPlayer";
+import TimedMedia from "./TimedMedia";
 
 // Your View / Reject choices, so a reload doesn't ask again. Kept on this device only.
 const CHOICES_KEY = "vchat.mediaChoices";
@@ -43,6 +44,11 @@ function sizeLabel(bytes: number) {
  * on your side only (the sender isn't told).
  */
 export default function MediaBubble({ attachment, ask = false }: { attachment: Attachment; ask?: boolean }) {
+  if (attachment.view) return <TimedMedia attachment={attachment} mine={!ask} />;
+  return <PlainMedia attachment={attachment} ask={ask} />;
+}
+
+function PlainMedia({ attachment, ask }: { attachment: Attachment; ask: boolean }) {
   const [choice, setChoice] = useState<Choice | undefined>(() =>
     ask && typeof window !== "undefined" ? readChoices()[attachment.id] : undefined,
   );

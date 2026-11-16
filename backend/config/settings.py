@@ -154,6 +154,7 @@ REST_FRAMEWORK = {
         "friend_requests": "40/hour",
         "rewards": "20/hour",
         "uploads": "60/hour",
+        "media_open": "200/hour",
     },
 }
 

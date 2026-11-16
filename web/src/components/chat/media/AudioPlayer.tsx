@@ -35,7 +35,8 @@ async function peaksOf(url: string, signal: AbortSignal): Promise<{ peaks: numbe
 
 const FLAT = Array.from({ length: BARS }, (_, i) => 0.25 + 0.2 * Math.abs(Math.sin(i * 1.7)));
 
-export default function AudioPlayer({ src }: { src: string }) {
+/** `autoPlay` + `onEnded`: a listen-twice voice message, played right after it is opened. */
+export default function AudioPlayer({ src, autoPlay = false, onEnded }: { src: string; autoPlay?: boolean; onEnded?: () => void }) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const [peaks, setPeaks] = useState<number[]>(FLAT);
   const [duration, setDuration] = useState(0);
@@ -108,7 +109,9 @@ export default function AudioPlayer({ src }: { src: string }) {
         onEnded={() => {
           setPlaying(false);
           setTime(0);
+          onEnded?.();
         }}
+        autoPlay={autoPlay}
         onLoadedMetadata={(e) => {
           const d = e.currentTarget.duration;
           if (Number.isFinite(d) && !duration) setDuration(d);

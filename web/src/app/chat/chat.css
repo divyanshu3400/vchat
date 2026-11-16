@@ -802,3 +802,74 @@ button.head-who:active { background: var(--surface-2); }
 .friend-card b { font-size: 14.5px; }
 .friend-card small { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 .friend-card-actions { display: flex; gap: 8px; margin-top: 6px; }
+
+/* --- random chat strip: smaller, centred, room below ------------------------------- */
+.composer-strip { justify-content: center; gap: 6px; padding-top: 6px; padding-bottom: 6px; }
+.composer-strip .strip-gap { display: none; }
+.composer-strip .next-btn, .composer-strip .end-btn, .composer-strip .strip-btn { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 10px; gap: 5px; }
+.composer-strip svg { width: 15px; height: 15px; }
+/* one day per random chat: no sticky day label covering messages */
+.st-chat .day-sep, .st-win .day-sep { display: none; }
+
+/* --- watch together: title over the video; a small floating player while typing ------- */
+.watch { position: relative; }
+/* While the video shows, its bar is one slim line (YouTube shows the title on the video too). */
+.watch:not(.min) .watch-bar { padding: 2px 4px 2px 10px; gap: 6px; }
+.watch:not(.min) .watch-title b { font-size: 12.5px; }
+.watch:not(.min) .watch-title small { display: none; }
+.watch:not(.min) .watch-bar .icon-btn { width: 28px; height: 28px; }
+@media (max-width: 767px) {
+  .app.kb-open .watch:not(.min) { height: 0; border: 0; overflow: visible; z-index: 8; background: transparent; }
+  .app.kb-open .watch:not(.min) .watch-bar { display: none; }
+  .app.kb-open .watch:not(.min) .watch-frame { position: absolute; top: 8px; right: 10px; width: min(46vw, 200px); max-height: none; border-radius: 12px; overflow: hidden; box-shadow: 0 14px 30px -12px rgba(0, 0, 0, 0.6); }
+}
+
+/* --- disappearing media: the bubble ---------------------------------------------------- */
+.timed { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: min(250px, 64vw); padding: 8px; border-radius: 14px; background: var(--bg); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); color: var(--fg); }
+.timed.spent { border-style: dashed; color: var(--muted); }
+.timed-icon { position: relative; width: 42px; height: 42px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); }
+.timed.spent .timed-icon { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
+.timed-badge { position: absolute; right: -4px; bottom: -3px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; font-size: 10.5px; line-height: 14px; text-align: center; background: var(--brand); color: var(--on-brand); border: 2px solid var(--bg); }
+.timed.spent .timed-badge { background: var(--muted); }
+.timed-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.timed-text b { font-size: 14.5px; }
+.timed-text small { font-size: 12px; color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+.timed-open { flex: none; }
+.timed-error { flex-basis: 100%; color: var(--danger); font-size: 12px; }
+
+/* --- disappearing media: full screen viewer -------------------------------------------- */
+.timed-viewer { position: fixed; inset: 0; z-index: 95; background: #050806; display: grid; place-items: center; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; animation: fade-in 0.15s ease; }
+.timed-stage { position: relative; display: grid; place-items: center; width: 100%; height: 100%; padding: 64px 12px max(16px, env(safe-area-inset-bottom, 0px)); overflow: hidden; }
+.timed-stage img, .timed-stage video { max-width: 100%; max-height: 100%; border-radius: 10px; }
+.timed-stage img { pointer-events: none; }
+.timed-viewer.away .timed-stage img, .timed-viewer.away .timed-stage video { filter: blur(28px) brightness(0.6); }
+.timed-away { position: absolute; color: #fff; font-weight: 800; }
+.timed-mark { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-around; align-items: center; pointer-events: none; overflow: hidden; }
+.timed-mark span { transform: rotate(-24deg); white-space: nowrap; font-size: 15px; font-weight: 800; color: rgba(255, 255, 255, 0.16); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25); }
+.timed-top { position: absolute; top: max(12px, env(safe-area-inset-top, 0px)); left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; }
+.timed-close { color: #fff; background: rgba(255, 255, 255, 0.12); }
+.timed-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; color: #fff; font-size: 13px; font-weight: 800; background: rgba(255, 255, 255, 0.12); }
+.timed-ring { --p: 1; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: #fff; background: conic-gradient(var(--brand) calc(var(--p) * 360deg), rgba(255, 255, 255, 0.15) 0); }
+.timed-ring b { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #050806; font-size: 15px; }
+.timed-viewer-note { color: #fff; text-align: center; max-width: 280px; }
+.timed-loading { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255, 255, 255, 0.2); border-top-color: #fff; animation: timed-spin 0.8s linear infinite; }
+@keyframes timed-spin { to { transform: rotate(360deg); } }
+
+/* --- before sending a photo or video ---------------------------------------------------- */
+.send-sheet-veil { display: grid; place-items: end center; background: rgba(8, 20, 14, 0.55); }
+.send-sheet { width: min(100%, 460px); display: grid; gap: 12px; padding: 14px 14px max(14px, env(safe-area-inset-bottom, 0px)); border-radius: 22px 22px 0 0; background: var(--surface); box-shadow: 0 -24px 60px -24px rgba(0, 0, 0, 0.45); animation: sheet-up 0.22s ease both; }
+@media (min-width: 768px) { .send-sheet-veil { place-items: center; } .send-sheet { border-radius: 22px; } }
+.send-sheet-preview { position: relative; display: grid; place-items: center; max-height: 46vh; border-radius: 14px; overflow: hidden; background: #000; }
+.send-sheet-preview img, .send-sheet-preview video { max-width: 100%; max-height: 46vh; display: block; }
+.send-sheet-flag { position: absolute; top: 8px; left: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 800; color: #fff; background: rgba(0, 0, 0, 0.55); }
+.view-choices { display: flex; gap: 4px; }
+.view-chip { appearance: none; flex: 1 1 auto; justify-content: center; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; border-radius: 999px; font: inherit; font-size: 12.5px; font-weight: 800; cursor: pointer; color: var(--fg); background: var(--bg); border: 1px solid var(--line); }
+.view-chip.on { color: var(--on-brand); background: var(--brand); border-color: var(--brand); }
+.send-sheet-hint { margin: 0; font-size: 12.5px; color: var(--muted); }
+.send-sheet-row { display: flex; gap: 8px; align-items: center; }
+.send-sheet-caption { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); outline: none; }
+.send-sheet-caption:focus { border-color: var(--brand); }
+
+/* --- voice: play twice ------------------------------------------------------------------ */
+.twice-btn { appearance: none; flex: none; height: 30px; min-width: 38px; padding: 0 8px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; color: var(--muted); background: transparent; border: 1px dashed var(--line); }
+.twice-btn.on { color: var(--on-brand); background: var(--brand); border: 1px solid var(--brand); }
