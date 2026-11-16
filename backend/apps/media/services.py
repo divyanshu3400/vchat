@@ -26,7 +26,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .models import Attachment
 
-MAX_BYTES = {"image": 8 * 1024 * 1024, "video": 25 * 1024 * 1024, "audio": 3 * 1024 * 1024}
+MAX_BYTES = {"image": 8 * 1024 * 1024, "video": 25 * 1024 * 1024, "audio": 10 * 1024 * 1024}
 MAX_IMAGE_SIDE = 1600
 SIGNER_SALT = "vchat.media"
 TIMED_SALT = "vchat.media.timed"
@@ -60,6 +60,10 @@ def _sniff(head: bytes) -> str | None:
         return "webm"  # container shared by video and audio; the declared kind decides
     if head[:4] == b"OggS":
         return "audio/ogg"
+    if head[:3] == b"ID3" or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0 and head[1] & 0x06):
+        return "audio/mpeg"  # MP3: ID3 tag or an MPEG frame (layer bits set, which rules out AAC/ADTS)
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "audio/wav"
     return None
 
 
@@ -110,9 +114,9 @@ def store_upload(owner, kind: str, upload, view: str = "") -> Attachment:
             raise UploadError("Videos must be MP4 or WebM.")
         mime = "video/webm" if sniffed == "webm" else "video/mp4"
     else:
-        if sniffed not in ("webm", "audio/ogg", "audio/mp4", "video/mp4"):
-            raise UploadError("That recording couldn't be read.")
-        mime = {"webm": "audio/webm", "audio/ogg": "audio/ogg"}.get(sniffed, "audio/mp4")
+        if sniffed not in ("webm", "audio/ogg", "audio/mp4", "video/mp4", "audio/mpeg", "audio/wav"):
+            raise UploadError("Audio must be MP3, M4A, WAV, OGG or WebM.")
+        mime = {"webm": "audio/webm", "video/mp4": "audio/mp4"}.get(sniffed, sniffed)
 
     attachment = Attachment(
         owner=owner, kind=kind, mime=mime, size=len(data), width=width, height=height, created_at=timezone.now(), view_mode=view

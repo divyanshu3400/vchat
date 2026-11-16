@@ -48,4 +48,6 @@ class Attachment(models.Model):
             "audio/webm": ".webm",
             "audio/ogg": ".ogg",
             "audio/mp4": ".m4a",
+            "audio/mpeg": ".mp3",
+            "audio/wav": ".wav",
         }.get(self.mime, ".bin")

@@ -187,3 +187,19 @@ async def test_stranger_photos_need_an_unlock_voice_is_free():
     assert (await a.receive_json_from())["code"] == "invalid_attachment"  # no videos with strangers
     await a.disconnect()
     await b.disconnect()
+
+
+@pytest.mark.django_db
+def test_audio_files_mp3_and_wav(alice):
+    client = auth_client(alice)
+    mp3 = upload(client, b"ID3\x04\x00" + b"\x00" * 200, kind="audio", name="song.mp3", ctype="audio/mpeg")
+    assert mp3.status_code == 201 and mp3.data["mime"] == "audio/mpeg"
+    frame = upload(client, b"\xff\xfb\x90\x64" + b"\x00" * 200, kind="audio", name="raw.mp3", ctype="audio/mpeg")
+    assert frame.status_code == 201 and frame.data["mime"] == "audio/mpeg"
+    wav = upload(client, b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 200, kind="audio", name="a.wav", ctype="audio/wav")
+    assert wav.status_code == 201 and wav.data["mime"] == "audio/wav"
+    m4a = upload(client, b"\x00\x00\x00\x18ftypM4A " + b"\x00" * 200, kind="audio", name="a.m4a", ctype="audio/mp4")
+    assert m4a.status_code == 201 and m4a.data["mime"] == "audio/mp4"
+    # A photo or a WebP sent as audio is refused.
+    assert upload(client, b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"\x00" * 200, kind="audio", name="x.mp3").status_code == 400
+    assert upload(client, b"\xff\xd8\xff\xe0" + b"\x00" * 200, kind="audio", name="x.mp3").status_code == 400

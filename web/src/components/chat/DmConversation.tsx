@@ -734,23 +734,26 @@ export default function DmConversation({ userId, variant = "page", minimized = f
                   <input
                     ref={fileRef}
                     type="file"
-                    accept="image/*,video/mp4,video/webm"
+                    accept="image/*,video/mp4,video/webm,audio/*"
                     hidden
                     id={`dm-file-${userId}-${variant}`}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       e.target.value = "";
-                      if (file) setPicked(file);
+                      if (!file) return;
+                      // Audio files (songs, recordings) go straight; photos and videos get the timer sheet first.
+                      if (file.type.startsWith("audio/")) sendFile(file, "audio", file.name);
+                      else setPicked(file);
                     }}
                   />
                   <button
                     type="button"
                     className="icon-btn"
-                    aria-label="Send a photo or video"
+                    aria-label="Attach a photo, video or audio"
                     disabled={!isFriend || uploading !== null}
                     onClick={() => fileRef.current?.click()}
                   >
-                    <Icon name="image" />
+                    <Icon name="clip" />
                   </button>
                   {picked && (
                     <MediaSendSheet
