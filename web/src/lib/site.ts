@@ -4,7 +4,7 @@
  */
 export const SITE = {
   name: "vChat",
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://vchat.ssmm.online",
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssmm.online",
   operator: "Techyugantar",
   location: "India",
   supportEmail: "support@techyugantar.in",

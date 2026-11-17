@@ -22,7 +22,7 @@ endif
 
 HOST    ?= hashai@10.10.11.6
 KEY     ?= ~/.ssh/github_actions_key
-SITE    ?= https://vchat.ssmm.online
+SITE    ?= https://ssmm.online
 BRANCH  ?= master
 SERVICE ?= backend
 LINES   ?= 200

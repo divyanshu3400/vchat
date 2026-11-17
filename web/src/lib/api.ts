@@ -548,7 +548,7 @@ export type CustomRoom = {
 export type InvitePreview = { name: string; emoji: string; description: string; members: number; is_member?: boolean; slug?: string };
 
 export function inviteLink(code: string) {
-  const origin = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://vchat.ssmm.online");
+  const origin = typeof window !== "undefined" ? window.location.origin : (process.env.NEXT_PUBLIC_SITE_URL ?? "https://ssmm.online");
   return `${origin}/r/${code}`;
 }
 
@@ -597,6 +597,7 @@ export function inviteCodeIn(text: string): string | null {
   const m = text.match(/(?:^|\s)(?:https?:\/\/)?([\w.-]+(?::\d+)?)\/r\/([A-Za-z0-9_-]{6,16})(?=$|[\s/?#.,!])/);
   if (!m) return null;
   const host = m[1].toLowerCase();
-  const ours = host === "vchat.ssmm.online" || host.startsWith("localhost") || host.startsWith("127.0.0.1") || (typeof window !== "undefined" && host === window.location.host);
+  // ssmm.online is the site; vchat.ssmm.online was its first address (old links still work).
+  const ours = ["ssmm.online", "www.ssmm.online", "vchat.ssmm.online"].includes(host) || host.startsWith("localhost") || host.startsWith("127.0.0.1") || (typeof window !== "undefined" && host === window.location.host);
   return ours ? m[2] : null;
 }

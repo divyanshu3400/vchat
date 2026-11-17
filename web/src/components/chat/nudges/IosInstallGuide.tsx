@@ -1,5 +1,7 @@
 "use client";
 
+import { SITE } from "@/lib/site";
+
 /** iPhone has no install button for websites: three steps in Safari instead. */
 export default function IosInstallGuide({ notSafari, onClose }: { notSafari?: boolean; onClose: () => void }) {
   return (
@@ -14,7 +16,7 @@ export default function IosInstallGuide({ notSafari, onClose }: { notSafari?: bo
         <h2>Add vChat to your Home Screen</h2>
         {notSafari ? (
           <p className="account-why">
-            On iPhone only <b>Safari</b> can add apps to the Home Screen. Open <b>vchat.ssmm.online</b> in Safari, then follow
+            On iPhone only <b>Safari</b> can add apps to the Home Screen. Open <b>{SITE.url.replace(/^https?:\/\//, "")}</b> in Safari, then follow
             these steps.
           </p>
         ) : (

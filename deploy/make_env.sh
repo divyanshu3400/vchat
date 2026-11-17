@@ -1,10 +1,10 @@
 #!/bin/sh
 # Writes deploy/.env with fresh secrets for a new server. Refuses to touch an existing one.
-#   sh make_env.sh                       # vchat.ssmm.online + api.vchat.ssmm.online
+#   sh make_env.sh                       # ssmm.online (+ www, the old vchat. name) and api.ssmm.online
 #   sh make_env.sh <host> <api host>     # other names
 #   PGDATA_PATH=~/vchat-data/pgdata sh make_env.sh   # database folder without sudo
 set -eu
-HOST=${1:-vchat.ssmm.online}
+HOST=${1:-ssmm.online}
 API_HOST=${2:-api.$HOST}
 OUT=$(dirname "$0")/.env
 [ -e "$OUT" ] && { echo "$OUT exists; not replacing it." >&2; exit 1; }
@@ -19,8 +19,8 @@ DJANGO_DEBUG=0
 DJANGO_SECRET_KEY=$(token)
 # The site and the API host. localhost: the container health check. backend: calls inside Docker.
 # WebSocket connections are accepted only from pages on these hosts.
-DJANGO_ALLOWED_HOSTS=$HOST,$API_HOST,localhost,backend
-DJANGO_CSRF_TRUSTED_ORIGINS=https://$HOST,https://$API_HOST
+DJANGO_ALLOWED_HOSTS=$HOST,www.$HOST,vchat.$HOST,$API_HOST,localhost,backend
+DJANGO_CSRF_TRUSTED_ORIGINS=https://$HOST,https://www.$HOST,https://vchat.$HOST,https://$API_HOST
 # The app nginx sits right in front of the backend and sets X-Forwarded-For to the visitor.
 NUM_PROXIES=1
 LOG_LEVEL=INFO
