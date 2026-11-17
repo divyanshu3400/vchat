@@ -11,12 +11,12 @@ export const SITE = {
   // Grievance Officer under India's IT Rules, 2021 (rule 3(2)).
   grievanceOfficer: "Grievance Officer, vChat",
   grievanceEmail: "support@techyugantar.in",
-  lastUpdated: "16 November 2026",
+  lastUpdated: "18 November 2026",
   retention: {
     messages: "1 year",
     friendChatsDefault: "1 week",
     randomChats: "7 days",
-    media: "1 year",
+    media: "3 days",
     reports: "2 years",
     ipLogs: "90 days",
   },

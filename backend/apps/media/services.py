@@ -159,7 +159,8 @@ def resolve(token: str) -> Attachment | None:
     except signing.BadSignature:  # also covers expired links
         return None
     # Disappearing media has no lasting link (see open_timed).
-    return Attachment.objects.filter(id=hex_id, used_at__isnull=False, view_mode="").first()
+    # A file deleted after MEDIA_KEEP_DAYS has no link either.
+    return Attachment.objects.filter(id=hex_id, used_at__isnull=False, view_mode="").exclude(file="").first()
 
 
 class OpenError(Exception):
@@ -242,6 +243,9 @@ def payload(attachment: Attachment | None) -> dict | None:
         "height": attachment.height,
         "size": attachment.size,
     }
+    if not attachment.file:
+        # The file was deleted (MEDIA_KEEP_DAYS): the chat shows "expired" in its place.
+        out.update(url="", expired=True)
     if attachment.view_mode:
         # No link: the recipient opens it through open_timed(), the sender can't open it again.
         left = max(0, max_views(attachment) - attachment.views) if attachment.file else 0

@@ -305,6 +305,8 @@ export type Attachment = {
   view?: ViewMode;
   views_left?: number;
   opened?: boolean;
+  /** The file was deleted (kept 3 days); the message stays. */
+  expired?: boolean;
 };
 export type ViewMode = "once" | "10" | "20" | "30" | "twice";
 export type DirectMessage = {

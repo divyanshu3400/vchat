@@ -231,6 +231,9 @@ VCHAT = {
     # Launch phase: every Plus feature is free for everyone and nobody sees ads or prices.
     # Set FREE_FOR_ALL=0 in .env when payments start.
     "FREE_FOR_ALL": os.environ.get("FREE_FOR_ALL", "1") == "1",
+    # Photos, videos and voice notes sent in chats: the file is deleted after this many days (the
+    # message stays and shows "expired"), so the disk never fills up. Profile photos are not affected.
+    "MEDIA_KEEP_DAYS": int(os.environ.get("MEDIA_KEEP_DAYS", "3")),
     # Rewarded ads unlock features (e.g. gender filter). Off in production until an ad network is live.
     "REWARDED_ADS": env_bool("REWARDED_ADS", DEBUG),
     "REWARDS_PER_DAY": 6,

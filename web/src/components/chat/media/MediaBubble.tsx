@@ -44,6 +44,15 @@ function sizeLabel(bytes: number) {
  * on your side only (the sender isn't told).
  */
 export default function MediaBubble({ attachment, ask = false }: { attachment: Attachment; ask?: boolean }) {
+  // Chat files are kept 3 days (to keep storage small); after that only this note remains.
+  if (attachment.expired && !attachment.view) {
+    const what = attachment.kind === "video" ? "Video" : attachment.kind === "audio" ? "Voice note" : "Photo";
+    return (
+      <span className="media-expired">
+        <Icon name={attachment.kind === "video" ? "video" : attachment.kind === "audio" ? "mic" : "image"} size={16} /> {what} expired
+      </span>
+    );
+  }
   if (attachment.view) return <TimedMedia attachment={attachment} mine={!ask} />;
   return <PlainMedia attachment={attachment} ask={ask} />;
 }

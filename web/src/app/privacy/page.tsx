@@ -117,6 +117,11 @@ export default function PrivacyPage() {
           <b>Random chats</b>: gone from your screen when the chat ends, and deleted from our servers {r.randomChats} after
           it ends. If you become friends, the chat moves into your friend chat and follows its setting.
         </li>
+        <li>
+          <b>Photos, videos and voice messages</b> sent in chats: the file is deleted {r.media} after it is sent, even if
+          the chat is kept longer (the message stays and shows that the file expired). Files in a reported random chat are
+          kept until that chat is deleted, so the report can be checked. Profile photos stay until you change or remove them.
+        </li>
         <li>Room messages: {r.messages}.</li>
         <li>Reports and the messages they point to: {r.reports}, to handle appeals and repeat abuse.</li>
         <li>IP addresses in logs: {r.ipLogs}.</li>

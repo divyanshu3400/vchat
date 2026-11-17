@@ -3,8 +3,9 @@
   friend chats ............................. after each chat's auto-delete setting (1 day to 1 year)
   random chats ............................. 7 days after they end, unless someone reported them
   room messages ............................ 1 year, unless a report from the last 2 years needs them
-  photos, videos, voice messages ........... with their message, at most 1 year; unsent uploads: 1 day
-  view-once / timed media .................. hidden copy for reports: 30 days, even if its message is gone
+  photos, videos, voice messages ........... file deleted after MEDIA_KEEP_DAYS (3 days); the message stays
+                                             and shows "expired". Unsent uploads: 1 day. A reported random
+                                             chat keeps its files as evidence until the chat itself goes.
   reports, contact messages ................ 2 years
   email codes .............................. 2 days; expired ban marks ........ 30 days
   accounts asked to be deleted ............. erased 15 days later, unless they logged in again
@@ -12,6 +13,7 @@
 
 from datetime import timedelta
 
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.db.models import Q
 from django.utils import timezone
@@ -82,14 +84,22 @@ class Command(BaseCommand):
                 a.delete()
         self.report("files", count)
 
-        # Still in a chat after 30 days: the file goes, the message stays and shows "expired".
-        timed = Attachment.objects.exclude(view_mode="").exclude(file="").filter(created_at__lt=now - TIMED_MEDIA)
-        count = timed.count()
+        # Sent files go after MEDIA_KEEP_DAYS to keep the disk from filling up. The message and the
+        # attachment row stay (the chat shows "expired"); only the file is deleted. A reported random
+        # chat keeps its files as evidence until the chat itself is purged.
+        keep = timedelta(days=settings.VCHAT["MEDIA_KEEP_DAYS"])
+        expired = (
+            Attachment.objects.exclude(file="")
+            .filter(used_at__isnull=False, created_at__lt=now - keep)
+            .exclude(stranger_message__session_id__in=reported_sessions)
+        )
+        count = expired.count()
+        freed = sum(expired.values_list("size", flat=True)) if count else 0
         if not dry_run:
-            for a in timed.iterator():
+            for a in expired.iterator():
                 a.file.delete(save=False)
                 Attachment.objects.filter(pk=a.pk).update(file="")
-        self.report("disappearing media files", count)
+        self.report(f"media files older than {keep.days} days ({freed / 1_048_576:.1f} MB)", count)
 
         if dry_run:
             self.report("accounts", User.objects.filter(delete_after__lte=now, deleted_at__isnull=True).count())
