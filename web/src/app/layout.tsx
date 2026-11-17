@@ -27,6 +27,8 @@ export const metadata: Metadata = {
     icon: [{ url: "/brand/favicon-64.png", type: "image/png", sizes: "64x64" }],
     apple: "/app-icon/apple",
   },
+  // Google AdSense site ownership (the publisher id is public; ads.txt in /public says the same).
+  other: { "google-adsense-account": "ca-pub-6569325659953207" },
 };
 
 export const viewport: Viewport = {
