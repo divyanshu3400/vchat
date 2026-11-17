@@ -1,0 +1,106 @@
+/* Responsive fixes and the responsive frame (breakpoints, wide screens, info panel). Part of chat.css; order matters. */
+/* ======================= Phase 1 responsive fixes ======================= */
+/* Room invite card: icon, name and button in a row when the bubble has room. When it doesn't (a
+   320px window, a tablet panel), the button wraps under the name and takes the full width, so the
+   name is never crushed. Flex-wrap reacts to the card's own width, wherever it is. */
+.invite-card { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; width: 300px; max-width: 100%; }
+.invite-card .invite-emoji { flex: 0 0 auto; }
+.invite-card .invite-text { flex: 999 1 80px; min-width: 0; }
+.invite-card .invite-join { flex: 1 0 auto; justify-content: center; }
+/* A message that is only the invite: the card is the bubble. */
+.bubble.has-card { padding: 4px; }
+.bubble.has-card .invite-card { border: 0; background: transparent; padding: 8px; }
+
+/* Long statuses in headers end in "…" instead of being cut mid-word. */
+.screen-sub > span, .win-title small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Open chat windows sit beside the page on laptops, not on top of its typing box. */
+@media (min-width: 1100px) {
+  .app .screen { padding-right: var(--dock-w, 0px); transition: padding-right 0.2s ease; }
+}
+
+/* Tap targets in windows and menus: at least 36-40px. */
+.win .composer .icon-btn, .win .attach-btn, .input-attach .icon-btn { min-width: 36px; min-height: 36px; }
+/* In a chat window the menu hangs from the window's header, so it stays inside the window. */
+.win-head { position: relative; }
+.win-head .menu-wrap { position: static; }
+.win-head .menu-wrap .dd { right: 6px; left: 6px; top: calc(100% + 4px); width: auto; max-height: 70vh; overflow-y: auto; }
+/* A long room name gets two lines before it is cut. */
+.invite-card .invite-text b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
+.sys-line.autodel-line { min-height: 36px; display: inline-flex; align-items: center; gap: 6px; }
+
+/* ======================= Phase 2: responsive frame =======================
+   Breakpoints (one set, used everywhere):
+     < 768        phone: one screen at a time, tab bar
+     768–1023     tablet: rail + list; inside a conversation the chat gets the whole width
+     1024–1439    laptop: rail + list + chat
+     ≥ 1440       wide: wider list; chats show an info panel on the right
+     ≥ 1800/2300  big monitors: the whole UI scales up a little
+   Inside the screen, layout follows the space the screen really has (@container screen). */
+
+/* Tablet: in a conversation, hide the list so the chat isn't squeezed to 400px. Back goes to it. */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .app.in-conversation { grid-template-columns: 76px minmax(0, 1fr); grid-template-areas: "rail screen"; }
+  .app.in-conversation .list-pane { display: none; }
+  .app.in-conversation .back-btn { display: inline-flex; }
+}
+
+/* Wide screens: a roomier list. */
+@media (min-width: 1440px) {
+  .app { grid-template-columns: 84px 380px minmax(0, 1fr); }
+  .app.ads-on { grid-template-columns: 84px 380px minmax(0, 1fr) 332px; }
+}
+
+/* Big monitors: scale the whole interface instead of leaving tiny text in a sea of space. */
+@media (min-width: 1800px) { :root { --ui-zoom: 1.08; } }
+@media (min-width: 2300px) { :root { --ui-zoom: 1.22; } }
+@media (min-width: 1800px) {
+  .app { zoom: var(--ui-zoom); height: calc(var(--app-h, 100dvh) / var(--ui-zoom)); }
+  .dock { zoom: var(--ui-zoom); }
+}
+
+/* Long lines are hard to read: the chat column stops at ~880px and sits in the middle. */
+@container screen (min-width: 1000px) {
+  .conversation .messages { padding-inline: max(22px, calc((100% - 880px) / 2)); }
+  .conversation .composer-wrap { padding-inline: max(0px, calc((100% - 900px) / 2)); }
+  /* The divider above the typing box still runs the full width. */
+  .conversation .composer-wrap { border-top: 1px solid var(--line); }
+  .conversation .composer-wrap .composer { border-top: 0; }
+}
+
+/* Hover tools (react / reply) float beside the bubble instead of taking its width. */
+@media (hover: hover) {
+  .m-row .m-tools { position: absolute; top: 50%; translate: 0 -50%; left: calc(100% + 4px); }
+  .m.me .m-row .m-tools { left: auto; right: calc(100% + 4px); }
+}
+
+/* Info panel on the right of a conversation (profile, room members), wide screens only. */
+.info-panel { display: none; }
+@container screen (min-width: 1040px) {
+  .conversation:has(> .info-panel) { padding-right: 320px; }
+  .conversation > .info-panel { display: flex; position: absolute; top: 0; right: 0; bottom: 0; width: 320px; z-index: 3; flex-direction: column; background: var(--surface); border-left: 1px solid var(--line); overflow-y: auto; }
+}
+.info-head { display: flex; align-items: center; min-height: 60px; padding: 10px 18px; border-bottom: 1px solid var(--line); font-weight: 800; font-size: 15px; flex: none; }
+.info-body { display: grid; gap: 18px; padding: 20px 18px 28px; align-content: start; }
+.info-who { display: grid; justify-items: center; gap: 6px; text-align: center; }
+.info-who h2 { font-size: 20px; font-weight: 800; margin-top: 6px; overflow-wrap: anywhere; }
+.info-who .muted-text { font-size: 13px; }
+.info-handle { color: var(--brand); font-weight: 700; font-size: 14px; }
+.info-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.info-actions button { appearance: none; border: 1px solid var(--line); background: var(--bg); color: var(--fg); font: inherit; font-size: 12.5px; font-weight: 700; border-radius: 14px; padding: 10px 4px; display: grid; justify-items: center; gap: 4px; cursor: pointer; }
+.info-actions button:hover { border-color: var(--brand); color: var(--brand); }
+.info-section { display: grid; gap: 8px; }
+.info-section > b { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-family: var(--mono); }
+.info-section p { font-size: 14px; color: var(--muted); line-height: 1.5; }
+.info-members { display: grid; gap: 2px; }
+.info-members .room-member { padding: 6px 0; }
+/* The card decides by its own width: under ~245px inside, Join/Open goes on its own row. */
+.invite-card:not(.loading):not(.gone) { container-type: inline-size; }
+@container (max-width: 245px) {
+  .invite-card .invite-join { flex-basis: 100%; }
+}
+
+/* What the landing page's old global .composer rules used to add by accident, kept on purpose:
+   a solid paper plane on the send button, and a line between random chat's buttons and the input. */
+.send-btn .icon { fill: currentColor; }
+.composer2 .composer-strip + .composer { border-top: 1px solid var(--line); }

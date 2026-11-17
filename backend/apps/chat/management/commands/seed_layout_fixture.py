@@ -59,6 +59,16 @@ class Command(BaseCommand):
             for text in ["hey", "how are you doing today? " * 3]:
                 social.send_dm(me, friend.id, text)
 
+        # An emoji-only message (shown big) and a deleted one, in both directions.
+        if not DirectMessage.objects.filter(sender=friend, content="😂🔥").exists():
+            from django.utils import timezone
+
+            social.send_dm(friend, me.id, "😂🔥")
+            social.send_dm(me, friend.id, "🎉")
+            for sender, recipient in ((friend, me), (me, friend)):
+                social.send_dm(sender, recipient.id, "this one gets deleted")
+            DirectMessage.objects.filter(content="this one gets deleted").update(deleted_at=timezone.now())
+
         data = {"login": me.handle, "password": PASSWORD, "friend_id": friend.id, "room_slug": room.slug, "invite_code": room.invite_code}
         if opts.get("out"):
             Path(opts["out"]).write_text(json.dumps(data, indent=2), encoding="utf-8")

@@ -1,0 +1,125 @@
+/* Watch together, saving an account, Me screen pieces. Part of chat.css; order matters. */
+/* ======================= watch together (YouTube) ======================= */
+.watch { flex: none; background: #000; border-bottom: 1px solid var(--line); }
+.watch-bar { display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.watch-live { width: 9px; height: 9px; border-radius: 50%; background: #e62117; flex: none; animation: pulse 1.6s infinite; }
+.watch-title { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.watch-title b { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-title small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-bar .icon-btn { width: 34px; height: 34px; border-radius: 10px; }
+.watch-frame { position: relative; aspect-ratio: 16 / 9; max-height: 34vh; width: 100%; margin: 0 auto; background: #000; }
+.watch-host, .watch-host > div, .watch-host iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+/* Hidden, not removed: the sound keeps playing while you read the chat. */
+.watch.min .watch-frame { height: 0; aspect-ratio: auto; overflow: hidden; }
+.watch-tap { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 10px; border: 0; cursor: pointer; font: inherit; font-weight: 800; font-size: 16px; color: #fff; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(2px); }
+.watch-error { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; text-align: center; color: #fff; background: #111; font-size: 14px; }
+.watch-error a { color: #fff; font-weight: 800; background: #e62117; padding: 7px 14px; border-radius: 999px; text-decoration: none; }
+.win .watch-frame { max-height: 180px; }
+@media (min-width: 768px) { .watch-frame { max-height: 42vh; } }
+
+.yt-together { appearance: none; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 800; background: #e62117; color: #fff; }
+.watch-start-title { display: block; font-family: var(--display); font-size: 18px; margin-bottom: 4px; color: var(--fg); }
+.watch-start p b.watch-start-title { margin-top: 0; font-size: 18px; font-family: var(--display); color: var(--fg); }
+.watch-input { width: 100%; font: inherit; font-size: 16px; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); outline: none; }
+.watch-input:focus { border-color: var(--brand); }
+.watch-start .go:disabled { opacity: 0.5; cursor: default; }
+
+/* Me: save a guest account */
+.save-card { background: linear-gradient(160deg, var(--brand-soft), var(--surface)); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); border-radius: 20px; padding: 18px; display: grid; gap: 10px; }
+.save-card h2 { font-family: var(--display); font-size: 20px; }
+.save-card p { color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+/* media keeps a fixed frame in the chat; the whole thing opens on tap */
+.media-photo { max-height: 300px; }
+.media-video { max-height: 300px; object-fit: contain; }
+.win .media-photo { width: min(220px, 62vw); max-height: 240px; }
+.lightbox img { object-fit: contain; cursor: default; }
+.lightbox-close { background: rgba(0, 0, 0, 0.45); border-radius: 50%; }
+
+/* nudges: one small card at a time (install the app, then notifications) */
+.nudge { position: fixed; z-index: 45; left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; align-items: center; padding: 14px; background: var(--surface); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); border-radius: 20px; box-shadow: var(--shadow); animation: sheet-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.nudge-icon { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); font-size: 22px; grid-row: span 2; align-self: start; }
+.nudge-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nudge-text b { font-size: 15px; }
+.nudge-text span { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.nudge-actions { display: flex; gap: 8px; }
+@media (min-width: 768px) { .nudge { left: auto; right: 24px; bottom: 24px; width: 380px; } }
+.app.kb-open ~ .nudge { display: none; }
+
+.settings-title { font-family: var(--display); font-size: 17px; padding: 4px 4px 0; }
+.settings-tip { font-size: 12.5px; color: var(--muted); line-height: 1.5; padding: 0 4px; }
+.ios-steps { display: grid; gap: 12px; margin: 4px 0 6px; padding: 0; list-style: none; counter-reset: step; }
+.ios-steps li { display: flex; align-items: center; gap: 12px; font-size: 15px; }
+.ios-step-icon { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); flex: none; font-weight: 800; }
+.ios-guide h2 { margin-bottom: 6px; }
+
+/* conversation bar: back · person · the few actions that matter; nothing gets squeezed */
+.head-who { appearance: none; border: 0; background: transparent; padding: 0; margin: 0; font: inherit; color: inherit; text-align: left; display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; cursor: default; }
+button.head-who { cursor: pointer; border-radius: 12px; }
+button.head-who:active { background: var(--surface-2); }
+.convo-head { gap: 4px; min-height: 56px; padding-top: max(6px, env(safe-area-inset-top, 0px)); padding-bottom: 6px; padding-left: max(4px, env(safe-area-inset-left, 0px)); }
+.convo-head .screen-title h1 { font-size: 17px; }
+.convo-head .screen-sub { font-family: var(--body); font-size: 12.5px; }
+.convo-head .screen-actions { gap: 0; }
+.convo-head .screen-actions .icon-btn { width: 40px; height: 40px; }
+.back-btn { position: relative; }
+.back-badge { position: absolute; top: 2px; right: -2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--brand); color: var(--on-brand); font-size: 10.5px; font-family: var(--mono); display: grid; place-items: center; }
+
+/* person card (tap the name in a chat) and the auto-delete chips */
+.profile-sheet { display: grid; gap: 16px; }
+.profile-top { display: flex; align-items: center; gap: 14px; }
+.profile-top h2 { font-family: var(--display); font-size: 22px; }
+.profile-actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.profile-actions button { appearance: none; border: 1px solid var(--line); background: var(--bg); color: var(--brand); font: inherit; font-weight: 800; font-size: 13px; border-radius: 14px; padding: 12px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.menu-group { display: grid; gap: 8px; padding: 8px 10px; }
+.menu-label { font-size: 12px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.menu-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.menu-chips button { appearance: none; border: 1px solid var(--line); background: var(--surface); color: var(--fg); font: inherit; font-size: 13px; font-weight: 700; border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.menu-chips button.on { background: var(--brand); border-color: var(--brand); color: var(--on-brand); }
+.menu-hint { font-size: 12px; color: var(--muted); }
+.autodel-line { appearance: none; background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.setting-note { animation: fade-in 0.2s ease, note-out 0.4s ease 4s forwards; }
+@keyframes note-out { to { opacity: 0; } }
+
+/* someone else's photo or video: nothing loads until "View" */
+.media-ask { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; width: min(260px, 78cqi); padding: 10px; border-radius: 14px; background: var(--bg); border: 1px dashed color-mix(in srgb, var(--brand) 40%, var(--line)); color: var(--fg); }
+.media-ask-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); }
+.media-ask-text { display: flex; flex-direction: column; min-width: 0; }
+.media-ask-text b { font-size: 14.5px; }
+.media-ask-text small { font-size: 12px; color: var(--muted); }
+.media-ask-actions { grid-column: 1 / -1; display: flex; gap: 8px; }
+.media-ask-actions .pill-btn { flex: 1; justify-content: center; }
+.media-declined { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; font-style: italic; color: var(--muted); padding: 4px 6px; }
+.media-declined .inline-link { font-style: normal; font-size: 12.5px; }
+
+/* a friend's message while you're elsewhere */
+.msg-banner { position: fixed; z-index: 85; top: calc(8px + env(safe-area-inset-top, 0px)); left: 50%; translate: -50% 0; width: min(420px, calc(100vw - 16px)); display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 18px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px); box-shadow: var(--shadow); font: inherit; color: var(--fg); text-align: left; cursor: pointer; animation: banner-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both, banner-out 0.3s ease 4.2s forwards; }
+.msg-banner-text { display: flex; flex-direction: column; min-width: 0; }
+.msg-banner-text b { font-size: 14px; }
+.msg-banner-text span { font-size: 13.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes banner-in { from { transform: translateY(-120%); opacity: 0; } }
+@keyframes banner-out { to { transform: translateY(-120%); opacity: 0; } }
+
+/* random chat safety */
+.safety-tip { align-self: center; display: flex; gap: 8px; align-items: flex-start; max-width: 520px; margin: 6px 0 4px; padding: 10px 12px; border-radius: 14px; font-size: 12.5px; line-height: 1.5; color: var(--muted); background: color-mix(in srgb, var(--amber) 9%, var(--surface)); border: 1px solid color-mix(in srgb, var(--amber) 28%, var(--line)); }
+.safety-tip .icon { color: var(--amber); margin-top: 2px; }
+.safety-tip a { color: var(--brand); font-weight: 700; }
+.contact-flag { display: flex; align-items: center; gap: 5px; margin: 4px 8px 0; font-size: 11.5px; font-weight: 700; color: var(--danger); }
+.contact-guard .guard-title { display: block; font-family: var(--display); font-size: 18px; color: var(--fg); margin: 0 0 4px; word-break: normal; }
+.link-guard .go.warn { background: var(--danger); border-color: var(--danger); color: #fff; }
+.ended-card { align-self: center; display: grid; gap: 10px; justify-items: center; text-align: center; max-width: 420px; margin: 18px 0; padding: 18px; border-radius: 18px; background: var(--surface); border: 1px solid var(--line); }
+.ended-card b { font-size: 15px; }
+.ended-card span { font-size: 13.5px; color: var(--muted); line-height: 1.5; }
+.shield-btn { padding: 0 10px; color: var(--danger) !important; }
+
+/* chat wallpaper: a soft doodle tile behind the messages (light and dark) */
+:root { --wall-ink: #0e8a5a; --wall-alpha: 0.075; }
+:root[data-theme="dark"] { --wall-ink: #3dd598; --wall-alpha: 0.06; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --wall-ink: #3dd598; --wall-alpha: 0.06; } }
+.conversation, .win { isolation: isolate; }
+.conversation::before, .win::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--wall-ink); opacity: var(--wall-alpha);
+  -webkit-mask: url("/chat-wallpaper.svg") 0 0 / 280px 280px repeat; mask: url("/chat-wallpaper.svg") 0 0 / 280px 280px repeat;
+}
+.conversation .messages, .win .messages { background: transparent; }
