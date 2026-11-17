@@ -23,7 +23,7 @@ export default defineConfig({
   use: {
     baseURL: process.env.LAYOUT_BASE_URL ?? "http://localhost:3100",
     channel: process.env.LAYOUT_BROWSER ?? "chrome",
-    reducedMotion: "reduce",
+    contextOptions: { reducedMotion: "reduce" },
   },
   projects: SIZES.map(({ name, width, height, isMobile, hasTouch }) => ({
     name,
