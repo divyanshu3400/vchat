@@ -532,9 +532,56 @@ export default function DmConversation({ userId, variant = "page", minimized = f
     );
   }
 
+  // Wide screens: who you're talking to, on the right (the page view only, not windows).
+  const infoPanel = !isWindow && partner && (
+    <aside className="info-panel" aria-label={`About ${name}`}>
+      <div className="info-head">Contact info</div>
+      <div className="info-body">
+        <div className="info-who">
+          <Avatar id={userId} name={name} size={96} online={isFriend ? partnerOnline : undefined} />
+          <h2>{name}</h2>
+          {partner.handle && <span className="info-handle">@{partner.handle}</span>}
+          <span className="muted-text">{isFriend ? status : "Not friends yet"}</span>
+        </div>
+        {isFriend && (
+          <div className="info-actions">
+            <button type="button" onClick={() => startCall(partner, "voice")}>
+              <Icon name="phone" size={18} /> Call
+            </button>
+            <button type="button" onClick={() => startCall(partner, "video")}>
+              <Icon name="video" size={18} /> Video
+            </button>
+            <button type="button" onClick={() => setWatchSheet(true)}>
+              <Icon name="play" size={18} /> Watch
+            </button>
+          </div>
+        )}
+        {isFriend && (
+          <div className="info-section">
+            <b>Disappearing messages</b>
+            <div className="dd-seg">
+              {AUTO_DELETE_DAYS.map((d) => (
+                <button key={d} type="button" className={d === autoDelete ? "on" : ""} aria-pressed={d === autoDelete} onClick={() => chooseAutoDelete(d)}>
+                  {AUTO_DELETE_SHORT[d]}
+                </button>
+              ))}
+            </div>
+            <p>Messages delete for both of you after this. Either of you can change it.</p>
+          </div>
+        )}
+        <div className="info-section">
+          <button type="button" className="pill-btn danger-text" onClick={() => setConfirming("block")}>
+            <Icon name="ban" size={15} /> Block {name}
+          </button>
+        </div>
+      </div>
+    </aside>
+  );
+
   return (
     <div className={isWindow ? `win${minimized ? " min" : ""}` : "conversation"}>
       {header}
+      {!minimized && infoPanel}
       {!minimized && (
         <>
           {confirmBar}

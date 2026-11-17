@@ -25,6 +25,7 @@ import MessageList, { JumpToLatest, type Msg, type MsgAction } from "./messages/
 import { useStickyScroll } from "./messages/useStickyScroll";
 import { useRouter } from "next/navigation";
 import { Icon } from "./bits";
+import RoomInfoPanel from "./rooms/RoomInfoPanel";
 import RoomInfoSheet from "./rooms/RoomInfoSheet";
 
 type Status = "connecting" | "live" | "reconnecting" | "missing";
@@ -300,6 +301,7 @@ export default function ChatRoom({ slug }: { slug: string }) {
           </>
         }
       />
+      <RoomInfoPanel slug={slug} custom={info} hereNow={hereNow} onInvite={() => setSheet(true)} />
       {/* Phone only: below the header, away from the typing box (no accidental taps). */}
       <AdSlot kind="anchor" className="room-anchor" />
 

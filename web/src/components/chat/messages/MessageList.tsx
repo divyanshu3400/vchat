@@ -419,10 +419,16 @@ export default function MessageList({ items, me, showNames, stranger, onReact, o
 
   const openMenu = useCallback(
     (m: Msg, el: HTMLElement) => {
-      const r = el.getBoundingClientRect();
+      // Big monitors scale the app with CSS zoom: rectangles come in screen pixels, the menu is
+      // placed in the app's own (unzoomed) pixels, so convert.
+      const z = parseFloat(getComputedStyle(el.closest(".app") ?? document.documentElement).zoom) || 1;
+      const b = el.getBoundingClientRect();
+      const r = { left: b.left / z, right: b.right / z, top: b.top / z, bottom: b.bottom / z };
+      const vw = window.innerWidth / z;
+      const vh = window.innerHeight / z;
       const width = 280;
-      const left = Math.min(Math.max(8, m.mine ? r.right - width : r.left), window.innerWidth - width - 8);
-      const below = r.bottom + 260 < window.innerHeight;
+      const left = Math.min(Math.max(8, m.mine ? r.right - width : r.left), vw - width - 8);
+      const below = r.bottom + 260 < vh;
       const style = { "--x": `${left}px`, "--y": `${below ? r.bottom + 6 : Math.max(8, r.top - 260)}px` } as CSSProperties;
       setMenu({ m, style, mine: myReaction(m, meId), confirmDelete: false, picker: false, at: Date.now() });
     },
