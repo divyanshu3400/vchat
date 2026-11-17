@@ -27,12 +27,15 @@ export default function JoinForm() {
   const [room, setRoom] = useState<string | null>(null);
   // An invite link opened before signing up comes here as /?invite=<code>#join.
   const [invite, setInvite] = useState<string | null>(null);
-  const destination = invite ? `/chat/join/${invite}` : room ? `/chat/${room}` : "/chat";
+  // "Start a random chat" links come here as /?go=stranger#join.
+  const [goRandom, setGoRandom] = useState(false);
+  const destination = invite ? `/chat/join/${invite}` : room ? `/chat/${room}` : goRandom ? "/chat/stranger" : "/chat";
 
   useEffect(() => {
     // Room pages link here as /?room=<slug>#join.
     const wanted = new URLSearchParams(window.location.search).get("room");
     const valid = wanted && findRoom(wanted) ? wanted : null;
+    const random = new URLSearchParams(window.location.search).get("go") === "stranger";
     const code = new URLSearchParams(window.location.search).get("invite");
     const inviteCode = code && /^[A-Za-z0-9_-]{6,16}$/.test(code) ? code : null;
     let cancelled = false;
@@ -40,6 +43,7 @@ export default function JoinForm() {
       .then((session) => {
         if (cancelled) return;
         if (valid) setRoom(valid);
+        if (random) setGoRandom(true);
         if (inviteCode) setInvite(inviteCode);
         if (session) {
           setExisting(session.user);

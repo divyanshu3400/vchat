@@ -327,3 +327,28 @@ div.handle-status { display: grid; gap: 8px; }
 .handle-chip:hover { background: color-mix(in srgb, var(--brand) 16%, var(--surface)); }
 .join-status { display: grid; gap: 4px; min-height: 18px; }
 .join .input[aria-invalid="true"] { border-color: var(--danger, #d9435f); }
+
+/* Search landing pages (app/[topic]) */
+.seo-hero { max-width: 760px; padding-block: 48px 28px; display: grid; gap: 4px; }
+.seo-hero h1 { font-size: clamp(38px, 6vw, 68px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; margin-top: 14px; }
+.seo-hero .lede { max-width: 52ch; }
+.seo-ctas { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 26px; }
+.seo-ctas .cta { gap: 14px; }
+.pill-link { text-decoration: none; font-weight: 700; color: var(--brand); border: 1px solid color-mix(in srgb, var(--brand) 40%, var(--line)); border-radius: 999px; padding: 12px 18px; }
+.pill-link:hover { background: color-mix(in srgb, var(--brand) 8%, transparent); }
+.seo-points { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-block: 24px 8px; }
+.seo-point { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px 20px; }
+.seo-point h2 { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; }
+.seo-point p { color: var(--muted); font-size: 15px; margin-top: 6px; line-height: 1.55; }
+.seo-section { max-width: 760px; padding-block: 28px; }
+.seo-section h2 { font-size: clamp(24px, 3.2vw, 34px); font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+.seo-section p { color: var(--muted); font-size: 17px; line-height: 1.7; margin-top: 10px; }
+.faq-list details { border-bottom: 1px solid var(--line); padding-block: 16px; }
+.faq-list summary { cursor: pointer; list-style: none; font-weight: 700; font-size: 17px; display: flex; justify-content: space-between; gap: 16px; }
+.faq-list summary::-webkit-details-marker { display: none; }
+.faq-list summary::after { content: "+"; color: var(--brand); font-size: 22px; line-height: 1; transition: transform 0.2s; }
+.faq-list details[open] summary::after { transform: rotate(45deg); }
+.faq-list details p { margin-top: 8px; }
+.foot-popular { width: 100%; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; }
+.foot-popular a { color: var(--muted); text-decoration: none; }
+.foot-popular a:hover { color: var(--brand); }

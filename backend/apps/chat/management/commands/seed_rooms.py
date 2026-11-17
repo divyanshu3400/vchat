@@ -18,6 +18,7 @@ REGIONS = [
 TOPICS = [
     ("random", "Random chat"),
     ("late-night", "Late-night talks"),
+    ("hindi", "Hindi & Hinglish"),
     ("music", "Music"),
     ("gaming", "Gaming"),
     ("movies-tv", "Movies & TV"),

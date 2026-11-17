@@ -20,6 +20,7 @@ export const REGION_ROOMS: RegionRoom[] = [
 export const TOPIC_ROOMS: TopicRoom[] = [
   { slug: "random", name: "Random chat", blurb: "Anything goes (within the rules). The busiest room on vChat." },
   { slug: "late-night", name: "Late-night talks", blurb: "Can't sleep? Neither can they." },
+  { slug: "hindi", name: "Hindi & Hinglish", blurb: "Baat karo apni bhasha mein: Hindi, Hinglish, ya jo bhi chale." },
   { slug: "music", name: "Music", blurb: "Share what's on repeat and find your next favourite song." },
   { slug: "gaming", name: "Gaming", blurb: "Find a squad, talk patch notes, argue about the best game ever." },
   { slug: "movies-tv", name: "Movies & TV", blurb: "What to watch next, and spoiler-free reviews." },

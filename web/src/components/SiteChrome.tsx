@@ -2,6 +2,7 @@ import Link from "next/link";
 import SharedAdSlot from "./AdSlot";
 import { OnlineTotal } from "./LiveCounts";
 import ThemeToggle from "./ThemeToggle";
+import { SEARCH_PAGES } from "@/lib/searchPages";
 
 export function Logo() {
   return (
@@ -50,6 +51,13 @@ export function SiteFooter() {
           <li><Link href="/report">Report abuse</Link></li>
           <li><Link href="/contact">Contact</Link></li>
         </ul>
+        <nav className="foot-popular" aria-label="Popular">
+          {SEARCH_PAGES.map((p) => (
+            <Link key={p.slug} href={`/${p.slug}`}>
+              {p.h1}
+            </Link>
+          ))}
+        </nav>
       </div>
     </footer>
   );

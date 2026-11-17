@@ -12,9 +12,9 @@ const FAQ = [
   ["Is vChat free?", "Yes. Chat rooms, private messages, friends and calls are all free. The site is supported by ads."],
   [
     "Do I need to register?",
-    "No. Pick a nickname and you're in. To keep your friends and log in on another phone or laptop, save your account with an email and a password whenever you like.",
+    "No. Pick a nickname and you're in. To keep your friends and log in on another phone or laptop, save your account with a username and a password whenever you like. An email is optional.",
   ],
-  ["Who can join?", "Anyone aged 18 or older, from any country. Rooms are in English, grouped by region and by topic."],
+  ["Who can join?", "Anyone aged 18 or older, from any country. Rooms are grouped by region and by topic, and there is a Hindi & Hinglish room too."],
   [
     "Is it safe to chat with strangers here?",
     "Every room has moderators, spam is filtered automatically, and you can block or report anyone in one tap. Never share your address, phone number or money with people you meet online.",

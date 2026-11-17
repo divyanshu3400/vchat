@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { setPlus } from "@/lib/plus";
 import AccountSheet from "@/components/account/AccountSheet";
@@ -605,7 +606,7 @@ export default function ChatProvider({ children }: { children: React.ReactNode }
           <h1>Account banned</h1>
           <p>{banned}</p>
           <p>
-            <a href="/rules">Chat rules</a> · <a href="/contact">Contact us</a>
+            <Link href="/rules">Chat rules</Link> · <Link href="/contact">Contact us</Link>
           </p>
         </div>
       </div>

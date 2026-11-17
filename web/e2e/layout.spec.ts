@@ -57,6 +57,9 @@ test.describe("public pages", () => {
     ["home", "/"],
     ["login", "/login"],
     ["invite", "/r/{code}"],
+    ["seo-india", "/talk-to-strangers-india"],
+    ["seo-hindi", "/hindi-chat-room"],
+    ["room-page", "/rooms/hindi"],
   ] as const) {
     test(label, async ({ page }) => {
       await page.goto(path.replace("{code}", fx.invite_code));
