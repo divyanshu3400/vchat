@@ -50,6 +50,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; }
+html, body { overflow-x: clip; }
 body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.6; overflow-x: hidden; }
 a { color: inherit; }
 h1, h2, h3 { font-family: var(--display); line-height: 1.05; margin: 0; text-wrap: balance; }
@@ -61,7 +62,7 @@ p { margin: 0; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--online) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 8px transparent; } }
 
 /* ---------- nav ---------- */
-.site-header { position: relative; z-index: 2; }
+.site-header { position: relative; z-index: 2; overflow-x: clip; }
 .glow { position: absolute; inset: -20% -10% auto; height: 780px; pointer-events: none; z-index: 0;
   background: radial-gradient(520px 380px at 78% 30%, var(--glow-a), transparent 70%), radial-gradient(420px 300px at 18% 12%, var(--glow-b), transparent 70%); filter: blur(10px); }
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 22px; position: relative; }

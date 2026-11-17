@@ -169,7 +169,7 @@
 
 /* ---------- conversation (room or DM) ---------- */
 .conversation { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--bg); }
-.messages { flex: 1; min-height: 0; overflow-y: auto; padding: 14px max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 8px; overscroll-behavior: contain; }
+.messages { container: chat / inline-size; flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 14px max(12px, env(safe-area-inset-right, 0px)) 10px max(12px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 8px; overscroll-behavior: contain; }
 .messages .b { animation: none; max-width: min(78%, 560px); }
 .messages .b:last-child { animation: bubble-in 0.25s ease both; }
 .b .when { font-size: 10.5px; color: var(--faint); font-family: var(--mono); }
@@ -443,7 +443,7 @@ button.chip { appearance: none; font: inherit; font-size: 13px; font-weight: 700
 .m:not(.me) .warm-cheer { background: linear-gradient(transparent 55%, color-mix(in srgb, var(--brand) 22%, transparent) 0); }
 .m.me .warm { text-decoration: underline wavy color-mix(in srgb, var(--on-brand) 55%, transparent); text-underline-offset: 3px; }
 
-.yt-card { display: block; margin-top: 6px; border-radius: 12px; overflow: hidden; position: relative; max-width: 280px; text-decoration: none; color: #fff; background: #000; }
+.yt-card { display: block; margin-top: 6px; border-radius: 12px; overflow: hidden; position: relative; width: min(280px, 78cqi); max-width: 100%; text-decoration: none; color: #fff; background: #000; }
 .yt-card img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
 .yt-card span { position: absolute; left: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px; background: #e62117; color: #fff; font-size: 11.5px; font-weight: 800; padding: 3px 8px; border-radius: 6px; }
 
@@ -662,7 +662,7 @@ button.head-who:active { background: var(--surface-2); }
 @keyframes note-out { to { opacity: 0; } }
 
 /* someone else's photo or video: nothing loads until "View" */
-.media-ask { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; width: min(260px, 64vw); padding: 10px; border-radius: 14px; background: var(--bg); border: 1px dashed color-mix(in srgb, var(--brand) 40%, var(--line)); color: var(--fg); }
+.media-ask { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: center; width: min(260px, 78cqi); padding: 10px; border-radius: 14px; background: var(--bg); border: 1px dashed color-mix(in srgb, var(--brand) 40%, var(--line)); color: var(--fg); }
 .media-ask-icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); }
 .media-ask-text { display: flex; flex-direction: column; min-width: 0; }
 .media-ask-text b { font-size: 14.5px; }
@@ -709,7 +709,7 @@ button.head-who:active { background: var(--surface-2); }
 .dock .win { width: 320px; height: calc(100dvh - 16px); max-height: 860px; border-radius: 16px 16px 0 0; border-bottom: 0; }
 .dock .win.min { height: auto; }
 .dock .win-head { min-height: 54px; padding: 8px 4px 8px 10px; gap: 6px; }
-.dock .win-head .icon-btn { width: 32px; height: 32px; }
+.dock .win-head .icon-btn { width: 32px; height: 32px; }  /* windows are a mouse-only (laptop) layout */
 .dock .win-head .pill-btn.add-friend { padding: 4px 9px; }
 .dock .win-head .pill-btn.add-friend span { display: none; }
 .dock .win .composer-strip { padding-top: 6px; }
@@ -822,7 +822,7 @@ button.head-who:active { background: var(--surface-2); }
 }
 
 /* --- disappearing media: the bubble ---------------------------------------------------- */
-.timed { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: min(250px, 64vw); padding: 8px; border-radius: 14px; background: var(--bg); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); color: var(--fg); }
+.timed { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; width: min(250px, 78cqi); padding: 8px; border-radius: 14px; background: var(--bg); border: 1px solid color-mix(in srgb, var(--brand) 30%, var(--line)); color: var(--fg); }
 .timed.spent { border-style: dashed; color: var(--muted); }
 .timed-icon { position: relative; width: 42px; height: 42px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand); }
 .timed.spent .timed-icon { background: color-mix(in srgb, var(--muted) 14%, transparent); color: var(--muted); }
@@ -892,8 +892,8 @@ button.head-who:active { background: var(--surface-2); }
 .dd-sep { height: 1px; margin: 4px 8px; background: var(--line); }
 .dd-group { display: grid; gap: 8px; padding: 8px; }
 .dd-group-head { display: flex; align-items: center; gap: 12px; }
-.dd-seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface-2); }
-.dd-seg button { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 800; padding: 7px 0; border-radius: 9px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.dd-seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(58px, 1fr)); gap: 2px; padding: 3px; border-radius: 12px; background: var(--surface-2); }
+.dd-seg button { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 800; padding: 8px 4px; min-height: 34px; border-radius: 9px; cursor: pointer; transition: background 0.15s, color 0.15s; white-space: nowrap; }
 .dd-seg button.on { background: var(--surface); color: var(--brand); box-shadow: 0 1px 3px rgba(6, 30, 18, 0.15); }
 .dd-back { appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 800; letter-spacing: 0.02em; display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px 8px; cursor: pointer; text-transform: uppercase; }
 .dd-back svg { transform: none; }
@@ -985,7 +985,7 @@ html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); 
 .gif-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gif-note { column-span: all; text-align: center; color: var(--muted); font-size: 13px; padding: 18px 8px; }
 .gif-credit { margin: 0; text-align: right; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
-.gif-msg { appearance: none; position: relative; display: block; width: min(220px, 60vw); max-height: 320px; padding: 0; border: 0; border-radius: 14px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; }
+.gif-msg { appearance: none; position: relative; display: block; width: min(220px, 70cqi); max-height: 320px; padding: 0; border: 0; border-radius: 14px; overflow: hidden; background: var(--surface-2); cursor: zoom-in; }
 .gif-msg img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .gif-badge { position: absolute; left: 6px; bottom: 6px; font-size: 10px; font-weight: 900; letter-spacing: 0.06em; color: #fff; background: rgba(0, 0, 0, 0.45); padding: 2px 5px; border-radius: 5px; }
 
@@ -1160,3 +1160,34 @@ html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); 
 .messages > .fade-away { align-self: center; max-width: 90%; }
 .m-card:empty { display: none; }
 @media (prefers-reduced-motion: reduce) { .fade-away { transition: none; } }
+
+
+/* ======================= Phase 1 responsive fixes ======================= */
+/* Room invite card: icon, name and button in a row when the bubble has room. When it doesn't (a
+   320px window, a tablet panel), the button wraps under the name and takes the full width, so the
+   name is never crushed. Flex-wrap reacts to the card's own width, wherever it is. */
+.invite-card { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; width: 300px; max-width: 100%; }
+.invite-card .invite-emoji { flex: 0 0 auto; }
+.invite-card .invite-text { flex: 999 1 80px; min-width: 0; }
+.invite-card .invite-join { flex: 1 0 auto; justify-content: center; }
+/* A message that is only the invite: the card is the bubble. */
+.bubble.has-card { padding: 4px; }
+.bubble.has-card .invite-card { border: 0; background: transparent; padding: 8px; }
+
+/* Long statuses in headers end in "…" instead of being cut mid-word. */
+.screen-sub > span, .win-title small { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Open chat windows sit beside the page on laptops, not on top of its typing box. */
+@media (min-width: 1100px) {
+  .app .screen { padding-right: var(--dock-w, 0px); transition: padding-right 0.2s ease; }
+}
+
+/* Tap targets in windows and menus: at least 36-40px. */
+.win .composer .icon-btn, .win .attach-btn, .input-attach .icon-btn { min-width: 36px; min-height: 36px; }
+/* In a chat window the menu hangs from the window's header, so it stays inside the window. */
+.win-head { position: relative; }
+.win-head .menu-wrap { position: static; }
+.win-head .menu-wrap .dd { right: 6px; left: 6px; top: calc(100% + 4px); width: auto; max-height: 70vh; overflow-y: auto; }
+/* A long room name gets two lines before it is cut. */
+.invite-card .invite-text b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.25; }
+.sys-line.autodel-line { min-height: 36px; display: inline-flex; align-items: center; gap: 6px; }

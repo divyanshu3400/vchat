@@ -140,6 +140,15 @@ function Dock({
     // The same chat open as a full page doesn't also need a window.
     id === RANDOM_WINDOW ? pathname !== "/chat/stranger" : pathname !== `/chat/dm/${id}`,
   );
+  // Tell the page how much room the open windows take, so it can keep its typing box clear of them.
+  const dockWidth = windows.length ? windows.length * (320 + 8) + 16 : 0;
+  useEffect(() => {
+    document.documentElement.style.setProperty("--dock-w", `${dockWidth}px`);
+    return () => {
+      document.documentElement.style.removeProperty("--dock-w");
+    };
+  }, [dockWidth]);
+
   if (!windows.length) return null;
 
   return (

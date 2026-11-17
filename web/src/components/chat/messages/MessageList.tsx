@@ -279,7 +279,7 @@ const Bubble = memo(function Bubble({ m, first, last, meId, meNick, showNames, s
           <Icon name="reply" size={16} />
         </span>
         <div
-          className={`bubble${jumbo ? " jumbo" : ""}${(m.attachment || gif) && !m.deleted ? " has-media" : ""}${m.deleted ? " deleted" : ""}${
+          className={`bubble${jumbo ? " jumbo" : ""}${(m.attachment || gif) && !m.deleted ? " has-media" : ""}${onlyInvite ? " has-card" : ""}${m.deleted ? " deleted" : ""}${
             m.attachment?.kind === "audio" ? " voice" : ""
           }`}
         >
