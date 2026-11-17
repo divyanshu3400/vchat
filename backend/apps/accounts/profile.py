@@ -17,16 +17,14 @@ from django.utils import timezone
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .models import User
-from .serializers import NICKNAME_RE, RESERVED
+from .names import name_problem
 
-HANDLE_RE = re.compile(r"^[a-z0-9](?:[a-z0-9_.]{1,18})[a-z0-9_]$")
 HANDLE_COOLDOWN = timedelta(days=14)
 HANDLE_HOLD = timedelta(days=14)
 NAME_CHANGES_PER_DAY = 3
 AVATAR_SIDE = 512
 AVATAR_MAX_BYTES = 8 * 1024 * 1024
 AVATAR_SALT = "vchat.avatar"
-RESERVED_HANDLES = RESERVED | {"help", "about", "settings", "root", "official", "team", "everyone", "here"}
 
 
 class ProfileError(Exception):
@@ -43,10 +41,9 @@ def set_nickname(user: User, value) -> None:
     name = str(value or "").strip()
     if name == user.nickname:
         return
-    if not NICKNAME_RE.match(name):
-        raise ProfileError("Use 3 to 18 letters, numbers, dots or underscores.", "nickname")
-    if name.lower().strip("._") in RESERVED:
-        raise ProfileError("That name is reserved. Pick another.", "nickname")
+    problem = name_problem(name, 18)
+    if problem:
+        raise ProfileError(problem, "nickname")
     key = f"profile:name:{user.pk}:{timezone.now():%Y%m%d}"
     if cache.get(key, 0) >= NAME_CHANGES_PER_DAY:
         raise ProfileError("You can change your name 3 times a day. Try again tomorrow.", "nickname")
@@ -64,10 +61,9 @@ def normalise_handle(value) -> str:
 
 def handle_problem(user: User | None, handle: str) -> str | None:
     """Why `user` (None: someone signing up) can't take `handle` right now, or None if they can."""
-    if not HANDLE_RE.match(handle) or ".." in handle:
-        return "3 to 20 letters, numbers, _ or . (not at the start or end)."
-    if handle.strip("._") in RESERVED_HANDLES or handle.startswith(("vchat", "admin")):
-        return "That username is reserved."
+    problem = name_problem(handle, 20)
+    if problem:
+        return problem
     others = User.objects.exclude(pk=user.pk) if user is not None and user.pk else User.objects.all()
     if others.filter(handle=handle).exists():
         return "That username is taken."

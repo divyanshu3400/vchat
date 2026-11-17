@@ -462,7 +462,8 @@ class AccountSaveView(APIView):
         s = UsernamePasswordSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         handle = profile.normalise_handle(s.validated_data.get("username") or user.handle)
-        problem = profile.handle_problem(user, handle)
+        # Keeping the name picked at sign-up is always fine (even one from before the current rules).
+        problem = None if handle == (user.handle or "") else profile.handle_problem(user, handle)
         if problem:
             return Response({"code": "bad_username", "field": "username", "detail": problem}, status=400)
         password = s.validated_data["password"]

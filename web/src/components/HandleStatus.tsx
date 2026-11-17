@@ -13,19 +13,22 @@ export type HandleState =
   | { kind: "taken"; note: string; suggestions: string[] }
   | { kind: "error" };
 
-const HANDLE_RE = /^[a-z0-9][a-z0-9_.]{1,18}[a-z0-9_]$/;
-
 /** The text as a @username: lowercase, no leading "@". */
 export function toHandle(text: string) {
   return text.trim().replace(/^@/, "").toLowerCase();
 }
 
 /** What's wrong with how it's written (before asking the server), or "". */
-export function handleFormatProblem(handle: string, max = 20): string {
-  if (handle.length < 3) return "At least 3 characters.";
-  if (handle.length > max) return `At most ${max} characters.`;
-  if (/[^a-z0-9_.]/.test(handle)) return "Only letters, numbers, _ and . (no spaces).";
-  if (!HANDLE_RE.test(handle) || handle.includes("..")) return "Can't start or end with a dot, or have two dots in a row.";
+export function handleFormatProblem(name: string, max = 20): string {
+  // Same rules as the server (backend/apps/accounts/names.py); it also checks reserved and rude words.
+  if (name.length < 4) return "At least 4 characters.";
+  if (name.length > max) return `At most ${max} characters.`;
+  if (/[^A-Za-z0-9_.]/.test(name)) return "Only letters, numbers, _ and . (no spaces).";
+  if (!/^[A-Za-z]/.test(name)) return "Start with a letter.";
+  if (!/[A-Za-z0-9]$/.test(name)) return "End with a letter or a number.";
+  if (/[_.]{2,}/.test(name)) return "No two _ or . in a row.";
+  if ((name.match(/[A-Za-z]/g) ?? []).length < 2) return "Use at least 2 letters.";
+  if (/\d{6,}/.test(name)) return "No long numbers (like a phone number) in a name.";
   return "";
 }
 

@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { HandleStatus, useHandleCheck } from "@/components/HandleStatus";
+import { handleFormatProblem, HandleStatus, useHandleCheck } from "@/components/HandleStatus";
 import { ApiError, setAvatar, updateMe, type ChatUser } from "@/lib/api";
 import { useChat } from "../ChatProvider";
 import { Avatar, Icon } from "../bits";
 
-const NAME_RE = /^[A-Za-z0-9_.]{3,18}$/;
 
 
 function errorText(e: unknown, fallback: string) {
@@ -33,7 +32,8 @@ export default function EditProfileSheet({ me, onClose }: { me: ChatUser; onClos
   const h = handle.trim().replace(/^@/, "").toLowerCase();
   const handleChanged = h !== (me.handle ?? "");
   const nameChanged = name.trim() !== me.nickname;
-  const nameOk = NAME_RE.test(name.trim());
+  const nameProblem = handleFormatProblem(name.trim(), 18);
+  const nameOk = !nameProblem;
   const status = useHandleCheck(handle, { access: getAccess, mine: me.handle });
   const handleOk = !handleChanged || status.kind === "free";
 
@@ -137,7 +137,7 @@ export default function EditProfileSheet({ me, onClose }: { me: ChatUser; onClos
             aria-invalid={!nameOk}
           />
           <small className={nameOk ? "muted-text" : "ep-error"}>
-            {nameOk ? "What people see in chats. You can change it 3 times a day." : "3 to 18 letters, numbers, dots or underscores."}
+            {nameOk ? "What people see in chats. You can change it 3 times a day." : nameProblem}
           </small>
         </label>
 

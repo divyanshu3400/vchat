@@ -169,7 +169,7 @@ export default function JoinForm() {
       <p className="form-msg" role="status">
         {error}
       </p>
-      <p className="fine">No email or phone number needed. Letters, numbers, dots and underscores only.</p>
+      <p className="fine">No email or phone number needed. 4–18 letters or numbers, starting with a letter; _ and . are fine.</p>
       <p className="fine">
         Saved your account before?{" "}
         <Link href="/login" className="text-link">

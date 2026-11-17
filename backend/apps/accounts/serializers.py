@@ -1,11 +1,6 @@
-import re
-
 from rest_framework import serializers
 
 from .models import User
-
-NICKNAME_RE = re.compile(r"^[A-Za-z0-9_.]{3,18}$")
-RESERVED = {"admin", "administrator", "mod", "moderator", "vchat", "support", "system", "staff"}
 
 
 class GuestSignupSerializer(serializers.Serializer):
@@ -14,12 +9,11 @@ class GuestSignupSerializer(serializers.Serializer):
     age_confirmed = serializers.BooleanField()
 
     def validate_nickname(self, value: str) -> str:
-        if not NICKNAME_RE.match(value):
-            raise serializers.ValidationError(
-                "Use 3 to 18 letters, numbers, dots or underscores."
-            )
-        if value.lower().strip("._") in RESERVED:
-            raise serializers.ValidationError("That nickname is reserved. Pick another.")
+        from .names import name_problem
+
+        problem = name_problem(value, 18)
+        if problem:
+            raise serializers.ValidationError(problem)
         return value
 
     def validate_age_confirmed(self, value: bool) -> bool:
