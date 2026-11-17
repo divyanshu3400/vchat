@@ -59,7 +59,7 @@ else
   server_tty = $(server)
 endif
 
-.PHONY: sync _sync-only help install dev-api dev-web migrate migrations shell test lint typecheck check deploy deploy-web deploy-api _clean-tree _bundle _ship status ps logs logs-f version env-keys restart ssh server-shell createsuperuser purge-dry purge backup backups set-env
+.PHONY: layout sync _sync-only help install dev-api dev-web migrate migrations shell test lint typecheck check deploy deploy-web deploy-api _clean-tree _bundle _ship status ps logs logs-f version env-keys restart ssh server-shell createsuperuser purge-dry purge backup backups set-env
 help: ## Show this list
 	@echo "vChat commands (make <name>):"
 	@grep -hE '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:.*## /|/' | awk -F'|' '{ printf "  \033[1m%-16s\033[0m %s\n", $$1, $$2 }'
@@ -95,6 +95,11 @@ typecheck: ## Website type check (TypeScript)
 	cd web && npx tsc --noEmit -p .
 
 check: test lint typecheck ## Everything that must pass before a deploy
+
+layout: ## Layout checks: every screen at 375/768/1366/1920/2560 (needs make dev-api and make dev-web running)
+	$(DJANGO) seed_layout_fixture --out ../web/e2e/.fixture.json > /dev/null
+	cd web && npx playwright test
+	@echo "Screenshots: web/e2e/screenshots/<size>/<screen>.png"
 
 
 # --- deploy ---

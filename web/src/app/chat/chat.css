@@ -1226,6 +1226,9 @@ html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); 
 @container screen (min-width: 1000px) {
   .conversation .messages { padding-inline: max(22px, calc((100% - 880px) / 2)); }
   .conversation .composer-wrap { padding-inline: max(0px, calc((100% - 900px) / 2)); }
+  /* The divider above the typing box still runs the full width. */
+  .conversation .composer-wrap { border-top: 1px solid var(--line); }
+  .conversation .composer-wrap .composer { border-top: 0; }
 }
 
 /* Hover tools (react / reply) float beside the bubble instead of taking its width. */
@@ -1254,3 +1257,8 @@ html.in-call-bar .app { margin-top: calc(44px + env(safe-area-inset-top, 0px)); 
 .info-section p { font-size: 14px; color: var(--muted); line-height: 1.5; }
 .info-members { display: grid; gap: 2px; }
 .info-members .room-member { padding: 6px 0; }
+/* The card decides by its own width: under ~245px inside, Join/Open goes on its own row. */
+.invite-card:not(.loading):not(.gone) { container-type: inline-size; }
+@container (max-width: 245px) {
+  .invite-card .invite-join { flex-basis: 100%; }
+}
