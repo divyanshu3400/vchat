@@ -40,7 +40,7 @@ export default function OpenGraphImage() {
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", width: 640 }}>
           <div style={{ display: "flex", fontSize: 44, fontWeight: 800, color: "#0e8a5a", letterSpacing: -1 }}>vchat</div>
           <div style={{ display: "flex", fontSize: 76, fontWeight: 800, color: "#0f241a", lineHeight: 1.02, marginTop: 18, letterSpacing: -2 }}>
-            Strangers tonight. Friends by morning.
+            Meet new people. Make friends.
           </div>
           <div style={{ display: "flex", fontSize: 30, color: "#4d685b", marginTop: 26 }}>
             Free anonymous chat rooms · no sign-up · 18+

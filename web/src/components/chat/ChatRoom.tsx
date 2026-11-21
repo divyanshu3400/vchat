@@ -16,7 +16,6 @@ import {
 } from "@/lib/api";
 import { refreshRoomPresence, useRoomPresence } from "@/lib/presence";
 import { findRoom } from "@/lib/rooms";
-import AdSlot from "@/components/AdSlot";
 import { HEARTBEAT_MS, useChat } from "./ChatProvider";
 import { ChatHeader } from "./ChatShell";
 import { useDock } from "./Dock";
@@ -302,8 +301,6 @@ export default function ChatRoom({ slug }: { slug: string }) {
         }
       />
       <RoomInfoPanel slug={slug} custom={info} hereNow={hereNow} onInvite={() => setSheet(true)} />
-      {/* Phone only: below the header, away from the typing box (no accidental taps). */}
-      <AdSlot kind="anchor" className="room-anchor" />
 
       <div className="messages" ref={listRef} onScroll={scroll.onScroll} aria-live="polite" aria-relevant="additions">
         {hasMore && (

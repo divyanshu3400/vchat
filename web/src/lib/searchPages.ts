@@ -147,7 +147,7 @@ export const SEARCH_PAGES: SearchPage[] = [
       ["Can I chat without creating an account?", "Yes. You chat as a guest with just a name. Saving the account is optional."],
       ["Is my IP address or phone shown to others?", "No. Other people never see your IP, email or phone. They see only the name you picked."],
       ["What happens to my chats?", "Random chats are deleted after 7 days. Friend chats delete after the time you set. You can also delete your account."],
-      ["Do I have to be 18?", "Yes. vChat is for adults only, 18 and older."],
+      ["Do I have to be 18?", "Yes. vChat is only for people aged 18 and older."],
     ],
     related: ["random-chat", "talk-to-strangers-india", "late-night-chat"],
   },
@@ -263,6 +263,95 @@ export const SEARCH_PAGES: SearchPage[] = [
       ["What if someone is rude?", "Tap the shield to report and leave, or block them. Moderators review every report."],
     ],
     related: ["talk-to-strangers-india", "anonymous-chat-no-login", "make-friends-online"],
+  },
+  {
+    slug: "chat-safety-tips",
+    title: "How to Chat Safely With Strangers Online: 10 Tips",
+    description:
+      "Practical tips for chatting safely with people you meet online: what not to share, how to spot scams and blackmail, and when to block and report.",
+    eyebrow: "Safety guide",
+    h1: "How to chat safely with strangers online",
+    lede: "Meeting new people online is fun, and a few habits keep it that way. Here's what to share, what never to share, and how to spot trouble early.",
+    cta: { label: "Read how vChat keeps chats safe", href: "/safety" },
+    second: RANDOM,
+    points: [
+      { title: "Keep your details", text: "Your phone number, address, school, workplace and social accounts can wait until you really know someone." },
+      { title: "Money is a red flag", text: "Anyone asking for money, gift cards, crypto, an OTP or a password is running a scam, whatever the story." },
+      { title: "Stay on the platform", text: "Moving to another app early is how most blackmail starts: you lose the report button and the other person gains your number." },
+      { title: "Trust the bad feeling", text: "You don't owe anyone a reply. Block, report and move on. It takes one tap." },
+    ],
+    sections: [
+      {
+        h2: "Ten habits that keep you safe",
+        paras: [
+          "1. Use a nickname, not your full name. 2. Don't share your phone number, address or social accounts early. 3. Never send money, gift cards, OTPs or passwords. 4. Don't send photos or videos of yourself to someone you just met: they can be saved and misused. 5. Be careful with links from strangers; on vChat you're asked before one opens.",
+          "6. Keep calls for people you trust. 7. If a chat turns sexual or pushy, end it. 8. Watch for stories that go from \"hi\" to \"I need help\" fast. 9. Report people who break the rules, so they can't do it to the next person. 10. If someone threatens you, keep the evidence, block them, and contact the police or a cyber-crime helpline.",
+        ],
+      },
+      {
+        h2: "If something already went wrong",
+        paras: [
+          "Don't pay a blackmailer: paying rarely makes it stop. Save screenshots, block the account, report it on the platform, and contact your local cyber-crime cell. In India you can report online at cybercrime.gov.in or call 1930. If you're thinking about hurting yourself, contact a crisis helpline or emergency services now.",
+        ],
+      },
+    ],
+    faq: [
+      ["Is it safe to talk to strangers online?", "It can be, if you keep personal details to yourself, never send money, and use a site with block and report buttons and active moderation."],
+      ["What should I never share with someone I just met?", "Your phone number, address, passwords, OTPs, bank details, and photos or videos of yourself."],
+      ["What do I do if someone threatens to leak my photos?", "Don't pay. Save evidence, block and report the account, and contact the cyber-crime police (in India: cybercrime.gov.in or 1930)."],
+      ["How does vChat help?", "One-tap block and report, moderators who review reports, warnings before sharing contact details or opening links, and no sexual content allowed."],
+    ],
+    related: ["anonymous-chat-no-login", "conversation-starters", "make-friends-online"],
+  },
+  {
+    slug: "conversation-starters",
+    title: "40 Conversation Starters for Chatting With Someone New",
+    description:
+      "Good questions to start a chat with someone new, by mood: fun, deep, music and movies, travel and food. Skip the awkward \"hi\" and get a real conversation going.",
+    eyebrow: "Guide",
+    h1: "Conversation starters for chatting with someone new",
+    lede: "\"Hi\" and \"hru\" kill most chats in ten seconds. A good question does the opposite. Here are some that work, grouped by mood.",
+    cta: { label: "Try one in a random chat", href: "/?go=stranger#join" },
+    second: { label: "Find a room for your interests", href: "/#rooms" },
+    points: [
+      { title: "Ask, then share", text: "Answer your own question too. It shows you're actually there, not just collecting answers." },
+      { title: "Open, not yes/no", text: "\"What's the best thing you ate this week?\" beats \"Do you like food?\"." },
+      { title: "Follow the spark", text: "When they light up about something, ask one more question about it." },
+      { title: "Keep it light at first", text: "Save deep questions for when the chat is flowing. Never start with personal details." },
+    ],
+    sections: [
+      {
+        h2: "Fun and easy",
+        paras: [
+          "What's something you're weirdly good at? · What's the last thing that made you laugh out loud? · Tea or coffee, and how strong? · What would you do with a free day and no phone? · What's a small thing that instantly makes your day better? · Which fictional world would you live in? · What's your most-used emoji, honestly? · What's a hobby you'd try if it were free?",
+        ],
+      },
+      {
+        h2: "Music, movies and games",
+        paras: [
+          "What song have you had on repeat lately? · Which movie could you watch ten times? · What's an underrated show everyone should watch? · Which game have you sunk the most hours into? · Which artist would you see live, anywhere in the world? · Hindi, English or regional songs: what's on your playlist? · What's a movie that changed how you think about something? · Who's your all-time favourite cricketer or footballer, and why?",
+        ],
+      },
+      {
+        h2: "Travel and food",
+        paras: [
+          "Where's the best place you've ever been? · Which city would you move to tomorrow? · What's your comfort food? · What's the best street food in your city? · Mountains or beach? · What's one dish you can cook really well? · Which country's food do you want to try next? · What's the most underrated place near you?",
+        ],
+      },
+      {
+        h2: "A little deeper",
+        paras: [
+          "What's something you changed your mind about recently? · What's a goal you're quietly working on? · What's the best advice anyone gave you? · What do people usually get wrong about you? · What would your younger self be surprised by? · What does a good day look like for you? · What are you looking forward to this month? · What's a small win you had this week?",
+        ],
+      },
+    ],
+    faq: [
+      ["What's a good first message to a stranger?", "A light, open question about something everyone has an opinion on, like music, food or a favourite movie, plus your own answer."],
+      ["How do I keep a conversation going?", "Ask follow-up questions about what they enjoy, share a bit about yourself, and avoid yes/no questions."],
+      ["What should I avoid asking at first?", "Personal details like their full name, phone number, where they live, or photos. Let trust build first."],
+      ["Does vChat help with this?", "Yes. Every random chat starts with an opener question you can send in one tap, and people with shared interests are matched first."],
+    ],
+    related: ["random-chat", "make-friends-online", "chat-safety-tips"],
   },
 ];
 

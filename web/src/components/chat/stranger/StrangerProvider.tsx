@@ -7,6 +7,9 @@ import type { Attachment, ReplyPreview, StrangerMessage, StrangerPartner } from 
 import { MAX_INTERESTS, iceBreaker, saveInterests, savedInterests } from "@/lib/interests";
 import { useChat } from "../ChatProvider";
 
+/** Ad screens between random chats: off (see next()). */
+const ADS_INTERSTITIALS = false;
+
 /**
  * Random 1-on-1 chat state. Lives in the app shell, so a chat survives moving between screens;
  * the conversation itself runs on the personal socket (see apps/stranger/consumer.py).
@@ -323,7 +326,8 @@ export default function StrangerProvider({ children }: { children: React.ReactNo
   const next = useCallback(() => {
     skips.current += 1;
     const due = skips.current % SKIPS_PER_INTERSTITIAL === 0;
-    if (ADS_ON && !plusRef.current && due && Date.now() - lastInterstitial.current > INTERSTITIAL_GAP_MS) {
+    // Off: AdSense doesn't allow our own countdown ad screens. Kept for an approved format later.
+    if (ADS_INTERSTITIALS && ADS_ON && !plusRef.current && due && Date.now() - lastInterstitial.current > INTERSTITIAL_GAP_MS) {
       lastInterstitial.current = Date.now();
       // End the current chat now; the next search starts when the ad is closed.
       if (phaseRef.current === "chatting") sendRaw({ type: "stranger.leave" });

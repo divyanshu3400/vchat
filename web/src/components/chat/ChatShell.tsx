@@ -238,9 +238,12 @@ function Frame({ children }: { children: React.ReactNode }) {
           <ConversationList />
         </aside>
         <main className="screen">{children}</main>
-        <aside className="ad-rail" aria-label="Advertisement">
-          <AdSlot kind="sky" />
-        </aside>
+        {/* Ads only beside our own content (home, rooms), never next to a conversation. */}
+        {!inConversation && (
+          <aside className="ad-rail" aria-label="Advertisement">
+            <AdSlot kind="sky" />
+          </aside>
+        )}
         {!inConversation && <AdSlot kind="anchor" className="phone-anchor" />}
         {!inConversation && <TabBar pathname={pathname} />}
       </div>

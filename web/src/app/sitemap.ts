@@ -16,10 +16,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
       lastModified: new Date(SEARCH_PAGES_UPDATED),
     })),
-    ...["about", "rules", "privacy", "terms", "report", "contact"].map((p) => ({
+    ...["about", "safety", "rules", "privacy", "terms", "report", "contact"].map((p) => ({
       url: `${SITE_URL}/${p}`,
       changeFrequency: "monthly" as const,
-      priority: p === "about" || p === "rules" ? 0.6 : 0.3,
+      priority: p === "about" || p === "rules" || p === "safety" ? 0.6 : 0.3,
       lastModified: LEGAL_UPDATED,
     })),
     ...ALL_ROOMS.map((r) => ({

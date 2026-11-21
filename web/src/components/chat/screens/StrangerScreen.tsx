@@ -147,7 +147,7 @@ function IdleView() {
   );
 }
 
-function SearchingView({ compact = false }: { compact?: boolean }) {
+function SearchingView() {
   const { waiting, cancel, region, want, notice } = useStranger();
   const [tip, setTip] = useState(0);
   useEffect(() => {
@@ -168,7 +168,6 @@ function SearchingView({ compact = false }: { compact?: boolean }) {
         <p className="st-tip">{TIPS[tip]}</p>
         {notice && <p className="chat-notice">{notice}</p>}
       </div>
-      {!compact && <AdSlot kind="rect" className="st-rect" />}
       <button type="button" className="pill-btn" onClick={cancel}>
         Cancel
       </button>
@@ -701,7 +700,7 @@ export function StrangerWindow({ win }: { win: WinControls }) {
         </div>
         <WinButtons win={win} />
       </header>
-      {!win.minimized && (phase === "searching" ? <SearchingView compact /> : <IdleView />)}
+      {!win.minimized && (phase === "searching" ? <SearchingView /> : <IdleView />)}
       {interstitial && ADS_ON && <Interstitial onDone={finishInterstitial} />}
     </div>
   );

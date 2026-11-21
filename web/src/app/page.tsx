@@ -68,7 +68,7 @@ export default function Home() {
           <div>
             <span className="eyebrow">Anonymous chat · No sign-up · 18+</span>
             <h1>
-              Strangers tonight. <em>Friends</em> by morning.
+              Meet new people. Make <em>friends</em>.
             </h1>
             <p className="lede">
               Jump into live chat rooms with people from all over the world. Pick a name and you&apos;re in. No email,

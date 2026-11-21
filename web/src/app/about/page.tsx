@@ -6,7 +6,7 @@ import { SITE } from "@/lib/site";
 export const metadata: Metadata = {
   title: "About vChat",
   description:
-    "vChat is a free, anonymous chat site for adults: live rooms by region and topic, one-on-one random chat, friends, voice and video calls.",
+    "vChat is a free, anonymous chat site for people 18 and older: live rooms by region and topic, one-on-one random chat, friends, voice and video calls.",
   alternates: { canonical: "/about" },
 };
 
@@ -39,7 +39,7 @@ export default function AboutPage() {
 
       <h2>Safety</h2>
       <p>
-        vChat is for adults only (18+). Everyone can block or report anyone in one tap, spam is muted automatically, and
+        vChat is only for people aged 18 and older. Everyone can block or report anyone in one tap, spam is muted automatically, and
         reports are reviewed by people. Read the <Link href="/rules">chat rules</Link> to see what isn&apos;t allowed and what
         happens when someone breaks them.
       </p>

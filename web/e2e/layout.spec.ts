@@ -60,6 +60,8 @@ test.describe("public pages", () => {
     ["seo-india", "/talk-to-strangers-india"],
     ["seo-hindi", "/hindi-chat-room"],
     ["room-page", "/rooms/hindi"],
+    ["safety", "/safety"],
+    ["guide-starters", "/conversation-starters"],
   ] as const) {
     test(label, async ({ page }) => {
       await page.goto(path.replace("{code}", fx.invite_code));

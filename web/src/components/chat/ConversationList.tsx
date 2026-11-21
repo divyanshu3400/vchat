@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useId, useMemo, useState } from "react";
-import AdSlot from "@/components/AdSlot";
-import { ADS_ON, NATIVE_EVERY } from "@/lib/ads";
 import type { ChatUser } from "@/lib/api";
 import { useRoomPresence } from "@/lib/presence";
 import { ALL_ROOMS } from "@/lib/rooms";
@@ -81,7 +79,7 @@ function FriendRequests() {
 export default function ConversationList() {
   const pathname = usePathname();
   const { me, friends, conversations, unread, socketLive } = useChat();
-  const { openChat, openRandom, isDesktop, parked } = useDock();
+  const { openChat, openRandom, parked } = useDock();
   const stranger = useStranger();
   const nameOf = (id: number) =>
     friends.find((f) => f.user.id === id)?.user.nickname ?? conversations.find((c) => c.user.id === id)?.user.nickname ?? "Chat";
@@ -322,10 +320,9 @@ export default function ConversationList() {
                     : "No chats yet. Join a room or talk to a stranger, then add the people you like."}
               </p>
             )}
-            {shownPeople.map((p, i) => (
+            {shownPeople.map((p) => (
               <Fragment key={p.user.id}>
                 {personRow(p)}
-                {ADS_ON && !isDesktop && (i + 1) % NATIVE_EVERY === 0 && <AdSlot kind="native" className="conv-native" />}
               </Fragment>
             ))}
             {q.length >= 2 && <PeopleSearch query={query} skip={new Set(shownPeople.map((p) => p.user.id))} />}

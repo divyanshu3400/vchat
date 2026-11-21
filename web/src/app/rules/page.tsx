@@ -14,14 +14,15 @@ export default function RulesPage() {
       title="Chat rules"
       intro="vChat works when people treat each other like people. These rules apply in rooms, random chats, private messages and calls."
     >
-      <h2>1. Adults only</h2>
+      <h2>1. 18+ only</h2>
       <p>You must be 18 or older. If someone looks or says they are under 18, report them and stop talking to them.</p>
 
       <h2>2. Be decent</h2>
       <ul>
         <li>No harassment, threats, stalking, or pushing someone who said no.</li>
         <li>No hate speech or slurs about race, religion, caste, nationality, gender, sexuality or disability.</li>
-        <li>No sexual messages, photos or calls with someone who didn&apos;t clearly agree, and never in public rooms.</li>
+        <li>No sexual content anywhere on vChat: no sexual messages, photos, videos, voice notes or calls, in rooms, random chats or private messages.</li>
+        <li>No nudity, and no asking anyone for photos or videos of themselves.</li>
       </ul>
 
       <h2>3. Never allowed</h2>
