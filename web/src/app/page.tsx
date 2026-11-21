@@ -153,7 +153,7 @@ export default function Home() {
                   <h3 style={{ marginTop: 12 }}>Your friend list lives on, even as a guest.</h3>
                   <p style={{ marginTop: 12 }}>
                     Message friends privately, see when they&apos;re online, and start a voice or video call. Save your
-                    account with an email to keep them on every device.
+                    account with a username and a password to keep them on every device.
                   </p>
                 </div>
                 <div className="friends" aria-label="Example friend list">
@@ -176,8 +176,8 @@ export default function Home() {
               </div>
               <div className="f">
                 <span className="tag">Calls</span>
-                <h3>Voice &amp; video, friends only</h3>
-                <p>Strangers can&apos;t call you. Only people you&apos;ve accepted as friends can.</p>
+                <h3>Calls on your terms</h3>
+                <p>Video calls are for friends only. In a random chat, a voice call starts only if you both say yes.</p>
               </div>
               <div className="f">
                 <span className="tag">Control</span>
